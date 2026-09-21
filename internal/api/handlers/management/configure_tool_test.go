@@ -25,7 +25,7 @@ func TestConfigureClaudeCodeWritesSettings(t *testing.T) {
 	os.Setenv("USERPROFILE", home)
 	defer os.Setenv("USERPROFILE", origUserProfile)
 
-	resp, errCfg := configureClaudeCode("http://127.0.0.1:8317", "test-key-123")
+	resp, errCfg := configureClaudeCode("http://127.0.0.1:8317", "test-key-123", "claude-sonnet-4-20250514")
 	if errCfg != nil {
 		t.Fatalf("configureClaudeCode failed: %v", errCfg)
 	}

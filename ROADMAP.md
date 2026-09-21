@@ -298,6 +298,18 @@ For tools that connect only to hardcoded vendor endpoints:
     - `🖥️ IDEs (Direct API)` — Cursor, Windsurf, VS Code (Continue.dev), VS Code (Cline).
     - `🛡️ IDEs (MITM Proxy)` — VS Code (Copilot), Google Antigravity IDE, Root CA Cert setup.
     - Server status badge (`127.0.0.1:8317`) and active port indicator.
+- **Per-Tool Model Configuration & Reset Lifecycle (Tool → Model → Apply → Reset)**:
+  - Replaces global single-model assignment with independent per-tool model selection:
+    - **Claude Code CLI**: configurable model (e.g. `claude-3-7-sonnet`, `claude-3-5-sonnet`) saved into `~/.claude/settings.json`.
+    - **OpenAI Codex CLI**: configurable model (e.g. `gpt-4o`, `o3-mini`, `codex-v2`) exported or saved into user env.
+    - **IDEs (Cursor, Continue, Cline, VS Code)**: model persisted into respective extension/IDE settings.
+  - **4-Step Tool Configuration UX**:
+    1. **Select Tool**: Click any CLI or IDE card from the vertical sidebar view.
+    2. **Select Model**: Dedicated model picker displaying active models for that specific tool.
+    3. **Apply Configuration**: 1-click apply sending `{tool, api_key, model}` to `POST /v0/management/configure-tool`.
+    4. **Reset Tool**: Explicit post-apply action prompting tool restart:
+       - Terminal/CLI: prompt to reopen terminal or reload shell with test command snippet.
+       - IDEs: prompt to reload window (`Developer: Reload Window`) or restart IDE to load new config.
 - **9router-Style Visual Design & Provider Icons**:
   - Crisp, authentic brand SVG icons for every tool and provider (matching 9router visual language):
     - **Claude Code**: Anthropic orange sunburst icon.

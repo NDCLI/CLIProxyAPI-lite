@@ -172,7 +172,7 @@ body{
   margin-top:2px;
 }
 
-/* Controls Panel */
+/* Controls Header */
 .controls-card{
   background:var(--card);
   border:1px solid var(--border);
@@ -183,6 +183,7 @@ body{
 .controls-row{
   display:flex;
   align-items:center;
+  justify-content:space-between;
   gap:16px;
   flex-wrap:wrap;
 }
@@ -229,32 +230,6 @@ body{
 .btn-outline:hover{color:var(--text);border-color:var(--accent);background:rgba(255,255,255,0.03)}
 .btn-sm{padding:5px 10px;font-size:12px}
 
-/* Model Chips */
-.model-section{
-  margin-top:12px;
-  padding-top:12px;
-  border-top:1px solid var(--border);
-  display:flex;
-  align-items:center;
-  gap:12px;
-  flex-wrap:wrap;
-}
-.model-chips{
-  display:flex;
-  flex-wrap:wrap;
-  gap:6px;
-}
-.model-chip{
-  padding:4px 10px;
-  background:var(--bg);
-  border:1px solid var(--border);
-  border-radius:14px;
-  font-size:12px;
-  cursor:pointer;
-  transition:all .15s;
-}
-.model-chip:hover{border-color:var(--accent);color:var(--accent-hover)}
-.model-chip.selected{background:var(--accent);border-color:var(--accent);color:#fff}
 .test-result{
   margin-top:12px;
   padding:10px 14px;
@@ -287,7 +262,7 @@ body{
   margin-bottom:24px;
 }
 
-/* The 9router horizontal card */
+/* Horizontal Tool Card */
 .card{
   background:var(--card);
   border:1px solid var(--border);
@@ -298,9 +273,10 @@ body{
   justify-content:space-between;
   gap:14px;
   transition:border-color .15s ease, background .15s ease;
+  cursor:pointer;
 }
 .card:hover{
-  border-color:#3f3f4c;
+  border-color:#4a4a58;
   background:var(--card-hover);
 }
 .card-left{
@@ -320,7 +296,6 @@ body{
   box-shadow:inset 0 0 0 1px rgba(255,255,255,0.06);
 }
 
-/* Provider Icon Box Themes */
 .card-icon-box.claude{background:#2a1c18}
 .card-icon-box.antigravity{background:#151c2d}
 .card-icon-box.codex{background:#11221b}
@@ -341,6 +316,13 @@ body{
   overflow:hidden;
   text-overflow:ellipsis;
 }
+.card-meta{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-top:3px;
+  flex-wrap:wrap;
+}
 .card-status-pill{
   display:inline-flex;
   align-items:center;
@@ -348,7 +330,6 @@ body{
   font-size:11px;
   font-weight:500;
   color:var(--success);
-  margin-top:3px;
 }
 .card-status-pill .dot{
   width:6px;
@@ -356,26 +337,23 @@ body{
   border-radius:50%;
   background:var(--success);
 }
-.card-status-pill.offline{
-  color:var(--muted);
-}
-.card-status-pill.offline .dot{
-  background:var(--muted);
+.model-badge{
+  font-size:11px;
+  font-family:monospace;
+  padding:1px 6px;
+  border-radius:4px;
+  background:rgba(99,102,241,0.15);
+  color:var(--accent-hover);
+  max-width:150px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
 }
 .card-right{
   display:flex;
   align-items:center;
   gap:8px;
   flex-shrink:0;
-}
-
-/* Card Feedback Status */
-.card-status-msg{
-  grid-column:1 / -1;
-  font-size:12px;
-  padding:8px 12px;
-  border-radius:6px;
-  display:none;
 }
 
 /* MITM Banner */
@@ -407,6 +385,147 @@ body{
   color:var(--success);
   font-weight:600;
 }
+.card-status-msg{
+  font-size:12px;
+  padding:8px 12px;
+  border-radius:6px;
+  display:none;
+}
+
+/* Config Modal (Tool -> Model -> Apply -> Reset Tool) */
+.modal-overlay{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(3px);
+  z-index:2000;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+.modal-overlay.open{display:flex}
+.modal-box{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  width:100%;
+  max-width:560px;
+  box-shadow:0 20px 50px rgba(0,0,0,0.6);
+  animation:modalSlide .2s ease;
+  overflow:hidden;
+}
+@keyframes modalSlide{from{transform:scale(0.96);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-header{
+  padding:18px 22px;
+  border-bottom:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.modal-header-left{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+.modal-title{
+  font-size:16px;
+  font-weight:700;
+  color:#fff;
+}
+.modal-path{
+  font-size:11px;
+  color:var(--muted);
+  font-family:monospace;
+  margin-top:2px;
+}
+.modal-close{
+  background:transparent;
+  border:none;
+  color:var(--muted);
+  font-size:18px;
+  cursor:pointer;
+  padding:4px 8px;
+  border-radius:6px;
+}
+.modal-close:hover{color:#fff;background:rgba(255,255,255,0.06)}
+.modal-body{
+  padding:22px;
+}
+.step-box{
+  margin-bottom:20px;
+}
+.step-title{
+  font-size:13px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:0.5px;
+  color:#fff;
+  margin-bottom:8px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.step-num{
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  background:var(--accent);
+  color:#fff;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  font-size:11px;
+}
+.model-chips{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:10px;
+}
+.model-chip{
+  padding:5px 12px;
+  background:var(--bg);
+  border:1px solid var(--border);
+  border-radius:16px;
+  font-size:12px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.model-chip:hover{border-color:var(--accent);color:var(--accent-hover)}
+.model-chip.selected{background:var(--accent);border-color:var(--accent);color:#fff}
+
+/* Step 3: Reset Notification Box */
+.reset-box{
+  background:rgba(245,158,11,0.08);
+  border:1px solid rgba(245,158,11,0.3);
+  border-radius:8px;
+  padding:14px;
+  margin-top:16px;
+  display:none;
+}
+.reset-title{
+  font-size:13px;
+  font-weight:700;
+  color:var(--warn);
+  display:flex;
+  align-items:center;
+  gap:6px;
+  margin-bottom:6px;
+}
+.reset-desc{
+  font-size:12px;
+  color:var(--text);
+  line-height:1.5;
+}
+.modal-footer{
+  padding:16px 22px;
+  border-top:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:#17171c;
+}
 
 /* Toast */
 .toast{
@@ -416,7 +535,7 @@ body{
   padding:12px 18px;
   border-radius:8px;
   font-size:13px;
-  z-index:1000;
+  z-index:3000;
   animation:slideIn .25s ease;
   box-shadow:0 8px 24px rgba(0,0,0,0.5);
 }
@@ -443,7 +562,7 @@ body{
   </div>
 
   <nav class="sidebar-nav">
-    <div class="nav-heading">Kết nối Tools</div>
+    <div class="nav-heading">Danh mục Tools</div>
     <button class="tab-btn active" onclick="switchTab('all')">
       <div class="tab-btn-left">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
@@ -504,33 +623,25 @@ body{
   <div class="top-bar">
     <div>
       <h1 class="page-title">Providers & Tools Connect</h1>
-      <p class="page-desc">Tự động cấu hình kết nối AI cho CLI Tools và IDEs theo phong cách 9router.</p>
+      <p class="page-desc">Nhấp vào từng Tool để chọn Model riêng, nhấn Apply rồi Reset tool để áp dụng.</p>
     </div>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-outline" onclick="testConnection()">🧪 Test All</button>
-      <button class="btn btn-orange" onclick="configureAllVisible()">⚡ Cấu hình TẤT CẢ</button>
+      <button class="btn btn-outline" onclick="testConnection()">🧪 Test Gateway</button>
     </div>
   </div>
 
-  <!-- Global Controls Panel -->
+  <!-- Global Controls Panel (API Key only) -->
   <div class="controls-card">
     <div class="controls-row">
       <div class="control-item">
-        <label class="control-label">API Key:</label>
+        <label class="control-label">Gateway API Key:</label>
         <select id="apiKeySelect" class="select-input">
           <option value="">Đang tải...</option>
         </select>
       </div>
-      <div class="control-item" id="clineModelWrap" style="display:none">
-        <label class="control-label">Cline Model:</label>
-        <select id="clineModelSelect" class="select-input" style="min-width:180px"></select>
+      <div style="font-size:12px;color:var(--muted)">
+        💡 Bấm vào bất kỳ Tool nào để mở hộp thoại <b>Chọn Model riêng → Apply → Reset Tool</b>
       </div>
-    </div>
-
-    <!-- Models List -->
-    <div id="modelSection" class="model-section" style="display:none">
-      <span class="control-label">Models:</span>
-      <div id="modelList" class="model-chips"></div>
     </div>
 
     <div id="testResult" class="test-result"></div>
@@ -538,21 +649,18 @@ body{
 
   <!-- Tab: ALL TOOLS -->
   <div id="pane-all" class="tab-pane active">
-    <!-- OAuth / CLI Providers -->
     <div class="section-header">
       <div class="section-title">CLI Tools</div>
       <button class="btn btn-outline btn-sm" onclick="switchTab('cli')">Mở tab CLI →</button>
     </div>
     <div class="grid" id="grid-cli-all"></div>
 
-    <!-- IDEs (Direct API) -->
     <div class="section-header">
       <div class="section-title">IDEs (Direct Base URL)</div>
       <button class="btn btn-outline btn-sm" onclick="switchTab('ide-direct')">Mở tab IDE Direct →</button>
     </div>
     <div class="grid" id="grid-direct-all"></div>
 
-    <!-- IDEs (MITM Proxy) -->
     <div class="section-header">
       <div class="section-title">IDEs (MITM Interception Proxy)</div>
       <button class="btn btn-outline btn-sm" onclick="switchTab('ide-mitm')">Mở tab MITM Proxy →</button>
@@ -601,24 +709,101 @@ body{
 
 </main>
 
+<!-- Interactive Configuration Modal: Tool -> Model -> Apply -> Reset Tool -->
+<div id="configModal" class="modal-overlay">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div class="modal-header-left">
+        <div id="modalIconBox" class="card-icon-box"></div>
+        <div>
+          <div id="modalToolTitle" class="modal-title">Tool Configuration</div>
+          <div id="modalToolPath" class="modal-path">config path</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Step 1: Select Model -->
+      <div class="step-box">
+        <div class="step-title">
+          <span class="step-num">1</span>
+          <span>Chọn Model riêng cho công cụ này</span>
+        </div>
+        <select id="modalModelSelect" class="select-input" style="width:100%" onchange="onModalModelSelectChange()">
+          <option value="">Mặc định của nhà cung cấp</option>
+        </select>
+        <div id="modalModelChips" class="model-chips"></div>
+      </div>
+
+      <!-- Step 2: Apply Button -->
+      <div class="step-box">
+        <div class="step-title">
+          <span class="step-num">2</span>
+          <span>Áp dụng cấu hình</span>
+        </div>
+        <button id="btnApplyModal" class="btn btn-primary" style="width:100%;justify-content:center" onclick="applyModalConfig()">
+          ⚡ Áp dụng Cấu hình (Apply)
+        </button>
+      </div>
+
+      <!-- Step 3: Reset Tool (Appears after Apply) -->
+      <div id="stepResetBox" class="reset-box">
+        <div class="reset-title">
+          <span>🔄</span>
+          <span>Bước 3: Khởi động lại tool (Reset Tool) để có hiệu lực!</span>
+        </div>
+        <div id="resetInstructions" class="reset-desc">
+          Vui lòng khởi động lại công cụ để nạp cấu hình vừa thay đổi.
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button id="btnCopyResetCmd" class="btn btn-outline btn-sm" onclick="copyResetCommand()">
+            📋 Copy lệnh thao tác
+          </button>
+          <button class="btn btn-orange btn-sm" onclick="closeModal()">
+            Hoàn tất & Đóng
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <div style="font-size:11px;color:var(--muted)">Gateway: 127.0.0.1:8317</div>
+      <button class="btn btn-outline btn-sm" onclick="closeModal()">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const BASE = window.location.origin;
 const MGMT = BASE + '/v0/management';
 let currentTab = 'all';
 let apiKeys = [];
 let models = [];
-let selectedModel = '';
+let activeModalTool = null;
+
+// Persistent per-tool configured models dictionary
+let toolModels = {
+  'claude-code': 'claude-3-7-sonnet',
+  'codex-cli': 'gpt-4o',
+  'env-openai': 'gpt-4o',
+  'env-anthropic': 'claude-3-5-sonnet',
+  'cursor': 'gpt-4o',
+  'vscode': 'claude-3-7-sonnet',
+  'continue': 'claude-3-7-sonnet',
+  'cline': 'gpt-4o',
+  'vscode-copilot': 'gpt-4o',
+  'antigravity-ide': 'claude-3-7-sonnet'
+};
 
 /* Exact 9router-style SVG Brand Icons */
 const SVGS = {
-  // Claude Code (Anthropic Starburst in white on terracotta)
   claude: `
     <svg viewBox="0 0 32 32" width="22" height="22">
       <circle cx="16" cy="16" r="3.2" fill="#fff"/>
       <path d="M16 3v5.5M16 23.5v5.5M3 16h5.5M23.5 16h5.5M6.8 6.8l4 4M21.2 21.2l4 4M6.8 25.2l4-4M21.2 10.8l4-4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
     </svg>
   `,
-  // Antigravity (Rainbow Loop Prism)
   antigravity: `
     <svg viewBox="0 0 32 32" width="24" height="24">
       <defs>
@@ -633,13 +818,11 @@ const SVGS = {
       <circle cx="16" cy="15" r="2.2" fill="url(#agGrad)"/>
     </svg>
   `,
-  // OpenAI Codex (Green/White Swirl)
   codex: `
     <svg viewBox="0 0 24 24" width="22" height="22" fill="#10a37f">
       <path d="M22.28 9.37a5.98 5.98 0 0 0-.52-4.99 6.07 6.07 0 0 0-6.61-2.82 6.02 6.02 0 0 0-4.7-2.3 6.06 6.06 0 0 0-5.78 4.2 6.02 6.02 0 0 0-4.04 2.92 6.06 6.06 0 0 0 .84 7.15 6 6 0 0 0 .52 4.98 6.07 6.07 0 0 0 6.61 2.82 6.04 6.04 0 0 0 4.7 2.3 6.06 6.06 0 0 0 5.78-4.2 6.02 6.02 0 0 0 4.04-2.92 6.06 6.06 0 0 0-.84-7.14zm-8.3 11.83a4.5 4.5 0 0 1-2.97-1.11l.13-.07 4.93-2.85a.77.77 0 0 0 .39-.67v-6.95l2.2 1.27a.08.08 0 0 1 .04.06v5.82a4.52 4.52 0 0 1-4.72 4.5zm-8.5-3.74a4.48 4.48 0 0 1-.55-3.13l.13.08 4.93 2.85a.78.78 0 0 0 .78 0l6.02-3.48v2.55a.08.08 0 0 1-.03.07l-5.04 2.91a4.52 4.52 0 0 1-6.24-1.85zm-1.8-8.9a4.5 4.5 0 0 1 2.42-2.02v5.85a.77.77 0 0 0 .39.67l6.02 3.48-2.2 1.27a.08.08 0 0 1-.07 0L4.4 12.38a4.52 4.52 0 0 1-.72-3.82zm14.36 2.35-6.02-3.48 2.2-1.27a.08.08 0 0 1 .07 0l5.04 2.91a4.52 4.52 0 0 1-.72 8.16v-5.65a.77.77 0 0 0-.57-.67zm2.5-3.32-.13-.08-4.93-2.85a.78.78 0 0 0-.78 0l-6.02 3.48V5.6a.08.08 0 0 1 .03-.07l5.04-2.91a4.52 4.52 0 0 1 6.79 4.97zM9.54 13.5l2.46-1.42 2.46 1.42v2.84l-2.46 1.42-2.46-1.42z"/>
     </svg>
   `,
-  // GitHub Copilot (Robot Head with visor eyes)
   copilot: `
     <svg viewBox="0 0 32 32" width="24" height="24">
       <rect x="5" y="7" width="22" height="18" rx="6" fill="#2d3748"/>
@@ -649,7 +832,6 @@ const SVGS = {
       <path d="M12 20.5h8" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
     </svg>
   `,
-  // Cursor (Isometric 3D Cube)
   cursor: `
     <svg viewBox="0 0 32 32" width="22" height="22">
       <polygon points="16,4 27,10 16,16 5,10" fill="#ffffff" />
@@ -657,7 +839,6 @@ const SVGS = {
       <polygon points="16,16 5,10 5,23 16,29" fill="#4b5563" />
     </svg>
   `,
-  // Cline (Purple Robot Avatar)
   cline: `
     <svg viewBox="0 0 32 32" width="22" height="22">
       <rect x="5" y="7" width="22" height="18" rx="5" fill="#818cf8"/>
@@ -667,19 +848,16 @@ const SVGS = {
       <rect x="13" y="19" width="6" height="1.8" rx="0.9" fill="#ffffff"/>
     </svg>
   `,
-  // Continue.dev (Cyan Triangle Play Button)
   continue: `
     <svg viewBox="0 0 32 32" width="22" height="22">
       <polygon points="10,7 24,16 10,25" fill="#0ea5e9"/>
     </svg>
   `,
-  // VS Code (Blue Ribbon)
   vscode: `
     <svg viewBox="0 0 24 24" width="22" height="22" fill="#007acc">
       <path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479l1.321 1.202c.379.345.94.368 1.277.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/>
     </svg>
   `,
-  // Shell / Environment
   env: `
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#9ca3af" stroke-width="2">
       <polyline points="4 17 10 11 4 5"></polyline>
@@ -697,7 +875,10 @@ const cardsData = [
     iconType: 'claude',
     title: 'Claude Code',
     status: '1 Connected',
-    target: 'claude-code'
+    target: 'claude-code',
+    path: '~/.claude/settings.json',
+    resetType: 'cli',
+    resetCmd: 'claude "hi"'
   },
   {
     id: 'codex-cli',
@@ -705,7 +886,10 @@ const cardsData = [
     iconType: 'codex',
     title: 'OpenAI Codex CLI',
     status: '1 Connected',
-    target: 'codex-cli'
+    target: 'codex-cli',
+    path: 'Windows Environment (setx OPENAI_MODEL)',
+    resetType: 'cli',
+    resetCmd: 'codex "hi"'
   },
   {
     id: 'env-openai',
@@ -713,7 +897,10 @@ const cardsData = [
     iconType: 'env',
     title: 'OpenAI Environment',
     status: '1 Connected',
-    target: 'env-openai'
+    target: 'env-openai',
+    path: 'User Environment Variables',
+    resetType: 'cli',
+    resetCmd: 'echo $env:OPENAI_MODEL'
   },
   {
     id: 'env-anthropic',
@@ -721,7 +908,10 @@ const cardsData = [
     iconType: 'env',
     title: 'Anthropic Environment',
     status: '1 Connected',
-    target: 'env-anthropic'
+    target: 'env-anthropic',
+    path: 'User Environment Variables',
+    resetType: 'cli',
+    resetCmd: 'echo $env:ANTHROPIC_MODEL'
   },
 
   // Direct IDEs
@@ -731,7 +921,10 @@ const cardsData = [
     iconType: 'cursor',
     title: 'Cursor IDE',
     status: '1 Connected',
-    target: 'cursor'
+    target: 'cursor',
+    path: '%APPDATA%/Cursor/User/settings.json',
+    resetType: 'ide',
+    resetCmd: 'Ctrl+Shift+P > Developer: Reload Window'
   },
   {
     id: 'vscode',
@@ -739,7 +932,10 @@ const cardsData = [
     iconType: 'vscode',
     title: 'VS Code (Claude Code)',
     status: '1 Connected',
-    target: 'vscode'
+    target: 'vscode',
+    path: '%APPDATA%/Code/User/settings.json',
+    resetType: 'ide',
+    resetCmd: 'Ctrl+Shift+P > Developer: Reload Window'
   },
   {
     id: 'continue',
@@ -747,7 +943,10 @@ const cardsData = [
     iconType: 'continue',
     title: 'Continue.dev',
     status: '1 Connected',
-    target: 'continue'
+    target: 'continue',
+    path: '~/.continue/config.json',
+    resetType: 'ide',
+    resetCmd: 'Ctrl+Shift+P > Developer: Reload Window'
   },
   {
     id: 'cline',
@@ -755,18 +954,23 @@ const cardsData = [
     iconType: 'cline',
     title: 'Cline',
     status: '1 Connected',
-    target: 'cline'
+    target: 'cline',
+    path: '%APPDATA%/Code/User/globalStorage/.../settings.json',
+    resetType: 'ide',
+    resetCmd: 'Ctrl+Shift+P > Developer: Reload Window'
   },
 
   // MITM IDEs
   {
-    id: 'copilot',
+    id: 'vscode-copilot',
     category: 'mitm',
     iconType: 'copilot',
     title: 'GitHub Copilot (VS Code)',
     status: 'MITM Mode',
     target: 'vscode-copilot',
-    isMitm: true
+    path: 'VS Code Proxy Setting (127.0.0.1:8318)',
+    resetType: 'ide',
+    resetCmd: 'Ctrl+Shift+P > Developer: Reload Window'
   },
   {
     id: 'antigravity-ide',
@@ -775,29 +979,33 @@ const cardsData = [
     title: 'Antigravity IDE',
     status: 'MITM Mode',
     target: 'antigravity-ide',
-    isMitm: true
+    path: 'Antigravity Proxy Env (HTTPS_PROXY: 8318)',
+    resetType: 'mitm',
+    resetCmd: 'Restart Antigravity IDE'
   }
 ];
 
 function createCardHTML(card, suffix = '') {
   const elemId = card.id + (suffix ? '-' + suffix : '');
   const iconSVG = SVGS[card.iconType] || SVGS.env;
+  const currentModel = toolModels[card.target] || 'Mặc định';
 
   return `
-    <div class="card" id="card-${elemId}">
+    <div class="card" id="card-${elemId}" onclick="openConfigModal('${card.target}')">
       <div class="card-left">
         <div class="card-icon-box ${card.iconType}">
           ${iconSVG}
         </div>
         <div class="card-info">
           <div class="card-title">${card.title}</div>
-          <div class="card-status-pill">
-            <span class="dot"></span> ${card.status}
+          <div class="card-meta">
+            <span class="card-status-pill"><span class="dot"></span> ${card.status}</span>
+            <span class="model-badge" id="badge-model-${card.target}">🎯 ${currentModel}</span>
           </div>
         </div>
       </div>
-      <div class="card-right">
-        <button class="btn btn-outline btn-sm" onclick="configureTool('${card.target}', '${elemId}')">Cấu hình</button>
+      <div class="card-right" onclick="event.stopPropagation()">
+        <button class="btn btn-outline btn-sm" onclick="openConfigModal('${card.target}')">⚙️ Cấu hình</button>
         <button class="btn btn-outline btn-sm" onclick="copySnippet('${card.target}')" title="Copy lệnh">📋</button>
       </div>
     </div>
@@ -832,11 +1040,6 @@ function switchTab(tabId) {
   });
   const targetPane = document.getElementById('pane-' + tabId);
   if (targetPane) targetPane.classList.add('active');
-
-  const clineWrap = document.getElementById('clineModelWrap');
-  if (clineWrap) {
-    clineWrap.style.display = (tabId === 'all' || tabId === 'ide-direct') ? 'flex' : 'none';
-  }
 }
 
 function getApiKey() {
@@ -849,6 +1052,133 @@ function showToast(msg, type = 'ok') {
   t.textContent = msg;
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3200);
+}
+
+/* Modal: Select Tool -> Select Model -> Apply -> Reset Tool */
+function openConfigModal(toolTarget) {
+  const card = cardsData.find(c => c.target === toolTarget);
+  if (!card) return;
+
+  activeModalTool = card;
+  const modal = document.getElementById('configModal');
+  const iconBox = document.getElementById('modalIconBox');
+  const title = document.getElementById('modalToolTitle');
+  const path = document.getElementById('modalToolPath');
+  const select = document.getElementById('modalModelSelect');
+  const chips = document.getElementById('modalModelChips');
+  const resetBox = document.getElementById('stepResetBox');
+  const btnApply = document.getElementById('btnApplyModal');
+
+  iconBox.className = 'card-icon-box ' + card.iconType;
+  iconBox.innerHTML = SVGS[card.iconType] || SVGS.env;
+  title.textContent = card.title;
+  path.textContent = '📁 ' + card.path;
+  resetBox.style.display = 'none';
+  btnApply.disabled = false;
+  btnApply.textContent = '⚡ Áp dụng Cấu hình (Apply)';
+
+  const currentModel = toolModels[toolTarget] || '';
+
+  // Populate models
+  select.innerHTML = '<option value="">Mặc định của nhà cung cấp</option>' +
+    models.map(m => `<option value="${m}"${m === currentModel ? ' selected' : ''}>${m}</option>`).join('');
+
+  chips.innerHTML = models.map(m =>
+    `<div class="model-chip${m === currentModel ? ' selected' : ''}" onclick="selectModalChip('${m}')">${m}</div>`
+  ).join('');
+
+  modal.classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('configModal').classList.remove('open');
+  activeModalTool = null;
+}
+
+function selectModalChip(modelName) {
+  const select = document.getElementById('modalModelSelect');
+  select.value = modelName;
+  document.querySelectorAll('#modalModelChips .model-chip').forEach(chip => {
+    chip.classList.toggle('selected', chip.textContent === modelName);
+  });
+}
+
+function onModalModelSelectChange() {
+  const select = document.getElementById('modalModelSelect');
+  document.querySelectorAll('#modalModelChips .model-chip').forEach(chip => {
+    chip.classList.toggle('selected', chip.textContent === select.value);
+  });
+}
+
+async function applyModalConfig() {
+  if (!activeModalTool) return;
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    showToast('Vui lòng chọn API key trước khi áp dụng', 'err');
+    return;
+  }
+
+  const model = document.getElementById('modalModelSelect').value;
+  const btnApply = document.getElementById('btnApplyModal');
+  const resetBox = document.getElementById('stepResetBox');
+  const resetDesc = document.getElementById('resetInstructions');
+
+  btnApply.disabled = true;
+  btnApply.textContent = '⏳ Đang lưu cấu hình...';
+
+  try {
+    const resp = await mgmtFetch('/configure-tool', {
+      method: 'POST',
+      body: JSON.stringify({
+        tool: activeModalTool.target,
+        api_key: apiKey,
+        model: model
+      })
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.error || 'Lỗi áp dụng');
+    }
+
+    // Save model to toolModels dictionary
+    toolModels[activeModalTool.target] = model || 'Mặc định';
+    renderAllGrids();
+
+    btnApply.textContent = '✅ Đã lưu cấu hình!';
+    showToast(`Đã lưu cấu hình cho ${activeModalTool.title}!`, 'ok');
+
+    // Display Step 3 (Reset Tool)
+    resetBox.style.display = 'block';
+    if (activeModalTool.resetType === 'cli') {
+      resetDesc.innerHTML = `
+        <b>Đóng và mở lại cửa sổ Terminal</b> (hoặc mở tab mới) để nạp biến môi trường và model <code>${model || 'mặc định'}</code> vừa lưu.<br>
+        Lệnh test nhanh: <code>${activeModalTool.resetCmd}</code>
+      `;
+    } else if (activeModalTool.resetType === 'ide') {
+      resetDesc.innerHTML = `
+        <b>Khởi động lại IDE hoặc Reload Window</b> để nạp cấu hình mới:<br>
+        Nhấn phím <b>Ctrl + Shift + P</b> (hoặc Cmd+Shift+P trên Mac) → gõ <b>Developer: Reload Window</b>.
+      `;
+    } else {
+      resetDesc.innerHTML = `
+        <b>Khởi động lại Antigravity IDE / VS Code</b> để kết nối qua cổng MITM Proxy <code>127.0.0.1:8318</code> với chứng chỉ Root CA.
+      `;
+    }
+
+  } catch (e) {
+    btnApply.disabled = false;
+    btnApply.textContent = '⚡ Thử lại (Apply)';
+    showToast('Lỗi: ' + e.message, 'err');
+  }
+}
+
+function copyResetCommand() {
+  if (!activeModalTool) return;
+  const cmd = activeModalTool.resetCmd || 'Developer: Reload Window';
+  navigator.clipboard.writeText(cmd).then(() => {
+    showToast(`Đã copy: "${cmd}"`, 'ok');
+  });
 }
 
 async function mgmtFetch(path, opts) {
@@ -883,34 +1213,9 @@ async function loadModels() {
     if (!resp.ok) return;
     const data = await resp.json();
     models = (data.data || []).map(m => m.id).sort();
-    renderModels();
   } catch (e) {
     console.error('loadModels:', e);
   }
-}
-
-function renderModels() {
-  const section = document.getElementById('modelSection');
-  const list = document.getElementById('modelList');
-  const clineSel = document.getElementById('clineModelSelect');
-
-  if (models.length === 0) {
-    section.style.display = 'none';
-    return;
-  }
-  section.style.display = 'flex';
-  list.innerHTML = models.map(m =>
-    `<div class="model-chip${m === selectedModel ? ' selected' : ''}" onclick="selectModel('${m}')">${m}</div>`
-  ).join('');
-
-  if (clineSel) {
-    clineSel.innerHTML = '<option value="">Mặc định</option>' + models.map(m => `<option value="${m}">${m}</option>`).join('');
-  }
-}
-
-function selectModel(m) {
-  selectedModel = selectedModel === m ? '' : m;
-  renderModels();
 }
 
 async function testConnection() {
@@ -946,56 +1251,29 @@ async function testConnection() {
   }
 }
 
-async function configureTool(tool, elemId) {
-  const apiKey = getApiKey();
-  if (!apiKey) {
-    showToast('Chọn API key trước', 'err');
-    return;
-  }
-
-  try {
-    let model = selectedModel;
-    const clineModelSelect = document.getElementById('clineModelSelect');
-    if (tool === 'cline' && clineModelSelect && clineModelSelect.value) {
-      model = clineModelSelect.value;
-    }
-
-    const resp = await mgmtFetch('/configure-tool', {
-      method: 'POST',
-      body: JSON.stringify({ tool, api_key: apiKey, model }),
-    });
-
-    const data = await resp.json();
-    if (!resp.ok) {
-      showToast('❌ Lỗi: ' + (data.error || 'unknown'), 'err');
-      return;
-    }
-
-    showToast('✅ ' + data.message, 'ok');
-  } catch (e) {
-    showToast('❌ ' + e.message, 'err');
-  }
-}
-
 function copySnippet(tool) {
   const key = getApiKey() || 'YOUR_API_KEY';
+  const model = toolModels[tool] || '';
   let snippet = '';
   switch (tool) {
     case 'claude-code':
       snippet = `export ANTHROPIC_BASE_URL="${BASE}"\nexport ANTHROPIC_API_KEY="${key}"`;
+      if (model) snippet += `\nexport ANTHROPIC_MODEL="${model}"`;
       break;
     case 'codex-cli':
     case 'env-openai':
       snippet = `export OPENAI_BASE_URL="${BASE}/v1"\nexport OPENAI_API_KEY="${key}"`;
+      if (model) snippet += `\nexport OPENAI_MODEL="${model}"`;
       break;
     case 'env-anthropic':
       snippet = `export ANTHROPIC_BASE_URL="${BASE}"\nexport ANTHROPIC_API_KEY="${key}"`;
+      if (model) snippet += `\nexport ANTHROPIC_MODEL="${model}"`;
       break;
     case 'cursor':
-      snippet = `{"openai.apiBaseUrl": "${BASE}/v1"}`;
+      snippet = `{"openai.apiBaseUrl": "${BASE}/v1", "openai.model": "${model || 'gpt-4o'}"}`;
       break;
     case 'vscode':
-      snippet = `{"claude-code.apiBaseUrl": "${BASE}"}`;
+      snippet = `{"claude-code.apiBaseUrl": "${BASE}", "claude-code.model": "${model || 'claude-3-7-sonnet'}"}`;
       break;
     case 'vscode-copilot':
       snippet = `{"http.proxy": "http://127.0.0.1:8318", "http.proxyStrictSSL": false}`;
@@ -1047,20 +1325,13 @@ async function autoInstallRootCA() {
   }
 }
 
-async function configureAllVisible() {
-  let cards = [];
-  if (currentTab === 'cli') cards = cardsData.filter(c => c.category === 'cli');
-  else if (currentTab === 'ide-direct') cards = cardsData.filter(c => c.category === 'direct');
-  else if (currentTab === 'ide-mitm') cards = cardsData.filter(c => c.category === 'mitm');
-  else cards = cardsData;
-
-  for (const c of cards) {
-    await configureTool(c.target, c.id);
+// Close modal when clicking outside
+window.onclick = function(event) {
+  const modal = document.getElementById('configModal');
+  if (event.target === modal) {
+    closeModal();
   }
-  showToast('Đã áp dụng cấu hình cho toàn bộ mục được chọn!', 'ok');
-}
-
-document.getElementById('apiKeySelect').addEventListener('change', loadModels);
+};
 
 (async function init() {
   renderAllGrids();

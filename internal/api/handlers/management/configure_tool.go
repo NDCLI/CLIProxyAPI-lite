@@ -48,21 +48,21 @@ func (h *Handler) ConfigureTool(c *gin.Context) {
 
 	switch req.Tool {
 	case "claude-code":
-		resp, errConfigure = configureClaudeCode(serverAddr, req.APIKey)
+		resp, errConfigure = configureClaudeCode(serverAddr, req.APIKey, req.Model)
 	case "codex-cli":
-		resp, errConfigure = configureCodexCLI(serverAddr, req.APIKey)
+		resp, errConfigure = configureCodexCLI(serverAddr, req.APIKey, req.Model)
 	case "continue":
 		resp, errConfigure = configureContinueDev(serverAddr, req.APIKey, req.Model)
 	case "cline":
 		resp, errConfigure = configureCline(serverAddr, req.APIKey, req.Model)
 	case "vscode":
-		resp, errConfigure = configureVSCode(serverAddr, req.APIKey)
+		resp, errConfigure = configureVSCode(serverAddr, req.APIKey, req.Model)
 	case "cursor":
-		resp, errConfigure = configureCursor(serverAddr, req.APIKey)
+		resp, errConfigure = configureCursor(serverAddr, req.APIKey, req.Model)
 	case "env-openai":
-		resp, errConfigure = configureEnvOpenAI(serverAddr, req.APIKey)
+		resp, errConfigure = configureEnvOpenAI(serverAddr, req.APIKey, req.Model)
 	case "env-anthropic":
-		resp, errConfigure = configureEnvAnthropic(serverAddr, req.APIKey)
+		resp, errConfigure = configureEnvAnthropic(serverAddr, req.APIKey, req.Model)
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("unsupported tool: %s", req.Tool)})
 		return
@@ -106,7 +106,7 @@ func mergeJSONFile(path string, merge map[string]any) error {
 	return writeJSONFile(path, existing)
 }
 
-func configureClaudeCode(serverAddr, apiKey string) (configureToolResponse, error) {
+func configureClaudeCode(serverAddr, apiKey, model string) (configureToolResponse, error) {
 	home := homeDir()
 	if home == "" {
 		return configureToolResponse{}, fmt.Errorf("cannot determine home directory")
@@ -124,21 +124,30 @@ func configureClaudeCode(serverAddr, apiKey string) (configureToolResponse, erro
 	}
 	envVars["ANTHROPIC_BASE_URL"] = serverAddr
 	envVars["ANTHROPIC_API_KEY"] = apiKey
+	if model != "" {
+		envVars["ANTHROPIC_MODEL"] = model
+		settings["model"] = model
+	}
 	settings["env"] = envVars
 
 	if errWrite := writeJSONFile(settingsPath, settings); errWrite != nil {
 		return configureToolResponse{}, fmt.Errorf("failed writing %s: %w", settingsPath, errWrite)
 	}
 
+	msg := fmt.Sprintf("Claude Code configured → %s", serverAddr)
+	if model != "" {
+		msg += fmt.Sprintf(" (model: %s)", model)
+	}
+
 	return configureToolResponse{
 		Status:  "ok",
 		Tool:    "claude-code",
-		Message: fmt.Sprintf("Claude Code configured → %s", serverAddr),
+		Message: msg,
 		Path:    settingsPath,
 	}, nil
 }
 
-func configureCodexCLI(serverAddr, apiKey string) (configureToolResponse, error) {
+func configureCodexCLI(serverAddr, apiKey, model string) (configureToolResponse, error) {
 	if runtime.GOOS == "windows" {
 		if errSet := setWindowsUserEnv("OPENAI_BASE_URL", serverAddr+"/v1"); errSet != nil {
 			return configureToolResponse{}, errSet
@@ -146,10 +155,17 @@ func configureCodexCLI(serverAddr, apiKey string) (configureToolResponse, error)
 		if errSet := setWindowsUserEnv("OPENAI_API_KEY", apiKey); errSet != nil {
 			return configureToolResponse{}, errSet
 		}
+		if model != "" {
+			_ = setWindowsUserEnv("OPENAI_MODEL", model)
+		}
+		msg := "Codex CLI configured via user environment variables (restart terminal to apply)"
+		if model != "" {
+			msg += fmt.Sprintf(" [model: %s]", model)
+		}
 		return configureToolResponse{
 			Status:  "ok",
 			Tool:    "codex-cli",
-			Message: "Codex CLI configured via user environment variables (restart terminal to apply)",
+			Message: msg,
 		}, nil
 	}
 
@@ -163,6 +179,9 @@ func configureCodexCLI(serverAddr, apiKey string) (configureToolResponse, error)
 		fmt.Sprintf("\n# CLIProxyAPI-lite — Codex CLI"),
 		fmt.Sprintf("export OPENAI_BASE_URL=%s/v1", serverAddr),
 		fmt.Sprintf("export OPENAI_API_KEY=%s", apiKey),
+	}
+	if model != "" {
+		lines = append(lines, fmt.Sprintf("export OPENAI_MODEL=%s", model))
 	}
 	content := strings.Join(lines, "\n") + "\n"
 
@@ -179,10 +198,15 @@ func configureCodexCLI(serverAddr, apiKey string) (configureToolResponse, error)
 		return configureToolResponse{}, fmt.Errorf("failed writing %s: %w", profilePath, errWrite)
 	}
 
+	msg := fmt.Sprintf("Codex CLI configured → %s/v1 (restart terminal to apply)", serverAddr)
+	if model != "" {
+		msg += fmt.Sprintf(" [model: %s]", model)
+	}
+
 	return configureToolResponse{
 		Status:  "ok",
 		Tool:    "codex-cli",
-		Message: fmt.Sprintf("Codex CLI configured → %s/v1 (restart terminal to apply)", serverAddr),
+		Message: msg,
 		Path:    profilePath,
 	}, nil
 }
@@ -280,7 +304,7 @@ func configureCline(serverAddr, apiKey, model string) (configureToolResponse, er
 	}, nil
 }
 
-func configureVSCode(serverAddr, apiKey string) (configureToolResponse, error) {
+func configureVSCode(serverAddr, apiKey, model string) (configureToolResponse, error) {
 	home := homeDir()
 	if home == "" {
 		return configureToolResponse{}, fmt.Errorf("cannot determine home directory")
@@ -300,20 +324,28 @@ func configureVSCode(serverAddr, apiKey string) (configureToolResponse, error) {
 	settings := map[string]any{
 		"claude-code.apiBaseUrl": serverAddr,
 	}
+	if model != "" {
+		settings["claude-code.model"] = model
+	}
 
 	if errWrite := mergeJSONFile(settingsPath, settings); errWrite != nil {
 		return configureToolResponse{}, fmt.Errorf("failed writing %s: %w", settingsPath, errWrite)
 	}
 
+	msg := "VS Code Claude Code extension configured"
+	if model != "" {
+		msg += fmt.Sprintf(" (model: %s)", model)
+	}
+
 	return configureToolResponse{
 		Status:  "ok",
 		Tool:    "vscode",
-		Message: "VS Code Claude Code extension configured",
+		Message: msg,
 		Path:    settingsPath,
 	}, nil
 }
 
-func configureCursor(serverAddr, apiKey string) (configureToolResponse, error) {
+func configureCursor(serverAddr, apiKey, model string) (configureToolResponse, error) {
 	home := homeDir()
 	if home == "" {
 		return configureToolResponse{}, fmt.Errorf("cannot determine home directory")
@@ -335,20 +367,28 @@ func configureCursor(serverAddr, apiKey string) (configureToolResponse, error) {
 	settings := map[string]any{
 		"openai.apiBaseUrl": serverAddr + "/v1",
 	}
+	if model != "" {
+		settings["openai.model"] = model
+	}
 
 	if errWrite := mergeJSONFile(settingsPath, settings); errWrite != nil {
 		return configureToolResponse{}, fmt.Errorf("failed writing %s: %w", settingsPath, errWrite)
 	}
 
+	msg := "Cursor configured → OpenAI Base URL set"
+	if model != "" {
+		msg += fmt.Sprintf(" (model: %s)", model)
+	}
+
 	return configureToolResponse{
 		Status:  "ok",
 		Tool:    "cursor",
-		Message: "Cursor configured → OpenAI Base URL set",
+		Message: msg,
 		Path:    settingsPath,
 	}, nil
 }
 
-func configureEnvOpenAI(serverAddr, apiKey string) (configureToolResponse, error) {
+func configureEnvOpenAI(serverAddr, apiKey, model string) (configureToolResponse, error) {
 	if runtime.GOOS == "windows" {
 		if errSet := setWindowsUserEnv("OPENAI_BASE_URL", serverAddr+"/v1"); errSet != nil {
 			return configureToolResponse{}, errSet
@@ -356,20 +396,31 @@ func configureEnvOpenAI(serverAddr, apiKey string) (configureToolResponse, error
 		if errSet := setWindowsUserEnv("OPENAI_API_KEY", apiKey); errSet != nil {
 			return configureToolResponse{}, errSet
 		}
+		if model != "" {
+			_ = setWindowsUserEnv("OPENAI_MODEL", model)
+		}
+		msg := "OPENAI_BASE_URL and OPENAI_API_KEY set for current user (restart terminal to apply)"
+		if model != "" {
+			msg += fmt.Sprintf(" [model: %s]", model)
+		}
 		return configureToolResponse{
 			Status:  "ok",
 			Tool:    "env-openai",
-			Message: "OPENAI_BASE_URL and OPENAI_API_KEY set for current user (restart terminal to apply)",
+			Message: msg,
 		}, nil
+	}
+	msg := fmt.Sprintf("Set these in your shell profile:\nexport OPENAI_BASE_URL=%s/v1\nexport OPENAI_API_KEY=%s", serverAddr, apiKey)
+	if model != "" {
+		msg += fmt.Sprintf("\nexport OPENAI_MODEL=%s", model)
 	}
 	return configureToolResponse{
 		Status:  "ok",
 		Tool:    "env-openai",
-		Message: fmt.Sprintf("Set these in your shell profile:\nexport OPENAI_BASE_URL=%s/v1\nexport OPENAI_API_KEY=%s", serverAddr, apiKey),
+		Message: msg,
 	}, nil
 }
 
-func configureEnvAnthropic(serverAddr, apiKey string) (configureToolResponse, error) {
+func configureEnvAnthropic(serverAddr, apiKey, model string) (configureToolResponse, error) {
 	if runtime.GOOS == "windows" {
 		if errSet := setWindowsUserEnv("ANTHROPIC_BASE_URL", serverAddr); errSet != nil {
 			return configureToolResponse{}, errSet
@@ -377,16 +428,27 @@ func configureEnvAnthropic(serverAddr, apiKey string) (configureToolResponse, er
 		if errSet := setWindowsUserEnv("ANTHROPIC_API_KEY", apiKey); errSet != nil {
 			return configureToolResponse{}, errSet
 		}
+		if model != "" {
+			_ = setWindowsUserEnv("ANTHROPIC_MODEL", model)
+		}
+		msg := "ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY set for current user (restart terminal to apply)"
+		if model != "" {
+			msg += fmt.Sprintf(" [model: %s]", model)
+		}
 		return configureToolResponse{
 			Status:  "ok",
 			Tool:    "env-anthropic",
-			Message: "ANTHROPIC_BASE_URL and ANTHROPIC_API_KEY set for current user (restart terminal to apply)",
+			Message: msg,
 		}, nil
+	}
+	msg := fmt.Sprintf("Set these in your shell profile:\nexport ANTHROPIC_BASE_URL=%s\nexport ANTHROPIC_API_KEY=%s", serverAddr, apiKey)
+	if model != "" {
+		msg += fmt.Sprintf("\nexport ANTHROPIC_MODEL=%s", model)
 	}
 	return configureToolResponse{
 		Status:  "ok",
 		Tool:    "env-anthropic",
-		Message: fmt.Sprintf("Set these in your shell profile:\nexport ANTHROPIC_BASE_URL=%s\nexport ANTHROPIC_API_KEY=%s", serverAddr, apiKey),
+		Message: msg,
 	}, nil
 }
 
