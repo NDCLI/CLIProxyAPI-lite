@@ -288,15 +288,20 @@ For tools that connect only to hardcoded vendor endpoints:
 
 ### 3. Web UI Updates (`web/connect.html` & `web/index.html`)
 
-- Replace unified single list with a clean 2-tab interface:
-  - **Tab 1: CLI Tools**: Cards for Claude Code CLI, Codex CLI, Aider, Environment Variables.
-  - **Tab 2: IDEs & Editors**:
-    - Top Section: Native Config IDEs (Cursor, Windsurf, Continue, Cline).
-    - Bottom Section: MITM Proxy IDEs (VS Code Copilot, Antigravity IDE):
-      - Status pill: Proxy running / stopped.
-      - 1-click "Install Root CA" button.
-      - 1-click "Configure VS Code Proxy" button.
-      - "Test Interception" indicator.
+- **Vertical Sidebar Tab Layout (Left sidebar navigation + Right content viewport)**:
+  - Replaces the long vertically scrolling page with a modern 2-column dashboard layout.
+  - **Left Sidebar Tabs**:
+    - `⚡ All Tools` — Combined overview with quick action buttons.
+    - `💻 CLI Tools` — Claude Code CLI, Codex CLI, Shell Environment Variables.
+    - `🖥️ IDEs (Direct API)` — Cursor, Windsurf, VS Code (Continue.dev), VS Code (Cline).
+    - `🛡️ IDEs (MITM Proxy)` — VS Code (Copilot), Google Antigravity IDE, Root CA Cert setup.
+    - Server status badge (`127.0.0.1:8317`) and active port indicator.
+  - **Right Content Viewport**:
+    - Top control bar: API Key selector, Model chips picker, "Test Connection" button.
+    - Tab content dynamically switches based on active vertical tab:
+      - Clean, focused view with no clutter or endless vertical scrolling.
+      - Each tool card displays: icon, description, 1-click Auto-configure button, copyable command/JSON snippet, and status feedback badge.
+      - MITM Proxy tab displays: live proxy status (running/stopped), 1-click Root CA installation command (`certutil`), and IDE proxy injection toggles.
 
 ---
 
