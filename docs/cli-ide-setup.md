@@ -274,6 +274,59 @@ curl http://127.0.0.1:8317/v1/messages \
 
 ---
 
+## Connecting IDEs via MITM Proxy (VS Code Copilot, Antigravity IDE)
+
+Some IDEs and official extensions (such as **VS Code GitHub Copilot** and **Google Antigravity IDE**) do not expose custom API base URL settings. Instead, they hardcode connections to vendor cloud endpoints.
+
+To use these tools with CLIProxyAPI-lite, we employ a local transparent **MITM Interception Proxy** (similar to 9router).
+
+### Architecture
+
+```
+[VS Code / Antigravity IDE]
+         │ (HTTP/HTTPS Proxy: http://127.0.0.1:8318)
+         ▼
+[Local MITM Proxy Engine]
+         │ (Intercept AI domains with local Root CA)
+         ▼
+[Unified Translator & Account Pool]
+         │ (Codex / Antigravity / Claude)
+         ▼
+[Upstream Provider APIs]
+```
+
+### Setup Steps
+
+1. **Start the MITM Proxy** (configured in `config.yaml` under `mitm-proxy` on port `8318`).
+2. **Install & Trust the Root CA Certificate**:
+   - Download the generated `ca.crt` from the Web UI Connect page or `GET /v0/management/mitm/ca.crt`.
+   - Windows:
+     ```cmd
+     certutil -addstore -user Root certs\ca.crt
+     ```
+   - Or configure Node.js based tools with the environment variable:
+     ```bash
+     export NODE_EXTRA_CA_CERTS="/path/to/certs/ca.crt"
+     ```
+3. **Configure VS Code**:
+   In VS Code `settings.json`:
+   ```json
+   {
+     "http.proxy": "http://127.0.0.1:8318",
+     "http.proxyStrictSSL": false,
+     "http.proxySupport": "override"
+   }
+   ```
+4. **Configure Antigravity IDE**:
+   Run Antigravity IDE with proxy environment variables:
+   ```bash
+   export HTTP_PROXY="http://127.0.0.1:8318"
+   export HTTPS_PROXY="http://127.0.0.1:8318"
+   export NODE_EXTRA_CA_CERTS="/path/to/certs/ca.crt"
+   ```
+
+---
+
 ## Authentication methods
 
 The server accepts API keys from any of these sources (checked in order):

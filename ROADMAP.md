@@ -25,18 +25,22 @@ go test ./...        # run all tests
 
 ## Current status
 
-### ✅ Done — Security hardening (commit `470ed23d`)
+### ✅ Done — Completed milestones
 
-| Area | What was done |
-|---|---|
-| Loopback binding | `DefaultHost = "127.0.0.1"` used in config loader, parser, all fallback paths, `NewServer` defense-in-depth, callback forwarder |
-| Antigravity OAuth | `parseAntigravityCallbackPayload` helper rejects empty/mismatched state, missing code, provider errors |
-| Tests | `host_test.go`, `server_host_test.go`, `antigravity_callback_test.go` |
-| Example config | `config.example.yaml` updated to local-only default |
+| Commit | Area | What was done |
+|---|---|---|
+| `470ed23d` | Security hardening | `DefaultHost = "127.0.0.1"` loopback binding across config, parser, server, and forwarder; strict Antigravity OAuth callback state validation |
+| `93d8fe10` | Roadmap & Architecture | Created `ROADMAP.md` detailing 6 phases to transform upstream into a streamlined local-only gateway |
+| `a426525d` | Documentation | Created `docs/cli-ide-setup.md` covering setup instructions for 10+ AI tools |
+| `02396353` | Tool auto-configuration v1 | Added backend handler `POST /v0/management/configure-tool` with tests, registered route in management API, created `web/connect.html` with model picker |
 
-### ⏳ Pending — Build verification
+### ⏳ In progress — Separate CLI Tools vs IDEs & MITM Proxy for IDEs
 
-Go is not installed on the current machine. Run the three verification commands above before continuing.
+Next implementation step: split tool settings into dedicated CLI and IDE workflows, and implement local MITM interception proxy for IDEs (such as VS Code Copilot and Google Antigravity IDE) that do not support custom base URLs directly.
+
+### ⏳ Pending — Toolchain & build verification
+
+Go toolchain verification (`gofmt`, `go build`, `go test`) to run when Go 1.26+ is available on the machine.
 
 ---
 
@@ -224,6 +228,75 @@ var webFS embed.FS
 s.engine.StaticFS("/static", http.FS(sub))
 s.engine.GET("/", func(c *gin.Context) { /* serve index.html */ })
 ```
+
+---
+
+## Phase 3.1 — Separate CLI Tools vs IDEs & MITM Proxy Integration
+
+**Goal:** Separate configuration workflows for CLI tools vs IDEs, and support IDEs/extensions that cannot configure custom API base URLs directly (e.g. VS Code Copilot, Google Antigravity IDE) via a local MITM interception proxy (similar to 9router).
+
+### 1. Separation of Concerns & UX
+
+- **CLI Tools (`[CLI Tools]` tab)**:
+  - **Targets**: Claude Code CLI, Codex CLI, Aider, OpenCode, Shell scripts / curl.
+  - **Connection mechanism**: Direct local environment variables (`ANTHROPIC_BASE_URL`, `OPENAI_BASE_URL`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`) and tool-specific config files (`~/.claude/settings.json`, Windows user env via `setx`, Linux `~/.bashrc`).
+  - **UX**: 1-click write configuration files or copy-paste shell export blocks.
+
+- **IDEs & Code Editors (`[IDEs & Editors]` tab)**:
+  - **Category A: Direct Base URL IDEs**:
+    - Cursor, Windsurf, VS Code with Continue.dev, VS Code with Cline.
+    - Mechanism: Direct configuration file writes (`%APPDATA%/Cursor/User/settings.json`, `~/.continue/config.json`, etc.).
+  - **Category B: Intercepted / MITM Proxy IDEs**:
+    - VS Code with official GitHub Copilot extension, Google Antigravity IDE.
+    - Mechanism: Local transparent / MITM HTTPS proxy intercepting outbound AI requests without requiring hardcoded endpoint changes in the IDE.
+
+### 2. Local MITM Proxy Architecture for IDEs
+
+For tools that connect only to hardcoded vendor endpoints:
+
+1. **Local MITM Proxy Engine (`internal/proxy/mitm/`)**:
+   - Loopback HTTP/HTTPS proxy listener (e.g., `127.0.0.1:8318` or unified port).
+   - Handles `CONNECT` tunneling for HTTPS traffic.
+   - Intercepts requests targeting known AI endpoints (Copilot completions, Antigravity API domains).
+   - Passthrough: non-AI domain traffic is forwarded untouched or blocked according to security policy.
+
+2. **Root Certificate Authority (CA)**:
+   - Automatically generate local Root CA certificate (`ca.crt`) and private key (`ca.key`) on first launch under `certs/` (excluded from git).
+   - Dynamic on-the-fly certificate generation for intercepted domains signed by local CA.
+   - Endpoint: `GET /v0/management/mitm/ca.crt` to download the public CA certificate.
+   - 1-click installation script:
+     - Windows: `certutil -addstore -user Root certs/ca.crt`
+     - macOS: `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain certs/ca.crt`
+     - Linux: `update-ca-certificates` or system trust store.
+
+3. **IDE Proxy Configuration**:
+   - Backend endpoint `POST /v0/management/configure-ide`:
+     - **VS Code**: updates `settings.json` with:
+       ```json
+       {
+         "http.proxy": "http://127.0.0.1:8318",
+         "http.proxyStrictSSL": false
+       }
+       ```
+       or injects `NODE_EXTRA_CA_CERTS` so strict SSL remains valid.
+     - **Antigravity IDE**: configures IDE proxy environment variables or sidecar hook.
+
+4. **Payload Translation & Upstream Execution**:
+   - Intercepted Copilot / Antigravity requests are parsed into canonical internal formats.
+   - Dispatched through the existing account pool (Codex, Antigravity, Claude).
+   - Formatted and streamed back to the IDE matching the vendor's protocol response schema.
+
+### 3. Web UI Updates (`web/connect.html` & `web/index.html`)
+
+- Replace unified single list with a clean 2-tab interface:
+  - **Tab 1: CLI Tools**: Cards for Claude Code CLI, Codex CLI, Aider, Environment Variables.
+  - **Tab 2: IDEs & Editors**:
+    - Top Section: Native Config IDEs (Cursor, Windsurf, Continue, Cline).
+    - Bottom Section: MITM Proxy IDEs (VS Code Copilot, Antigravity IDE):
+      - Status pill: Proxy running / stopped.
+      - 1-click "Install Root CA" button.
+      - 1-click "Configure VS Code Proxy" button.
+      - "Test Interception" indicator.
 
 ---
 
