@@ -197,6 +197,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/meta-auth-url", s.mgmt.RequestMetaToken)
 		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
 		mgmt.DELETE("/oauth-session", s.mgmt.CancelAuthSession)
+		mgmt.POST("/configure-tool", s.mgmt.ConfigureTool)
 	}
 }
 

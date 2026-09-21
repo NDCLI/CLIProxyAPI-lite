@@ -120,6 +120,7 @@ GET    /v0/management/claude-api-key
 PUT    /v0/management/claude-api-key
 GET    /v0/management/codex-api-key
 PUT    /v0/management/codex-api-key
+POST   /v0/management/configure-tool
 ```
 
 ### Packages to REMOVE or disable
@@ -206,6 +207,7 @@ PUT    /v0/management/codex-api-key
 ### File structure
 ```
 web/
+  connect.html        # Auto-configure IDE/CLI page with model picker
   index.html          # SPA shell with client-side routing
   static/
     style.css         # All styles
