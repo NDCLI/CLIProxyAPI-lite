@@ -36,11 +36,17 @@ go test ./...        # run all tests
 
 ### ⏳ In progress — Separate CLI Tools vs IDEs & MITM Proxy for IDEs
 
-Next implementation step: split tool settings into dedicated CLI and IDE workflows, and implement local MITM interception proxy for IDEs (such as VS Code Copilot and Google Antigravity IDE) that do not support custom base URLs directly.
+The embedded Vietnamese setup UI now serves `/` and `/connect`, with separate CLI, direct IDE, MITM, 9router account-import, and Endpoint/API key tabs. The Endpoint tab follows 9router's local endpoint plus masked key-list pattern and reuses the existing management API for create, reveal, copy, and delete actions. Per-tool model configuration and the Root CA backend are implemented. The Root CA is generated locally and can be downloaded, installed, or removed through the management API on Windows.
 
-### ⏳ Pending — Toolchain & build verification
+9router JSON import accepts a single account, an account array, or a full backup containing `providerConnections`. It converts Codex, Claude, and Antigravity accounts into native auth files while skipping unsupported providers without exposing tokens in the response.
 
-Go toolchain verification (`gofmt`, `go build`, `go test`) to run when Go 1.26+ is available on the machine.
+The loopback MITM listener now runs on `127.0.0.1:443`, generates SNI leaf certificates, supports per-tool DNS and model mappings for GitHub Copilot and Antigravity, passes unmapped traffic through, and reuses the existing Gemini/OpenAI translators for mapped Antigravity traffic. Raw request/response logging is deliberately disabled to avoid persisting prompts or credentials.
+
+Claude Code and Codex CLI configuration now follows each tool's native files. Apply merges only the gateway-owned settings; Reset removes those settings while preserving unrelated user configuration.
+
+### ✅ Done — Toolchain & build verification
+
+Verified on Windows with Go 1.27.0: `gofmt`, server build, focused management/OAuth tests, and `go test ./...` pass.
 
 ---
 

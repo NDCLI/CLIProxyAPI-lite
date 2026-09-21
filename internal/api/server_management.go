@@ -198,6 +198,16 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
 		mgmt.DELETE("/oauth-session", s.mgmt.CancelAuthSession)
 		mgmt.POST("/configure-tool", s.mgmt.ConfigureTool)
+		mgmt.POST("/import/9router", s.mgmt.Import9RouterAccounts)
+		mgmt.GET("/mitm/ca.crt", s.mgmt.DownloadMITMCA)
+		mgmt.POST("/mitm/install-cert", s.mgmt.InstallMITMCert)
+		mgmt.POST("/mitm/uninstall-cert", s.mgmt.UninstallMITMCert)
+		mgmt.GET("/mitm/status", s.mgmt.GetMITMStatus)
+		mgmt.POST("/mitm/start", s.mgmt.StartMITM)
+		mgmt.POST("/mitm/stop", s.mgmt.StopMITM)
+		mgmt.PATCH("/mitm/dns", s.mgmt.ToggleMITMDNS)
+		mgmt.GET("/mitm/mappings", s.mgmt.GetMITMMappings)
+		mgmt.PUT("/mitm/mappings", s.mgmt.PutMITMMappings)
 	}
 }
 
@@ -334,5 +344,22 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 		}
 	}
 
-	c.File(filePath)
+	body, errRead := os.ReadFile(filePath)
+	if errRead != nil {
+		log.WithError(errRead).Error("failed to read management control panel asset")
+		c.AbortWithStatus(http.StatusInternalServerError)
+		return
+	}
+	if localized, ok := managementasset.AddVietnameseLocale(body); ok {
+		body = localized
+	} else {
+		log.Warn("management control panel asset does not match Vietnamese locale patch markers")
+	}
+	if quotaEmail, ok := managementasset.PreferQuotaEmail(body); ok {
+		body = quotaEmail
+	} else {
+		log.Warn("management control panel asset does not match quota email patch marker")
+	}
+	c.Header("Cache-Control", "no-cache")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
 }

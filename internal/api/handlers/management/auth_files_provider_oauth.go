@@ -28,6 +28,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type codexOAuthService interface {
+	GenerateAuthURL(state string, pkceCodes *codex.PKCECodes) (string, error)
+	ExchangeCodeForTokens(ctx context.Context, code string, pkceCodes *codex.PKCECodes) (*codex.CodexAuthBundle, error)
+	CreateTokenStorage(bundle *codex.CodexAuthBundle) *codex.CodexTokenStorage
+}
+
 func parseAntigravityCallbackPayload(payload map[string]string, expectedState string) (string, error) {
 	expectedState = strings.TrimSpace(expectedState)
 	if expectedState == "" {
@@ -413,7 +419,8 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 				var payload map[string]string
 				_ = json.Unmarshal(data, &payload)
 				_ = os.Remove(waitFile)
-				authCode, errPayload := parseAntigravityCallbackPayload(payload, state)
+				var errPayload error
+				authCode, errPayload = parseAntigravityCallbackPayload(payload, state)
 				if errPayload != nil {
 					log.Error(errPayload)
 					SetOAuthSessionError(state, errPayload.Error())

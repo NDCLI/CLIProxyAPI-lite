@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pelletier/go-toml/v2"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,6 +19,7 @@ type configureToolRequest struct {
 	Tool   string `json:"tool"`
 	APIKey string `json:"api_key"`
 	Model  string `json:"model,omitempty"`
+	Action string `json:"action,omitempty"`
 }
 
 type configureToolResponse struct {
@@ -36,6 +38,26 @@ func (h *Handler) ConfigureTool(c *gin.Context) {
 
 	req.Tool = strings.TrimSpace(strings.ToLower(req.Tool))
 	req.APIKey = strings.TrimSpace(req.APIKey)
+	req.Action = strings.TrimSpace(strings.ToLower(req.Action))
+	if req.Action == "reset" {
+		var resp configureToolResponse
+		var errReset error
+		switch req.Tool {
+		case "claude-code":
+			resp, errReset = resetClaudeCode()
+		case "codex-cli":
+			resp, errReset = resetCodexCLI()
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("reset is not supported for tool: %s", req.Tool)})
+			return
+		}
+		if errReset != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": errReset.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, resp)
+		return
+	}
 	if req.APIKey == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "api_key is required"})
 		return
@@ -122,13 +144,14 @@ func configureClaudeCode(serverAddr, apiKey, model string) (configureToolRespons
 	if !ok {
 		envVars = make(map[string]any)
 	}
-	envVars["ANTHROPIC_BASE_URL"] = serverAddr
-	envVars["ANTHROPIC_API_KEY"] = apiKey
+	envVars["ANTHROPIC_BASE_URL"] = serverAddr + "/v1"
+	envVars["ANTHROPIC_AUTH_TOKEN"] = apiKey
+	delete(envVars, "ANTHROPIC_API_KEY")
 	if model != "" {
 		envVars["ANTHROPIC_MODEL"] = model
-		settings["model"] = model
 	}
 	settings["env"] = envVars
+	settings["hasCompletedOnboarding"] = true
 
 	if errWrite := writeJSONFile(settingsPath, settings); errWrite != nil {
 		return configureToolResponse{}, fmt.Errorf("failed writing %s: %w", settingsPath, errWrite)
@@ -148,57 +171,55 @@ func configureClaudeCode(serverAddr, apiKey, model string) (configureToolRespons
 }
 
 func configureCodexCLI(serverAddr, apiKey, model string) (configureToolResponse, error) {
-	if runtime.GOOS == "windows" {
-		if errSet := setWindowsUserEnv("OPENAI_BASE_URL", serverAddr+"/v1"); errSet != nil {
-			return configureToolResponse{}, errSet
-		}
-		if errSet := setWindowsUserEnv("OPENAI_API_KEY", apiKey); errSet != nil {
-			return configureToolResponse{}, errSet
-		}
-		if model != "" {
-			_ = setWindowsUserEnv("OPENAI_MODEL", model)
-		}
-		msg := "Codex CLI configured via user environment variables (restart terminal to apply)"
-		if model != "" {
-			msg += fmt.Sprintf(" [model: %s]", model)
-		}
-		return configureToolResponse{
-			Status:  "ok",
-			Tool:    "codex-cli",
-			Message: msg,
-		}, nil
-	}
-
 	home := homeDir()
 	if home == "" {
 		return configureToolResponse{}, fmt.Errorf("cannot determine home directory")
 	}
-
-	profilePath := filepath.Join(home, ".bashrc")
-	lines := []string{
-		fmt.Sprintf("\n# CLIProxyAPI-lite — Codex CLI"),
-		fmt.Sprintf("export OPENAI_BASE_URL=%s/v1", serverAddr),
-		fmt.Sprintf("export OPENAI_API_KEY=%s", apiKey),
+	if model == "" {
+		return configureToolResponse{}, fmt.Errorf("model is required for Codex CLI")
 	}
-	if model != "" {
-		lines = append(lines, fmt.Sprintf("export OPENAI_MODEL=%s", model))
-	}
-	content := strings.Join(lines, "\n") + "\n"
-
-	f, errOpen := os.OpenFile(profilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
-	if errOpen != nil {
-		return configureToolResponse{}, fmt.Errorf("failed writing %s: %w", profilePath, errOpen)
-	}
-	defer func() {
-		if errClose := f.Close(); errClose != nil {
-			log.Errorf("failed to close %s: %v", profilePath, errClose)
+	codexDir := filepath.Join(home, ".codex")
+	configPath := filepath.Join(codexDir, "config.toml")
+	authPath := filepath.Join(codexDir, "auth.json")
+	configData := make(map[string]any)
+	if existing, errRead := os.ReadFile(configPath); errRead == nil {
+		if errParse := toml.Unmarshal(existing, &configData); errParse != nil {
+			return configureToolResponse{}, fmt.Errorf("parse %s: %w", configPath, errParse)
 		}
-	}()
-	if _, errWrite := f.WriteString(content); errWrite != nil {
-		return configureToolResponse{}, fmt.Errorf("failed writing %s: %w", profilePath, errWrite)
+	}
+	configData["model"] = model
+	configData["model_provider"] = "cliproxyapi-lite"
+	providers := nestedMap(configData, "model_providers")
+	providers["cliproxyapi-lite"] = map[string]any{
+		"name":     "CLIProxyAPI-lite",
+		"base_url": serverAddr + "/v1",
+		"wire_api": "responses",
+	}
+	configData["model_providers"] = providers
+	agents := nestedMap(configData, "agents")
+	agents["subagent"] = map[string]any{"model": model}
+	configData["agents"] = agents
+	encodedConfig, errMarshal := toml.Marshal(configData)
+	if errMarshal != nil {
+		return configureToolResponse{}, fmt.Errorf("encode Codex config: %w", errMarshal)
+	}
+	if errDir := os.MkdirAll(codexDir, 0o700); errDir != nil {
+		return configureToolResponse{}, errDir
+	}
+	if errWrite := os.WriteFile(configPath, encodedConfig, 0o600); errWrite != nil {
+		return configureToolResponse{}, fmt.Errorf("write %s: %w", configPath, errWrite)
+	}
+	authData := make(map[string]any)
+	if existing, errRead := os.ReadFile(authPath); errRead == nil {
+		_ = json.Unmarshal(existing, &authData)
+	}
+	authData["OPENAI_API_KEY"] = apiKey
+	authData["auth_mode"] = "apikey"
+	if errWrite := writeJSONFile(authPath, authData); errWrite != nil {
+		return configureToolResponse{}, fmt.Errorf("write %s: %w", authPath, errWrite)
 	}
 
-	msg := fmt.Sprintf("Codex CLI configured → %s/v1 (restart terminal to apply)", serverAddr)
+	msg := fmt.Sprintf("Codex CLI configured → %s/v1", serverAddr)
 	if model != "" {
 		msg += fmt.Sprintf(" [model: %s]", model)
 	}
@@ -207,8 +228,90 @@ func configureCodexCLI(serverAddr, apiKey, model string) (configureToolResponse,
 		Status:  "ok",
 		Tool:    "codex-cli",
 		Message: msg,
-		Path:    profilePath,
+		Path:    configPath,
 	}, nil
+}
+
+func resetClaudeCode() (configureToolResponse, error) {
+	settingsPath := filepath.Join(homeDir(), ".claude", "settings.json")
+	settings := make(map[string]any)
+	data, errRead := os.ReadFile(settingsPath)
+	if os.IsNotExist(errRead) {
+		return configureToolResponse{Status: "ok", Tool: "claude-code", Message: "Claude Code has no CLIProxyAPI-lite settings"}, nil
+	}
+	if errRead != nil || json.Unmarshal(data, &settings) != nil {
+		return configureToolResponse{}, fmt.Errorf("read %s", settingsPath)
+	}
+	if envVars, ok := settings["env"].(map[string]any); ok {
+		for _, key := range []string{"ANTHROPIC_BASE_URL", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_API_KEY", "ANTHROPIC_MODEL"} {
+			delete(envVars, key)
+		}
+		if len(envVars) == 0 {
+			delete(settings, "env")
+		}
+	}
+	if errWrite := writeJSONFile(settingsPath, settings); errWrite != nil {
+		return configureToolResponse{}, errWrite
+	}
+	return configureToolResponse{Status: "ok", Tool: "claude-code", Message: "CLIProxyAPI-lite settings removed", Path: settingsPath}, nil
+}
+
+func resetCodexCLI() (configureToolResponse, error) {
+	home := homeDir()
+	configPath := filepath.Join(home, ".codex", "config.toml")
+	authPath := filepath.Join(home, ".codex", "auth.json")
+	configData := make(map[string]any)
+	if existing, errRead := os.ReadFile(configPath); errRead == nil {
+		if errParse := toml.Unmarshal(existing, &configData); errParse != nil {
+			return configureToolResponse{}, fmt.Errorf("parse %s: %w", configPath, errParse)
+		}
+		managedModel, _ := configData["model"].(string)
+		if configData["model_provider"] == "cliproxyapi-lite" {
+			delete(configData, "model")
+			delete(configData, "model_provider")
+		}
+		if providers, ok := configData["model_providers"].(map[string]any); ok {
+			delete(providers, "cliproxyapi-lite")
+			if len(providers) == 0 {
+				delete(configData, "model_providers")
+			}
+		}
+		if agents, ok := configData["agents"].(map[string]any); ok {
+			if subagent, ok := agents["subagent"].(map[string]any); ok && subagent["model"] == managedModel {
+				delete(agents, "subagent")
+			}
+			if len(agents) == 0 {
+				delete(configData, "agents")
+			}
+		}
+		encoded, errMarshal := toml.Marshal(configData)
+		if errMarshal != nil {
+			return configureToolResponse{}, errMarshal
+		}
+		if errWrite := os.WriteFile(configPath, encoded, 0o600); errWrite != nil {
+			return configureToolResponse{}, errWrite
+		}
+	}
+	if data, errRead := os.ReadFile(authPath); errRead == nil {
+		authData := make(map[string]any)
+		if json.Unmarshal(data, &authData) == nil {
+			delete(authData, "OPENAI_API_KEY")
+			if authData["auth_mode"] == "apikey" {
+				delete(authData, "auth_mode")
+			}
+			if errWrite := writeJSONFile(authPath, authData); errWrite != nil {
+				return configureToolResponse{}, errWrite
+			}
+		}
+	}
+	return configureToolResponse{Status: "ok", Tool: "codex-cli", Message: "CLIProxyAPI-lite settings removed", Path: configPath}, nil
+}
+
+func nestedMap(values map[string]any, key string) map[string]any {
+	if nested, ok := values[key].(map[string]any); ok {
+		return nested
+	}
+	return make(map[string]any)
 }
 
 func configureContinueDev(serverAddr, apiKey, model string) (configureToolResponse, error) {
@@ -286,7 +389,7 @@ func configureCline(serverAddr, apiKey, model string) (configureToolResponse, er
 
 	settingsPath := filepath.Join(settingsDir, "settings.json")
 	settings := map[string]any{
-		"apiProvider":  "openai-native",
+		"apiProvider":   "openai-native",
 		"openAiBaseUrl": serverAddr + "/v1",
 		"openAiApiKey":  apiKey,
 		"openAiModelId": model,

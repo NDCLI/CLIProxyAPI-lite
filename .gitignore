@@ -1,6 +1,7 @@
 # Binaries
 cli-proxy-api
 *.exe
+*.exe~
 
 # Configuration
 config.yaml
@@ -27,6 +28,12 @@ static/*
 auths/*
 /auths
 !auths/.gitkeep
+
+# Local MITM certificate authority
+/certs
+
+# Local 9router credential backups
+/9router-backup-*.json
 
 # Documentation
 docs/*

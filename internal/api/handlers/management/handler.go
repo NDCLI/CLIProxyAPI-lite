@@ -61,6 +61,7 @@ type Handler struct {
 	pluginStoreHTTPClient   pluginstore.HTTPDoer
 	pluginStoreRateLimiter  *pluginstore.GitHubRateLimiter
 	pluginReleases          pluginReleaseCache
+	mitm                    *mitmRuntime
 }
 
 type configReloadSnapshot struct {
@@ -82,6 +83,7 @@ func NewHandler(cfg *config.Config, configFilePath string, manager *coreauth.Man
 		allowRemoteOverride: envSecret != "",
 		envSecret:           envSecret,
 	}
+	h.mitm = newMITMRuntime(configFilePath, cfg.Port)
 	h.startAttemptCleanup()
 	return h
 }

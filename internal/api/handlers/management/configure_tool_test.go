@@ -42,8 +42,52 @@ func TestConfigureClaudeCodeWritesSettings(t *testing.T) {
 	if !contains(content, "ANTHROPIC_BASE_URL") || !contains(content, "http://127.0.0.1:8317") {
 		t.Fatalf("settings file missing expected content: %s", content)
 	}
-	if !contains(content, "ANTHROPIC_API_KEY") || !contains(content, "test-key-123") {
+	if !contains(content, "ANTHROPIC_AUTH_TOKEN") || !contains(content, "test-key-123") {
 		t.Fatalf("settings file missing API key: %s", content)
+	}
+	if contains(content, "ANTHROPIC_API_KEY") {
+		t.Fatalf("settings file retained legacy ANTHROPIC_API_KEY: %s", content)
+	}
+}
+
+func TestConfigureAndResetCodexCLIPreservesUnrelatedSettings(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("USERPROFILE", home)
+	codexDir := filepath.Join(home, ".codex")
+	if errDir := os.MkdirAll(codexDir, 0o700); errDir != nil {
+		t.Fatal(errDir)
+	}
+	if errWrite := os.WriteFile(filepath.Join(codexDir, "config.toml"), []byte("approval_policy = \"never\"\n"), 0o600); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+	if errWrite := os.WriteFile(filepath.Join(codexDir, "auth.json"), []byte(`{"tokens":{"access_token":"keep-me"}}`), 0o600); errWrite != nil {
+		t.Fatal(errWrite)
+	}
+
+	resp, errConfigure := configureCodexCLI("http://127.0.0.1:8317", "gateway-key", "gpt-5.4")
+	if errConfigure != nil {
+		t.Fatalf("configureCodexCLI failed: %v", errConfigure)
+	}
+	configData, _ := os.ReadFile(resp.Path)
+	if !contains(string(configData), `model_provider = 'cliproxyapi-lite'`) || !contains(string(configData), `approval_policy = 'never'`) {
+		t.Fatalf("unexpected Codex config: %s", configData)
+	}
+	authData, _ := os.ReadFile(filepath.Join(codexDir, "auth.json"))
+	if !contains(string(authData), "gateway-key") || !contains(string(authData), "keep-me") {
+		t.Fatalf("unexpected Codex auth: %s", authData)
+	}
+
+	if _, errReset := resetCodexCLI(); errReset != nil {
+		t.Fatalf("resetCodexCLI failed: %v", errReset)
+	}
+	configData, _ = os.ReadFile(resp.Path)
+	if contains(string(configData), "cliproxyapi-lite") || !contains(string(configData), "approval_policy") {
+		t.Fatalf("reset removed unrelated config or retained managed config: %s", configData)
+	}
+	authData, _ = os.ReadFile(filepath.Join(codexDir, "auth.json"))
+	if contains(string(authData), "gateway-key") || !contains(string(authData), "keep-me") {
+		t.Fatalf("reset removed unrelated auth or retained gateway key: %s", authData)
 	}
 }
 

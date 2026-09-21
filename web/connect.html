@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CLIProxyAPI-lite — Connect & Providers</title>
+<title>CLIProxyAPI-lite — Kết nối công cụ</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -260,6 +260,19 @@ body{
   grid-template-columns:repeat(auto-fill,minmax(360px,1fr));
   gap:14px;
   margin-bottom:24px;
+}
+
+.endpoint-stack{display:flex;flex-direction:column;gap:14px;max-width:900px}
+.endpoint-row,.key-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border)}
+.endpoint-row:last-child,.key-row:last-child{border-bottom:none}
+.endpoint-label{min-width:78px;padding:3px 8px;border-radius:5px;background:var(--accent-soft);color:var(--accent-hover);text-align:center;font:11px monospace}
+.endpoint-value,.key-value{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:12px monospace;color:var(--text)}
+.key-empty{padding:34px 12px;text-align:center;color:var(--muted);font-size:13px}
+@media(max-width:720px){
+  .sidebar{width:210px}
+  .main-viewport{padding:18px}
+  .endpoint-row,.key-row{align-items:flex-start;flex-wrap:wrap}
+  .endpoint-value,.key-value{flex-basis:calc(100% - 90px)}
 }
 
 /* Horizontal Tool Card */
@@ -573,36 +586,50 @@ body{
     <button class="tab-btn" onclick="switchTab('cli')">
       <div class="tab-btn-left">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-        <span>CLI Tools</span>
+        <span>Công cụ CLI</span>
       </div>
       <span class="tab-badge">4</span>
     </button>
     <button class="tab-btn" onclick="switchTab('ide-direct')">
       <div class="tab-btn-left">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
-        <span>IDEs (Direct API)</span>
+        <span>IDE dùng API trực tiếp</span>
       </div>
       <span class="tab-badge">4</span>
     </button>
     <button class="tab-btn" onclick="switchTab('ide-mitm')">
       <div class="tab-btn-left">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-        <span>IDEs (MITM Proxy)</span>
+        <span>IDE dùng MITM Proxy</span>
       </div>
       <span class="tab-badge new">MITM</span>
     </button>
+    <button class="tab-btn" onclick="switchTab('accounts')">
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M19 8v6M22 11h-6"></path></svg>
+        <span>Nhập tài khoản 9router</span>
+      </div>
+      <span class="tab-badge new">JSON</span>
+    </button>
+    <button class="tab-btn" onclick="switchTab('endpoint')">
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"></path><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"></path></svg>
+        <span>Endpoint &amp; API key</span>
+      </div>
+      <span class="tab-badge" id="badge-api-keys">0</span>
+    </button>
 
     <div class="nav-heading" style="margin-top:14px">Hệ thống</div>
-    <a href="/" class="tab-btn" style="text-decoration:none">
+    <a href="/management.html" class="tab-btn" style="text-decoration:none">
       <div class="tab-btn-left">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-        <span>Dashboard</span>
+        <span>Trang quản trị</span>
       </div>
     </a>
-    <a href="/settings" class="tab-btn" style="text-decoration:none">
+    <a href="/management.html#/config" class="tab-btn" style="text-decoration:none">
       <div class="tab-btn-left">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-        <span>Settings</span>
+        <span>Cấu hình máy chủ</span>
       </div>
     </a>
   </nav>
@@ -611,7 +638,7 @@ body{
     <div class="server-status">
       <div class="status-dot"></div>
       <div>
-        <div style="font-weight:600;color:var(--text)">Proxy Running</div>
+        <div style="font-weight:600;color:var(--text)">Proxy đang chạy</div>
         <div style="font-size:11px">127.0.0.1:8317</div>
       </div>
     </div>
@@ -622,11 +649,11 @@ body{
 <main class="main-viewport">
   <div class="top-bar">
     <div>
-      <h1 class="page-title">Providers & Tools Connect</h1>
-      <p class="page-desc">Nhấp vào từng Tool để chọn Model riêng, nhấn Apply rồi Reset tool để áp dụng.</p>
+      <h1 class="page-title">Kết nối nhà cung cấp và công cụ</h1>
+      <p class="page-desc">Chọn từng công cụ, chọn model, áp dụng cấu hình rồi khởi động lại công cụ.</p>
     </div>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-outline" onclick="testConnection()">🧪 Test Gateway</button>
+      <button class="btn btn-outline" onclick="testConnection()">🧪 Kiểm tra gateway</button>
     </div>
   </div>
 
@@ -634,13 +661,18 @@ body{
   <div class="controls-card">
     <div class="controls-row">
       <div class="control-item">
-        <label class="control-label">Gateway API Key:</label>
+        <label class="control-label" for="managementKey">Khóa quản trị:</label>
+        <input id="managementKey" class="select-input" type="password" autocomplete="off" placeholder="Mặc định: admin" onkeydown="if(event.key==='Enter') connectManagement()">
+      </div>
+      <div class="control-item">
+        <label class="control-label">Khóa API gateway:</label>
         <select id="apiKeySelect" class="select-input">
           <option value="">Đang tải...</option>
         </select>
       </div>
+      <button class="btn btn-primary btn-sm" onclick="connectManagement()">Kết nối</button>
       <div style="font-size:12px;color:var(--muted)">
-        💡 Bấm vào bất kỳ Tool nào để mở hộp thoại <b>Chọn Model riêng → Apply → Reset Tool</b>
+        Khóa quản trị chỉ được giữ trong tab trình duyệt hiện tại.
       </div>
     </div>
 
@@ -650,20 +682,20 @@ body{
   <!-- Tab: ALL TOOLS -->
   <div id="pane-all" class="tab-pane active">
     <div class="section-header">
-      <div class="section-title">CLI Tools</div>
+      <div class="section-title">Công cụ CLI</div>
       <button class="btn btn-outline btn-sm" onclick="switchTab('cli')">Mở tab CLI →</button>
     </div>
     <div class="grid" id="grid-cli-all"></div>
 
     <div class="section-header">
-      <div class="section-title">IDEs (Direct Base URL)</div>
-      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-direct')">Mở tab IDE Direct →</button>
+      <div class="section-title">IDE dùng địa chỉ API trực tiếp</div>
+      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-direct')">Mở phần IDE trực tiếp →</button>
     </div>
     <div class="grid" id="grid-direct-all"></div>
 
     <div class="section-header">
-      <div class="section-title">IDEs (MITM Interception Proxy)</div>
-      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-mitm')">Mở tab MITM Proxy →</button>
+      <div class="section-title">IDE dùng MITM Proxy</div>
+      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-mitm')">Mở phần MITM →</button>
     </div>
     <div class="grid" id="grid-mitm-all"></div>
   </div>
@@ -671,7 +703,7 @@ body{
   <!-- Tab: CLI TOOLS ONLY -->
   <div id="pane-cli" class="tab-pane">
     <div class="section-header">
-      <div class="section-title">Terminal & CLI Tools</div>
+      <div class="section-title">Terminal và công cụ CLI</div>
       <span style="font-size:12px;color:var(--muted)">Thiết lập qua Environment Variables hoặc File config cục bộ</span>
     </div>
     <div class="grid" id="grid-cli"></div>
@@ -691,20 +723,71 @@ body{
     <div class="mitm-banner">
       <div>
         <div class="mitm-banner-title">
-          <span>🛡️ Local MITM Interception Proxy</span>
-          <span class="mitm-status-pill">● 127.0.0.1:8318 Sẵn sàng</span>
+          <span>🛡️ Máy chủ MITM cục bộ</span>
+          <span class="mitm-status-pill" id="mitmServerStatus">● Đang kiểm tra...</span>
         </div>
         <div style="font-size:12px;color:var(--muted);margin-top:4px">
-          Dành riêng cho <b>GitHub Copilot</b> và <b>Google Antigravity IDE</b>. Proxy tự động đón chặn và ký SSL cert.
+          IDE → DNS về <code>127.0.0.1:443</code> → MITM → CLIProxyAPI-lite. Request không có model mapping sẽ đi thẳng tới nhà cung cấp.
         </div>
       </div>
       <div style="display:flex;gap:8px">
-        <button class="btn btn-outline btn-sm" onclick="downloadCACert()">📥 Tải ca.crt</button>
-        <button class="btn btn-orange btn-sm" id="btnAutoInstallCA" onclick="autoInstallRootCA()">🔑 Tự động cài Root CA Certificate</button>
+        <button class="btn btn-outline btn-sm" onclick="downloadCACert()">📥 Tải chứng chỉ CA</button>
+        <button class="btn btn-orange btn-sm" id="btnAutoInstallCA" onclick="autoInstallRootCA()">🔑 Tự động cài Root CA</button>
+        <button class="btn btn-primary btn-sm" id="btnMITMServer" onclick="toggleMITMServer()">▶ Khởi động MITM</button>
       </div>
     </div>
     <div id="caInstallMsg" class="card-status-msg" style="margin-bottom:14px"></div>
+    <div id="mitmAdminWarning" class="card-status-msg" style="margin-bottom:14px"></div>
     <div class="grid" id="grid-mitm"></div>
+  </div>
+
+  <!-- Tab: 9ROUTER ACCOUNT IMPORT -->
+  <div id="pane-accounts" class="tab-pane">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Nhập tài khoản từ 9router</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:5px">Hỗ trợ một account, mảng account hoặc file backup có trường <code>providerConnections</code>.</div>
+      </div>
+    </div>
+    <div class="controls-card" style="max-width:760px">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <label class="control-label" for="accountFile">File JSON từ 9router</label>
+        <input id="accountFile" type="file" accept="application/json,.json" class="select-input" style="width:100%;padding:10px">
+        <div style="font-size:12px;color:var(--muted)">Nhập được Codex, Claude và Antigravity. Token chỉ được lưu cục bộ trong thư mục auth, không hiển thị lại trên giao diện hoặc log.</div>
+        <button id="btnImport9Router" class="btn btn-primary" style="align-self:flex-start" onclick="import9RouterAccounts()">📥 Nhập tài khoản</button>
+        <div id="importResult" class="card-status-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tab: ENDPOINT AND CLIENT API KEYS -->
+  <div id="pane-endpoint" class="tab-pane">
+    <div class="endpoint-stack">
+      <div class="controls-card" style="margin-bottom:0">
+        <div class="section-header" style="margin:0 0 8px">
+          <div>
+            <div class="section-title">API Endpoint</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">Dùng địa chỉ này cho ứng dụng hỗ trợ chuẩn OpenAI.</div>
+          </div>
+        </div>
+        <div class="endpoint-row">
+          <span class="endpoint-label">Local</span>
+          <code class="endpoint-value" id="localEndpoint"></code>
+          <button class="btn btn-outline btn-sm" onclick="copyEndpoint()">📋 Sao chép</button>
+        </div>
+      </div>
+
+      <div class="controls-card" style="margin-bottom:0">
+        <div class="section-header" style="margin:0 0 8px">
+          <div>
+            <div class="section-title">API Keys</div>
+            <div style="font-size:12px;color:var(--muted);margin-top:4px">Khóa dùng để ứng dụng kết nối tới endpoint phía trên.</div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="createAPIKey()">＋ Tạo khóa</button>
+        </div>
+        <div id="apiKeyList"><div class="key-empty">Kết nối API quản trị để tải danh sách khóa.</div></div>
+      </div>
+    </div>
   </div>
 
 </main>
@@ -716,7 +799,7 @@ body{
       <div class="modal-header-left">
         <div id="modalIconBox" class="card-icon-box"></div>
         <div>
-          <div id="modalToolTitle" class="modal-title">Tool Configuration</div>
+          <div id="modalToolTitle" class="modal-title">Cấu hình công cụ</div>
           <div id="modalToolPath" class="modal-path">config path</div>
         </div>
       </div>
@@ -769,7 +852,10 @@ body{
 
     <div class="modal-footer">
       <div style="font-size:11px;color:var(--muted)">Gateway: 127.0.0.1:8317</div>
-      <button class="btn btn-outline btn-sm" onclick="closeModal()">Đóng</button>
+      <div style="display:flex;gap:8px">
+        <button id="btnResetConfig" class="btn btn-outline btn-sm" onclick="resetModalConfig()" style="display:none">Gỡ cấu hình gateway</button>
+        <button class="btn btn-outline btn-sm" onclick="closeModal()">Đóng</button>
+      </div>
     </div>
   </div>
 </div>
@@ -777,10 +863,13 @@ body{
 <script>
 const BASE = window.location.origin;
 const MGMT = BASE + '/v0/management';
+const MANAGEMENT_KEY_SESSION = 'cliproxy-management-key';
 let currentTab = 'all';
 let apiKeys = [];
 let models = [];
 let activeModalTool = null;
+let mitmState = { running: false, cert_trusted: false, dns: {} };
+const visibleAPIKeys = new Set();
 
 // Persistent per-tool configured models dictionary
 let toolModels = {
@@ -874,7 +963,7 @@ const cardsData = [
     category: 'cli',
     iconType: 'claude',
     title: 'Claude Code',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'claude-code',
     path: '~/.claude/settings.json',
     resetType: 'cli',
@@ -885,9 +974,9 @@ const cardsData = [
     category: 'cli',
     iconType: 'codex',
     title: 'OpenAI Codex CLI',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'codex-cli',
-    path: 'Windows Environment (setx OPENAI_MODEL)',
+    path: 'Biến môi trường Windows (setx OPENAI_MODEL)',
     resetType: 'cli',
     resetCmd: 'codex "hi"'
   },
@@ -896,9 +985,9 @@ const cardsData = [
     category: 'cli',
     iconType: 'env',
     title: 'OpenAI Environment',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'env-openai',
-    path: 'User Environment Variables',
+    path: 'Biến môi trường người dùng',
     resetType: 'cli',
     resetCmd: 'echo $env:OPENAI_MODEL'
   },
@@ -907,9 +996,9 @@ const cardsData = [
     category: 'cli',
     iconType: 'env',
     title: 'Anthropic Environment',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'env-anthropic',
-    path: 'User Environment Variables',
+    path: 'Biến môi trường người dùng',
     resetType: 'cli',
     resetCmd: 'echo $env:ANTHROPIC_MODEL'
   },
@@ -920,7 +1009,7 @@ const cardsData = [
     category: 'direct',
     iconType: 'cursor',
     title: 'Cursor IDE',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'cursor',
     path: '%APPDATA%/Cursor/User/settings.json',
     resetType: 'ide',
@@ -931,7 +1020,7 @@ const cardsData = [
     category: 'direct',
     iconType: 'vscode',
     title: 'VS Code (Claude Code)',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'vscode',
     path: '%APPDATA%/Code/User/settings.json',
     resetType: 'ide',
@@ -942,7 +1031,7 @@ const cardsData = [
     category: 'direct',
     iconType: 'continue',
     title: 'Continue.dev',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'continue',
     path: '~/.continue/config.json',
     resetType: 'ide',
@@ -953,7 +1042,7 @@ const cardsData = [
     category: 'direct',
     iconType: 'cline',
     title: 'Cline',
-    status: '1 Connected',
+    status: 'Sẵn sàng cấu hình',
     target: 'cline',
     path: '%APPDATA%/Code/User/globalStorage/.../settings.json',
     resetType: 'ide',
@@ -966,22 +1055,24 @@ const cardsData = [
     category: 'mitm',
     iconType: 'copilot',
     title: 'GitHub Copilot (VS Code)',
-    status: 'MITM Mode',
+    status: 'Thiết lập MITM',
     target: 'vscode-copilot',
-    path: 'VS Code Proxy Setting (127.0.0.1:8318)',
+    path: 'api.individual.githubcopilot.com → 127.0.0.1:443',
     resetType: 'ide',
-    resetCmd: 'Ctrl+Shift+P > Developer: Reload Window'
+    resetCmd: 'Ctrl+Shift+P > Developer: Reload Window',
+    aliases: ['gpt-4o-mini', 'claude-haiku-4.5', 'gpt-4o', 'gpt-5-mini']
   },
   {
     id: 'antigravity-ide',
     category: 'mitm',
     iconType: 'antigravity',
     title: 'Antigravity IDE',
-    status: 'MITM Mode',
+    status: 'Thiết lập MITM',
     target: 'antigravity-ide',
-    path: 'Antigravity Proxy Env (HTTPS_PROXY: 8318)',
+    path: 'daily-cloudcode-pa.googleapis.com → 127.0.0.1:443',
     resetType: 'mitm',
-    resetCmd: 'Restart Antigravity IDE'
+    resetCmd: 'Khởi động lại Antigravity IDE',
+    aliases: ['gemini-3.1-pro-high', 'gemini-3.1-pro-low', 'gemini-3-flash', 'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gpt-oss-120b-medium']
   }
 ];
 
@@ -1012,6 +1103,37 @@ function createCardHTML(card, suffix = '') {
   `;
 }
 
+function createMITMCardHTML(card) {
+  const iconSVG = SVGS[card.iconType] || SVGS.env;
+  return `
+    <div class="card" id="mitm-card-${card.target}" style="display:block">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer" onclick="toggleMITMCard('${card.target}')">
+        <div class="card-left">
+          <div class="card-icon-box ${card.iconType}">${iconSVG}</div>
+          <div class="card-info">
+            <div class="card-title">${card.title}</div>
+            <div class="card-meta"><span class="card-status-pill" id="mitm-dns-status-${card.target}"><span class="dot"></span> DNS tắt</span><span class="modal-path">${card.path}</span></div>
+          </div>
+        </div>
+        <button class="btn btn-outline btn-sm">Cấu hình ▾</button>
+      </div>
+      <div id="mitm-detail-${card.target}" style="display:none;margin-top:16px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:14px">
+          <div style="font-size:12px;color:var(--muted)">Bật DNS để chuyển riêng lưu lượng của ${card.title} qua MITM.</div>
+          <button class="btn btn-outline btn-sm" id="mitm-dns-btn-${card.target}" onclick="event.stopPropagation();toggleMITMDNS('${card.target}')">Bật DNS</button>
+        </div>
+        <div style="display:grid;gap:8px">
+          ${(card.aliases || []).map(alias => `
+            <div style="display:grid;grid-template-columns:minmax(150px,.8fr) 18px minmax(180px,1.2fr);gap:8px;align-items:center">
+              <label class="control-label" for="mitm-map-${card.target}-${alias}">${alias}</label>
+              <span style="color:var(--muted)">→</span>
+              <input class="select-input mitm-map-${card.target}" id="mitm-map-${card.target}-${alias}" data-alias="${alias}" placeholder="provider/model-id" onblur="saveMITMMappings('${card.target}')">
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>`;
+}
+
 function renderAllGrids() {
   const cliCards = cardsData.filter(c => c.category === 'cli');
   const directCards = cardsData.filter(c => c.category === 'direct');
@@ -1019,7 +1141,7 @@ function renderAllGrids() {
 
   document.getElementById('grid-cli').innerHTML = cliCards.map(c => createCardHTML(c, 'cli')).join('');
   document.getElementById('grid-direct').innerHTML = directCards.map(c => createCardHTML(c, 'direct')).join('');
-  document.getElementById('grid-mitm').innerHTML = mitmCards.map(c => createCardHTML(c, 'mitm')).join('');
+  document.getElementById('grid-mitm').innerHTML = mitmCards.map(createMITMCardHTML).join('');
 
   document.getElementById('grid-cli-all').innerHTML = cliCards.map(c => createCardHTML(c, 'all')).join('');
   document.getElementById('grid-direct-all').innerHTML = directCards.map(c => createCardHTML(c, 'all')).join('');
@@ -1054,10 +1176,99 @@ function showToast(msg, type = 'ok') {
   setTimeout(() => t.remove(), 3200);
 }
 
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+}
+
+async function copyText(value, message) {
+  await navigator.clipboard.writeText(value);
+  showToast(message, 'ok');
+}
+
+function copyEndpoint() {
+  copyText(BASE + '/v1', 'Đã sao chép endpoint');
+}
+
+function maskAPIKey(key) {
+  return key.length > 12 ? key.slice(0, 8) + '••••••••' + key.slice(-4) : '••••••••••••';
+}
+
+function renderAPIKeys() {
+  document.getElementById('badge-api-keys').textContent = apiKeys.length;
+  const list = document.getElementById('apiKeyList');
+  if (!apiKeys.length) {
+    list.innerHTML = '<div class="key-empty">Chưa có API key. Tạo khóa đầu tiên để kết nối ứng dụng.</div>';
+    return;
+  }
+  list.innerHTML = apiKeys.map((key, index) => {
+    const shown = visibleAPIKeys.has(index);
+    return `<div class="key-row">
+      <span class="endpoint-label">Khóa ${index + 1}</span>
+      <code class="key-value">${escapeHTML(shown ? key : maskAPIKey(key))}</code>
+      <button class="btn btn-outline btn-sm" onclick="toggleAPIKey(${index})">${shown ? '🙈 Ẩn' : '👁 Hiện'}</button>
+      <button class="btn btn-outline btn-sm" onclick="copyAPIKey(${index})">📋</button>
+      <button class="btn btn-outline btn-sm" style="color:var(--error)" onclick="deleteAPIKey(${index})">🗑 Xóa</button>
+    </div>`;
+  }).join('');
+}
+
+function toggleAPIKey(index) {
+  if (visibleAPIKeys.has(index)) visibleAPIKeys.delete(index);
+  else visibleAPIKeys.add(index);
+  renderAPIKeys();
+}
+
+function copyAPIKey(index) {
+  if (apiKeys[index]) copyText(apiKeys[index], 'Đã sao chép API key');
+}
+
+function generatedAPIKey() {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return 'sk-cliproxy-' + Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
+
+async function createAPIKey() {
+  try {
+    const key = generatedAPIKey();
+    const resp = await mgmtFetch('/api-keys', {
+      method: 'PATCH',
+      body: JSON.stringify({ old: '__new_api_key__' + key, new: key })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Không thể tạo API key');
+    await loadApiKeys();
+    const index = apiKeys.indexOf(key);
+    if (index >= 0) visibleAPIKeys.add(index);
+    renderAPIKeys();
+    await copyText(key, 'Đã tạo và sao chép API key mới');
+  } catch (e) {
+    showToast('Lỗi: ' + e.message, 'err');
+  }
+}
+
+async function deleteAPIKey(index) {
+  if (!apiKeys[index] || !confirm(`Xóa Khóa ${index + 1}? Ứng dụng đang dùng khóa này sẽ ngừng kết nối.`)) return;
+  try {
+    const resp = await mgmtFetch('/api-keys?index=' + index, { method: 'DELETE' });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.error || 'Không thể xóa API key');
+    visibleAPIKeys.clear();
+    await loadApiKeys();
+    showToast('Đã xóa API key', 'ok');
+  } catch (e) {
+    showToast('Lỗi: ' + e.message, 'err');
+  }
+}
+
 /* Modal: Select Tool -> Select Model -> Apply -> Reset Tool */
 function openConfigModal(toolTarget) {
   const card = cardsData.find(c => c.target === toolTarget);
   if (!card) return;
+  if (card.category === 'mitm') {
+    switchTab('ide-mitm');
+    setTimeout(() => toggleMITMCard(toolTarget), 0);
+    return;
+  }
 
   activeModalTool = card;
   const modal = document.getElementById('configModal');
@@ -1068,12 +1279,14 @@ function openConfigModal(toolTarget) {
   const chips = document.getElementById('modalModelChips');
   const resetBox = document.getElementById('stepResetBox');
   const btnApply = document.getElementById('btnApplyModal');
+  const btnReset = document.getElementById('btnResetConfig');
 
   iconBox.className = 'card-icon-box ' + card.iconType;
   iconBox.innerHTML = SVGS[card.iconType] || SVGS.env;
   title.textContent = card.title;
   path.textContent = '📁 ' + card.path;
   resetBox.style.display = 'none';
+  btnReset.style.display = ['claude-code', 'codex-cli'].includes(toolTarget) ? 'inline-flex' : 'none';
   btnApply.disabled = false;
   btnApply.textContent = '⚡ Áp dụng Cấu hình (Apply)';
 
@@ -1182,25 +1395,109 @@ function copyResetCommand() {
 }
 
 async function mgmtFetch(path, opts) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = {};
+  const key = document.getElementById('managementKey')?.value.trim() || sessionStorage.getItem(MANAGEMENT_KEY_SESSION) || '';
+  if (key) headers['X-Management-Key'] = key;
+  if (!(opts?.body instanceof FormData)) headers['Content-Type'] = 'application/json';
   return fetch(MGMT + path, { ...opts, headers: { ...headers, ...(opts?.headers || {}) } });
+}
+
+async function resetModalConfig() {
+  if (!activeModalTool || !['claude-code', 'codex-cli'].includes(activeModalTool.target)) return;
+  const button = document.getElementById('btnResetConfig');
+  button.disabled = true;
+  button.textContent = 'Đang gỡ...';
+  try {
+    const resp = await mgmtFetch('/configure-tool', {
+      method: 'POST',
+      body: JSON.stringify({ tool: activeModalTool.target, action: 'reset' })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Không thể gỡ cấu hình');
+    showToast('Đã gỡ cấu hình gateway khỏi ' + activeModalTool.title, 'ok');
+    closeModal();
+  } catch (e) {
+    showToast('Lỗi: ' + e.message, 'err');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Gỡ cấu hình gateway';
+  }
+}
+
+async function connectManagement() {
+  const input = document.getElementById('managementKey');
+  const key = input.value.trim();
+  if (!key) {
+    showToast('Vui lòng nhập khóa quản trị', 'err');
+    return;
+  }
+  sessionStorage.setItem(MANAGEMENT_KEY_SESSION, key);
+  const connected = await loadApiKeys();
+  if (!connected) return;
+  await loadModels();
+  await loadMITMStatus();
+  showToast('Đã kết nối API quản trị', 'ok');
 }
 
 async function loadApiKeys() {
   try {
     const resp = await mgmtFetch('/api-keys');
-    if (!resp.ok) return;
+    if (!resp.ok) {
+      if (resp.status === 401) showToast('Khóa quản trị không đúng', 'err');
+      return false;
+    }
     const data = await resp.json();
-    apiKeys = data.keys || data.api_keys || data || [];
+    apiKeys = data.keys || data['api-keys'] || data.api_keys || data || [];
     if (Array.isArray(apiKeys) && apiKeys.length > 0) {
       const sel = document.getElementById('apiKeySelect');
       sel.innerHTML = apiKeys.map(k => {
         const display = k.length > 14 ? k.slice(0, 8) + '…' + k.slice(-4) : k;
-        return `<option value="${k}">${display}</option>`;
+        return `<option value="${escapeHTML(k)}">${escapeHTML(display)}</option>`;
       }).join('');
+    } else {
+      document.getElementById('apiKeySelect').innerHTML = '<option value="">Chưa có khóa API</option>';
     }
+    renderAPIKeys();
+    return true;
   } catch (e) {
     console.error('loadApiKeys:', e);
+    showToast('Không thể kết nối API quản trị', 'err');
+    return false;
+  }
+}
+
+async function import9RouterAccounts() {
+  const input = document.getElementById('accountFile');
+  const button = document.getElementById('btnImport9Router');
+  const result = document.getElementById('importResult');
+  if (!input.files?.length) {
+    showToast('Vui lòng chọn file JSON của 9router', 'err');
+    return;
+  }
+  const form = new FormData();
+  form.append('file', input.files[0]);
+  button.disabled = true;
+  button.textContent = '⏳ Đang nhập tài khoản...';
+  try {
+    const resp = await mgmtFetch('/import/9router', { method: 'POST', body: form });
+    const data = await resp.json();
+    if (!resp.ok && resp.status !== 207) throw new Error(data.error || 'Không thể nhập file');
+    const failed = Array.isArray(data.failed) ? data.failed.length : 0;
+    result.style.display = 'block';
+    result.style.background = failed ? 'rgba(245,158,11,.12)' : 'rgba(34,197,94,.12)';
+    result.style.color = failed ? 'var(--warn)' : 'var(--success)';
+    result.textContent = `Đã nhập ${data.imported || 0} tài khoản${failed ? `; bỏ qua ${failed} mục không hỗ trợ hoặc không hợp lệ` : ''}.`;
+    input.value = '';
+    showToast(`Đã nhập ${data.imported || 0} tài khoản`, failed ? 'err' : 'ok');
+  } catch (e) {
+    result.style.display = 'block';
+    result.style.background = 'rgba(239,68,68,.12)';
+    result.style.color = 'var(--error)';
+    result.textContent = 'Không thể nhập: ' + e.message;
+    showToast('Lỗi nhập tài khoản: ' + e.message, 'err');
+  } finally {
+    button.disabled = false;
+    button.textContent = '📥 Nhập tài khoản';
   }
 }
 
@@ -1276,10 +1573,10 @@ function copySnippet(tool) {
       snippet = `{"claude-code.apiBaseUrl": "${BASE}", "claude-code.model": "${model || 'claude-3-7-sonnet'}"}`;
       break;
     case 'vscode-copilot':
-      snippet = `{"http.proxy": "http://127.0.0.1:8318", "http.proxyStrictSSL": false}`;
+      snippet = `127.0.0.1 api.individual.githubcopilot.com`;
       break;
     case 'antigravity-ide':
-      snippet = `export HTTPS_PROXY="http://127.0.0.1:8318"\nexport NODE_EXTRA_CA_CERTS="ca.crt"`;
+      snippet = `127.0.0.1 daily-cloudcode-pa.googleapis.com\n127.0.0.1 cloudcode-pa.googleapis.com`;
       break;
     default:
       snippet = `${BASE}/v1`;
@@ -1289,8 +1586,130 @@ function copySnippet(tool) {
   });
 }
 
-function downloadCACert() {
-  showToast('Đang tải file ca.crt từ gateway...', 'ok');
+function mitmToolID(target) {
+  return target === 'vscode-copilot' ? 'copilot' : 'antigravity';
+}
+
+async function loadMITMStatus() {
+  try {
+    const resp = await mgmtFetch('/mitm/status');
+    if (!resp.ok) return;
+    mitmState = await resp.json();
+    const status = document.getElementById('mitmServerStatus');
+    const button = document.getElementById('btnMITMServer');
+    status.textContent = mitmState.running ? '● Đang chạy 127.0.0.1:443' : '● Đã dừng';
+    status.style.color = mitmState.running ? 'var(--success)' : 'var(--muted)';
+    button.textContent = mitmState.running ? '■ Dừng MITM' : '▶ Khởi động MITM';
+    const warning = document.getElementById('mitmAdminWarning');
+    if (!mitmState.is_admin) {
+      warning.style.display = 'block';
+      warning.style.background = 'rgba(245,158,11,.12)';
+      warning.style.color = 'var(--warn)';
+      warning.textContent = 'Windows cần chạy CLIProxyAPI-lite bằng quyền Administrator để bật/tắt DNS trong file hosts.';
+    } else {
+      warning.style.display = 'none';
+    }
+    document.getElementById('btnAutoInstallCA').textContent = mitmState.cert_trusted ? '✅ Root CA đã được tin cậy' : '🔑 Tự động cài Root CA';
+    updateMITMDNSUI();
+  } catch (e) {
+    console.error('loadMITMStatus:', e);
+  }
+}
+
+async function toggleMITMServer() {
+  const button = document.getElementById('btnMITMServer');
+  button.disabled = true;
+  try {
+    if (!mitmState.running && !getApiKey()) throw new Error('Hãy chọn khóa API gateway trước');
+    const path = mitmState.running ? '/mitm/stop' : '/mitm/start';
+    const resp = await mgmtFetch(path, {
+      method: 'POST',
+      body: mitmState.running ? undefined : JSON.stringify({ api_key: getApiKey() })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Không thể đổi trạng thái MITM');
+    mitmState = data;
+    showToast(mitmState.running ? 'Máy chủ MITM đã chạy trên cổng 443' : 'Đã dừng máy chủ MITM', 'ok');
+    await loadMITMStatus();
+  } catch (e) {
+    showToast('MITM: ' + e.message, 'err');
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function toggleMITMCard(target) {
+  const detail = document.getElementById('mitm-detail-' + target);
+  const opening = detail.style.display === 'none';
+  detail.style.display = opening ? 'block' : 'none';
+  if (opening) loadMITMMappings(target);
+}
+
+async function loadMITMMappings(target) {
+  const tool = mitmToolID(target);
+  const resp = await mgmtFetch('/mitm/mappings?tool=' + encodeURIComponent(tool));
+  if (!resp.ok) return;
+  const data = await resp.json();
+  document.querySelectorAll('.mitm-map-' + target).forEach(input => {
+    input.value = data.mappings?.[input.dataset.alias] || '';
+    input.disabled = !mitmState.dns?.[tool];
+  });
+}
+
+async function saveMITMMappings(target) {
+  const mappings = {};
+  document.querySelectorAll('.mitm-map-' + target).forEach(input => mappings[input.dataset.alias] = input.value.trim());
+  const resp = await mgmtFetch('/mitm/mappings', {
+    method: 'PUT',
+    body: JSON.stringify({ tool: mitmToolID(target), mappings })
+  });
+  if (resp.ok) showToast('Đã lưu mapping model', 'ok');
+}
+
+async function toggleMITMDNS(target) {
+  const tool = mitmToolID(target);
+  const enabled = !mitmState.dns?.[tool];
+  try {
+    const resp = await mgmtFetch('/mitm/dns', {
+      method: 'PATCH',
+      body: JSON.stringify({ tool, enabled })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Không thể cập nhật DNS');
+    mitmState.dns = data.dns || {};
+    updateMITMDNSUI();
+    await loadMITMMappings(target);
+    showToast(`${enabled ? 'Đã bật' : 'Đã tắt'} DNS cho ${tool}. Hãy khởi động lại IDE.`, 'ok');
+  } catch (e) {
+    showToast('DNS: ' + e.message, 'err');
+  }
+}
+
+function updateMITMDNSUI() {
+  for (const target of ['vscode-copilot', 'antigravity-ide']) {
+    const enabled = !!mitmState.dns?.[mitmToolID(target)];
+    const label = document.getElementById('mitm-dns-status-' + target);
+    const button = document.getElementById('mitm-dns-btn-' + target);
+    if (label) label.innerHTML = `<span class="dot"></span> ${enabled ? 'DNS đang bật' : 'DNS tắt'}`;
+    if (button) button.textContent = enabled ? 'Tắt DNS' : 'Bật DNS';
+    document.querySelectorAll('.mitm-map-' + target).forEach(input => input.disabled = !enabled);
+  }
+}
+
+async function downloadCACert() {
+  try {
+    const resp = await mgmtFetch('/mitm/ca.crt');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const url = URL.createObjectURL(await resp.blob());
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'CLIProxyAPI-Root-CA.crt';
+    link.click();
+    URL.revokeObjectURL(url);
+    showToast('Đã tải chứng chỉ Root CA', 'ok');
+  } catch (e) {
+    showToast('Không thể tải chứng chỉ: ' + e.message, 'err');
+  }
 }
 
 async function autoInstallRootCA() {
@@ -1310,6 +1729,7 @@ async function autoInstallRootCA() {
       msgBox.innerHTML = `✅ <b>Thành công!</b> ${data.message || 'Đã cài Root CA vào Windows User Root Store (không cần quyền Admin).'}`;
       btn.textContent = '✅ Đã cài đặt Root CA';
       showToast('Đã cài đặt Root CA thành công!', 'ok');
+      await loadMITMStatus();
     } else {
       throw new Error(data.error || 'Không thể cài đặt tự động');
     }
@@ -1335,8 +1755,13 @@ window.onclick = function(event) {
 
 (async function init() {
   renderAllGrids();
-  await loadApiKeys();
-  await loadModels();
+  document.getElementById('localEndpoint').textContent = BASE + '/v1';
+  const savedKey = sessionStorage.getItem(MANAGEMENT_KEY_SESSION) || '';
+  document.getElementById('managementKey').value = savedKey;
+  if (savedKey && await loadApiKeys()) {
+    await loadModels();
+    await loadMITMStatus();
+  }
 })();
 </script>
 </body>

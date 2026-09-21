@@ -30,6 +30,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
+	webui "github.com/router-for-me/CLIProxyAPI/v7/web"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -127,17 +128,11 @@ func (s *Server) setupRoutes() {
 		v1beta.GET("/models/*action", s.geminiGetHandler(geminiHandlers))
 	}
 
-	// Root endpoint
-	s.engine.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "CLI Proxy API Server",
-			"endpoints": []string{
-				"POST /v1/chat/completions",
-				"POST /v1/completions",
-				"GET /v1/models",
-			},
-		})
-	})
+	serveConnectUI := func(c *gin.Context) {
+		c.Data(http.StatusOK, "text/html; charset=utf-8", webui.ConnectHTML)
+	}
+	s.engine.GET("/", serveConnectUI)
+	s.engine.GET("/connect", serveConnectUI)
 
 	// OAuth callback endpoints (reuse main server port)
 	// These endpoints receive provider redirects and persist
