@@ -299,15 +299,17 @@ To use these tools with CLIProxyAPI-lite, we employ a local transparent **MITM I
 
 1. **Start the MITM Proxy** (configured in `config.yaml` under `mitm-proxy` on port `8318`).
 2. **Install & Trust the Root CA Certificate**:
-   - Download the generated `ca.crt` from the Web UI Connect page or `GET /v0/management/mitm/ca.crt`.
-   - Windows:
-     ```cmd
-     certutil -addstore -user Root certs\ca.crt
-     ```
-   - Or configure Node.js based tools with the environment variable:
-     ```bash
-     export NODE_EXTRA_CA_CERTS="/path/to/certs/ca.crt"
-     ```
+   - **Automatic 1-Click Install (Recommended)**: On the Web UI Connect page (`IDEs (MITM Proxy)` tab), click **"🔑 Tự động cài Root CA"**. The server executes `certutil -addstore -user Root` directly to install the certificate into your personal trusted root store without requiring administrative UAC prompts.
+   - **Manual install**:
+     - Download `ca.crt` from `GET /v0/management/mitm/ca.crt`.
+     - Windows:
+       ```cmd
+       certutil -addstore -user Root certs\ca.crt
+       ```
+     - Or configure Node.js based tools with the environment variable:
+       ```bash
+       export NODE_EXTRA_CA_CERTS="/path/to/certs/ca.crt"
+       ```
 3. **Configure VS Code**:
    In VS Code `settings.json`:
    ```json

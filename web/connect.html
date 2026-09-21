@@ -3,36 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CLIProxyAPI-lite — Connect</title>
+<title>CLIProxyAPI-lite — Connect & Providers</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0b0d13;
-  --sidebar-bg:#12151e;
-  --card:#181c28;
-  --card-hover:#1e2333;
-  --border:#262b3d;
-  --text:#e4e4e7;
-  --muted:#8e95a5;
+  --bg:#121214;
+  --sidebar-bg:#16161a;
+  --card:#1c1c21;
+  --card-hover:#23232a;
+  --border:#2a2a32;
+  --text:#f4f4f6;
+  --muted:#8e8e9a;
   --accent:#6366f1;
-  --accent-hover:#818cf8;
+  --accent-hover:#7c7ff6;
   --accent-soft:rgba(99,102,241,0.12);
   --success:#22c55e;
   --error:#ef4444;
   --warn:#f59e0b;
-  --radius:12px;
+  --radius:10px;
 }
 body{
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
   background:var(--bg);
   color:var(--text);
   min-height:100vh;
   display:flex;
 }
 
-/* Sidebar Styles */
+/* Sidebar Styles (9router style) */
 .sidebar{
-  width:280px;
+  width:260px;
   background:var(--sidebar-bg);
   border-right:1px solid var(--border);
   display:flex;
@@ -41,60 +41,60 @@ body{
   flex-shrink:0;
 }
 .sidebar-header{
-  padding:24px 20px;
+  padding:20px 18px;
   border-bottom:1px solid var(--border);
-}
-.sidebar-logo{
   display:flex;
   align-items:center;
-  gap:10px;
-  font-size:18px;
-  font-weight:700;
-  color:#fff;
-  letter-spacing:-0.3px;
+  gap:12px;
 }
 .sidebar-logo-icon{
-  width:32px;
-  height:32px;
+  width:36px;
+  height:36px;
   border-radius:8px;
-  background:linear-gradient(135deg,var(--accent),#a855f7);
+  background:linear-gradient(135deg,#f97316,#ea580c);
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:18px;
-  font-weight:bold;
+  color:#fff;
+  flex-shrink:0;
 }
-.sidebar-subtitle{
-  font-size:12px;
+.sidebar-title{
+  font-size:15px;
+  font-weight:700;
+  color:#fff;
+  letter-spacing:-0.2px;
+}
+.sidebar-ver{
+  font-size:11px;
   color:var(--muted);
-  margin-top:4px;
+  font-family:monospace;
 }
 .sidebar-nav{
-  padding:16px 12px;
+  padding:14px 10px;
   display:flex;
   flex-direction:column;
-  gap:4px;
+  gap:3px;
   flex:1;
 }
-.nav-section-title{
+.nav-heading{
   font-size:11px;
-  font-weight:600;
+  font-weight:700;
   text-transform:uppercase;
-  letter-spacing:0.6px;
+  letter-spacing:0.7px;
   color:var(--muted);
-  padding:10px 12px 6px;
+  padding:12px 10px 6px;
 }
 .tab-btn{
   display:flex;
   align-items:center;
   justify-content:space-between;
   width:100%;
-  padding:10px 14px;
+  padding:9px 12px;
   background:transparent;
   border:none;
-  border-radius:8px;
+  border-radius:7px;
   color:var(--muted);
-  font-size:14px;
+  font-size:13px;
   font-weight:500;
   cursor:pointer;
   transition:all 0.15s ease;
@@ -105,8 +105,8 @@ body{
   color:var(--text);
 }
 .tab-btn.active{
-  background:var(--accent-soft);
-  color:var(--accent-hover);
+  background:#261f22;
+  color:#f97316;
   font-weight:600;
 }
 .tab-btn-left{
@@ -115,24 +115,24 @@ body{
   gap:10px;
 }
 .tab-badge{
-  font-size:11px;
-  padding:2px 7px;
+  font-size:10px;
+  padding:2px 6px;
   border-radius:10px;
-  background:rgba(255,255,255,0.08);
+  background:rgba(255,255,255,0.06);
   color:var(--muted);
 }
 .tab-badge.new{
-  background:rgba(245,158,11,0.2);
-  color:var(--warn);
+  background:rgba(249,115,22,0.15);
+  color:#f97316;
 }
 .tab-btn.active .tab-badge{
-  background:var(--accent);
+  background:#f97316;
   color:#fff;
 }
 .sidebar-footer{
-  padding:16px 20px;
+  padding:14px 18px;
   border-top:1px solid var(--border);
-  font-size:12px;
+  font-size:11px;
   color:var(--muted);
 }
 .server-status{
@@ -145,75 +145,76 @@ body{
   height:8px;
   border-radius:50%;
   background:var(--success);
-  box-shadow:0 0 8px rgba(34,197,94,0.6);
+  box-shadow:0 0 6px rgba(34,197,94,0.7);
 }
 
 /* Main Content Area */
 .main-viewport{
   flex:1;
-  padding:28px 36px;
+  padding:24px 32px;
   overflow-y:auto;
-  max-width:1200px;
+  max-width:1300px;
 }
-.header-top{
-  margin-bottom:24px;
+.top-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom:20px;
 }
 .page-title{
-  font-size:26px;
+  font-size:22px;
   font-weight:700;
-  letter-spacing:-0.5px;
+  letter-spacing:-0.4px;
 }
 .page-desc{
   color:var(--muted);
-  font-size:14px;
-  margin-top:4px;
+  font-size:13px;
+  margin-top:2px;
 }
 
-/* Controls Header */
-.controls-panel{
+/* Controls Panel */
+.controls-card{
   background:var(--card);
   border:1px solid var(--border);
   border-radius:var(--radius);
-  padding:18px 20px;
-  margin-bottom:28px;
+  padding:16px 20px;
+  margin-bottom:24px;
 }
 .controls-row{
   display:flex;
-  align-items:flex-end;
+  align-items:center;
   gap:16px;
   flex-wrap:wrap;
 }
 .control-item{
-  flex:1;
-  min-width:240px;
+  display:flex;
+  align-items:center;
+  gap:10px;
 }
 .control-label{
   font-size:12px;
   font-weight:600;
-  text-transform:uppercase;
-  letter-spacing:0.5px;
   color:var(--muted);
-  margin-bottom:6px;
-  display:block;
+  white-space:nowrap;
 }
 .select-input{
-  width:100%;
-  padding:9px 12px;
+  padding:7px 12px;
   background:var(--bg);
   border:1px solid var(--border);
-  border-radius:8px;
+  border-radius:6px;
   color:var(--text);
-  font-size:14px;
+  font-size:13px;
   outline:none;
+  min-width:260px;
 }
 .select-input:focus{border-color:var(--accent)}
 .btn{
   display:inline-flex;
   align-items:center;
   gap:6px;
-  padding:9px 18px;
+  padding:7px 14px;
   border:none;
-  border-radius:8px;
+  border-radius:6px;
   font-size:13px;
   font-weight:600;
   cursor:pointer;
@@ -222,161 +223,189 @@ body{
 }
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:var(--accent-hover)}
+.btn-orange{background:#ea580c;color:#fff}
+.btn-orange:hover{background:#f97316}
 .btn-outline{background:transparent;color:var(--muted);border:1px solid var(--border)}
 .btn-outline:hover{color:var(--text);border-color:var(--accent);background:rgba(255,255,255,0.03)}
-.btn-sm{padding:6px 12px;font-size:12px}
+.btn-sm{padding:5px 10px;font-size:12px}
 
-/* Model Selector Chips */
+/* Model Chips */
 .model-section{
-  margin-top:16px;
-  padding-top:14px;
+  margin-top:12px;
+  padding-top:12px;
   border-top:1px solid var(--border);
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
 }
-.model-list{
+.model-chips{
   display:flex;
   flex-wrap:wrap;
-  gap:8px;
-  margin-top:8px;
+  gap:6px;
 }
 .model-chip{
-  padding:5px 12px;
+  padding:4px 10px;
   background:var(--bg);
   border:1px solid var(--border);
-  border-radius:16px;
+  border-radius:14px;
   font-size:12px;
   cursor:pointer;
   transition:all .15s;
 }
 .model-chip:hover{border-color:var(--accent);color:var(--accent-hover)}
 .model-chip.selected{background:var(--accent);border-color:var(--accent);color:#fff}
-
 .test-result{
-  margin-top:14px;
+  margin-top:12px;
   padding:10px 14px;
-  border-radius:8px;
-  font-size:13px;
+  border-radius:6px;
+  font-size:12px;
   font-family:monospace;
   display:none;
 }
 
-/* Card Grids */
+/* 9router Style Cards */
 .tab-pane{display:none}
 .tab-pane.active{display:block}
 .section-header{
   display:flex;
   align-items:center;
   justify-content:space-between;
-  margin:24px 0 16px;
+  margin:20px 0 12px;
 }
 .section-title{
-  font-size:18px;
-  font-weight:600;
-  display:flex;
-  align-items:center;
-  gap:8px;
+  font-size:15px;
+  font-weight:700;
+  color:#fff;
+  letter-spacing:-0.2px;
 }
+
 .grid{
   display:grid;
-  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
-  gap:18px;
-  margin-bottom:28px;
+  grid-template-columns:repeat(auto-fill,minmax(360px,1fr));
+  gap:14px;
+  margin-bottom:24px;
 }
+
+/* The 9router horizontal card */
 .card{
   background:var(--card);
   border:1px solid var(--border);
   border-radius:var(--radius);
-  padding:20px;
-  display:flex;
-  flex-direction:column;
-  justify-content:space-between;
-  transition:border-color .2s, transform .2s;
-}
-.card:hover{
-  border-color:var(--accent);
-}
-.card-header{
+  padding:14px 16px;
   display:flex;
   align-items:center;
-  gap:12px;
-  margin-bottom:14px;
+  justify-content:space-between;
+  gap:14px;
+  transition:border-color .15s ease, background .15s ease;
 }
-.card-icon{
-  width:42px;
-  height:42px;
+.card:hover{
+  border-color:#3f3f4c;
+  background:var(--card-hover);
+}
+.card-left{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  min-width:0;
+}
+.card-icon-box{
+  width:44px;
+  height:44px;
   border-radius:10px;
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:18px;
-  font-weight:700;
+  flex-shrink:0;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+
+/* Provider Icon Box Themes */
+.card-icon-box.claude{background:#2a1c18}
+.card-icon-box.antigravity{background:#151c2d}
+.card-icon-box.codex{background:#11221b}
+.card-icon-box.copilot{background:#1b2430}
+.card-icon-box.cursor{background:#18181c}
+.card-icon-box.cline{background:#211b33}
+.card-icon-box.continue{background:#11222e}
+.card-icon-box.env{background:#1f232b}
+
+.card-info{
+  min-width:0;
+}
+.card-title{
+  font-size:14px;
+  font-weight:600;
+  color:#fff;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.card-status-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-size:11px;
+  font-weight:500;
+  color:var(--success);
+  margin-top:3px;
+}
+.card-status-pill .dot{
+  width:6px;
+  height:6px;
+  border-radius:50%;
+  background:var(--success);
+}
+.card-status-pill.offline{
+  color:var(--muted);
+}
+.card-status-pill.offline .dot{
+  background:var(--muted);
+}
+.card-right{
+  display:flex;
+  align-items:center;
+  gap:8px;
   flex-shrink:0;
 }
-.card-icon.claude{background:#d97757;color:#fff}
-.card-icon.openai{background:#10a37f;color:#fff}
-.card-icon.vscode{background:#007acc;color:#fff}
-.card-icon.cursor{background:#fff;color:#000}
-.card-icon.continue{background:#1389fd;color:#fff}
-.card-icon.cline{background:#6366f1;color:#fff}
-.card-icon.env{background:#374151;color:#e4e4e7}
-.card-icon.mitm{background:linear-gradient(135deg,#f59e0b,#ef4444);color:#fff}
-.card-icon.antigravity{background:linear-gradient(135deg,#3b82f6,#8b5cf6);color:#fff}
 
-.card-title{font-size:16px;font-weight:600}
-.card-desc{color:var(--muted);font-size:13px;margin-top:2px}
-.field{margin:12px 0 6px}
-.field select{
-  width:100%;
-  padding:7px 10px;
-  background:var(--bg);
-  border:1px solid var(--border);
-  border-radius:6px;
-  color:var(--text);
-  font-size:13px;
-  outline:none;
-}
-.card-actions{
-  margin-top:16px;
-  display:flex;
-  gap:8px;
-  align-items:center;
-}
-.status{
-  margin-top:10px;
+/* Card Feedback Status */
+.card-status-msg{
+  grid-column:1 / -1;
+  font-size:12px;
   padding:8px 12px;
   border-radius:6px;
-  font-size:12px;
   display:none;
-  line-height:1.4;
 }
-.status.ok{display:block;background:rgba(34,197,94,.12);color:var(--success);border:1px solid rgba(34,197,94,.2)}
-.status.err{display:block;background:rgba(239,68,68,.12);color:var(--error);border:1px solid rgba(239,68,68,.2)}
-.status.loading{display:block;background:rgba(99,102,241,.12);color:var(--accent);border:1px solid rgba(99,102,241,.2)}
 
-/* MITM Banner Card */
+/* MITM Banner */
 .mitm-banner{
-  background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(99,102,241,0.08));
-  border:1px solid rgba(245,158,11,0.3);
+  background:linear-gradient(135deg,#1f1a16,#181b24);
+  border:1px solid rgba(249,115,22,0.3);
   border-radius:var(--radius);
-  padding:20px;
-  margin-bottom:24px;
+  padding:18px 20px;
+  margin-bottom:20px;
   display:flex;
-  justify-content:space-between;
   align-items:center;
+  justify-content:space-between;
   gap:20px;
   flex-wrap:wrap;
 }
-.mitm-banner-title{font-size:16px;font-weight:600;display:flex;align-items:center;gap:8px}
-.mitm-banner-desc{color:var(--muted);font-size:13px;margin-top:4px}
-.mitm-status-pill{
-  display:inline-flex;
+.mitm-banner-title{
+  font-size:15px;
+  font-weight:700;
+  color:#fff;
+  display:flex;
   align-items:center;
-  gap:6px;
-  padding:4px 10px;
+  gap:8px;
+}
+.mitm-status-pill{
+  font-size:11px;
+  padding:3px 8px;
   border-radius:12px;
-  font-size:12px;
-  font-weight:600;
   background:rgba(34,197,94,0.15);
   color:var(--success);
+  font-weight:600;
 }
 
 /* Toast */
@@ -384,55 +413,78 @@ body{
   position:fixed;
   bottom:24px;
   right:24px;
-  padding:12px 20px;
+  padding:12px 18px;
   border-radius:8px;
-  font-size:14px;
+  font-size:13px;
   z-index:1000;
-  animation:slideIn .3s ease;
-  box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  animation:slideIn .25s ease;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);
 }
 .toast.ok{background:var(--success);color:#fff}
 .toast.err{background:var(--error);color:#fff}
-@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes slideIn{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
 </style>
 </head>
 <body>
 
-<!-- Left Vertical Sidebar -->
+<!-- Left Vertical Sidebar (9router style) -->
 <aside class="sidebar">
   <div class="sidebar-header">
-    <div class="sidebar-logo">
-      <div class="sidebar-logo-icon">⚡</div>
-      <span>CLIProxyAPI-lite</span>
+    <div class="sidebar-logo-icon">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M12 3v6m0 6v6M3 12h6m6 0h6"></path>
+      </svg>
     </div>
-    <div class="sidebar-subtitle">Local AI Gateway & Client Config</div>
+    <div>
+      <div class="sidebar-title">CLIProxyAPI-lite</div>
+      <div class="sidebar-ver">v0.1.0 • gateway</div>
+    </div>
   </div>
 
   <nav class="sidebar-nav">
-    <div class="nav-section-title">Danh mục công cụ</div>
+    <div class="nav-heading">Kết nối Tools</div>
     <button class="tab-btn active" onclick="switchTab('all')">
-      <div class="tab-btn-left"><span>⚡</span><span>Tất cả công cụ</span></div>
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        <span>Tất cả công cụ</span>
+      </div>
       <span class="tab-badge" id="badge-all">10</span>
     </button>
     <button class="tab-btn" onclick="switchTab('cli')">
-      <div class="tab-btn-left"><span>💻</span><span>CLI Tools</span></div>
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+        <span>CLI Tools</span>
+      </div>
       <span class="tab-badge">4</span>
     </button>
     <button class="tab-btn" onclick="switchTab('ide-direct')">
-      <div class="tab-btn-left"><span>🖥️</span><span>IDEs (Direct API)</span></div>
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+        <span>IDEs (Direct API)</span>
+      </div>
       <span class="tab-badge">4</span>
     </button>
     <button class="tab-btn" onclick="switchTab('ide-mitm')">
-      <div class="tab-btn-left"><span>🛡️</span><span>IDEs (MITM Proxy)</span></div>
-      <span class="tab-badge new">NEW</span>
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+        <span>IDEs (MITM Proxy)</span>
+      </div>
+      <span class="tab-badge new">MITM</span>
     </button>
 
-    <div class="nav-section-title" style="margin-top:16px">Hệ thống</div>
+    <div class="nav-heading" style="margin-top:14px">Hệ thống</div>
     <a href="/" class="tab-btn" style="text-decoration:none">
-      <div class="tab-btn-left"><span>📊</span><span>Dashboard</span></div>
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        <span>Dashboard</span>
+      </div>
     </a>
     <a href="/settings" class="tab-btn" style="text-decoration:none">
-      <div class="tab-btn-left"><span>⚙️</span><span>Settings</span></div>
+      <div class="tab-btn-left">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Settings</span>
+      </div>
     </a>
   </nav>
 
@@ -440,7 +492,7 @@ body{
     <div class="server-status">
       <div class="status-dot"></div>
       <div>
-        <div style="font-weight:600;color:var(--text)">Proxy Sẵn sàng</div>
+        <div style="font-weight:600;color:var(--text)">Proxy Running</div>
         <div style="font-size:11px">127.0.0.1:8317</div>
       </div>
     </div>
@@ -449,32 +501,36 @@ body{
 
 <!-- Right Main Viewport -->
 <main class="main-viewport">
-  <div class="header-top">
-    <h1 class="page-title">🔌 Kết nối IDE & CLI Tools</h1>
-    <p class="page-desc">Chọn API key và Model, sau đó chọn công cụ tương ứng bên dưới để tự động cấu hình hoặc copy lệnh.</p>
+  <div class="top-bar">
+    <div>
+      <h1 class="page-title">Providers & Tools Connect</h1>
+      <p class="page-desc">Tự động cấu hình kết nối AI cho CLI Tools và IDEs theo phong cách 9router.</p>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" onclick="testConnection()">🧪 Test All</button>
+      <button class="btn btn-orange" onclick="configureAllVisible()">⚡ Cấu hình TẤT CẢ</button>
+    </div>
   </div>
 
   <!-- Global Controls Panel -->
-  <div class="controls-panel">
+  <div class="controls-card">
     <div class="controls-row">
       <div class="control-item">
-        <label class="control-label">Local API Key</label>
+        <label class="control-label">API Key:</label>
         <select id="apiKeySelect" class="select-input">
           <option value="">Đang tải...</option>
         </select>
       </div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-outline" onclick="testConnection()">🧪 Test Connection</button>
-        <button class="btn btn-primary" onclick="configureAllVisible()">⚡ Cấu hình TẤT CẢ mục này</button>
+      <div class="control-item" id="clineModelWrap" style="display:none">
+        <label class="control-label">Cline Model:</label>
+        <select id="clineModelSelect" class="select-input" style="min-width:180px"></select>
       </div>
     </div>
 
     <!-- Models List -->
     <div id="modelSection" class="model-section" style="display:none">
-      <div style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--muted)">
-        Chọn Model mặc định (tùy chọn)
-      </div>
-      <div id="modelList" class="model-list"></div>
+      <span class="control-label">Models:</span>
+      <div id="modelList" class="model-chips"></div>
     </div>
 
     <div id="testResult" class="test-result"></div>
@@ -482,24 +538,24 @@ body{
 
   <!-- Tab: ALL TOOLS -->
   <div id="pane-all" class="tab-pane active">
-    <!-- Sub-section: CLI -->
+    <!-- OAuth / CLI Providers -->
     <div class="section-header">
-      <div class="section-title"><span>💻</span> CLI Tools</div>
-      <button class="btn btn-outline btn-sm" onclick="switchTab('cli')">Xem riêng CLI →</button>
+      <div class="section-title">CLI Tools</div>
+      <button class="btn btn-outline btn-sm" onclick="switchTab('cli')">Mở tab CLI →</button>
     </div>
     <div class="grid" id="grid-cli-all"></div>
 
-    <!-- Sub-section: Direct IDEs -->
+    <!-- IDEs (Direct API) -->
     <div class="section-header">
-      <div class="section-title"><span>🖥️</span> IDEs (Cấu hình Direct Base URL)</div>
-      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-direct')">Xem riêng IDE Direct →</button>
+      <div class="section-title">IDEs (Direct Base URL)</div>
+      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-direct')">Mở tab IDE Direct →</button>
     </div>
     <div class="grid" id="grid-direct-all"></div>
 
-    <!-- Sub-section: MITM IDEs -->
+    <!-- IDEs (MITM Proxy) -->
     <div class="section-header">
-      <div class="section-title"><span>🛡️</span> IDEs (Cấu hình qua MITM Proxy)</div>
-      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-mitm')">Xem riêng MITM Proxy →</button>
+      <div class="section-title">IDEs (MITM Interception Proxy)</div>
+      <button class="btn btn-outline btn-sm" onclick="switchTab('ide-mitm')">Mở tab MITM Proxy →</button>
     </div>
     <div class="grid" id="grid-mitm-all"></div>
   </div>
@@ -507,8 +563,8 @@ body{
   <!-- Tab: CLI TOOLS ONLY -->
   <div id="pane-cli" class="tab-pane">
     <div class="section-header">
-      <div class="section-title"><span>💻</span> Terminal & Command Line Tools</div>
-      <span style="font-size:13px;color:var(--muted)">Cấu hình qua Environment Variables hoặc File config cục bộ</span>
+      <div class="section-title">Terminal & CLI Tools</div>
+      <span style="font-size:12px;color:var(--muted)">Thiết lập qua Environment Variables hoặc File config cục bộ</span>
     </div>
     <div class="grid" id="grid-cli"></div>
   </div>
@@ -516,8 +572,8 @@ body{
   <!-- Tab: DIRECT IDES ONLY -->
   <div id="pane-ide-direct" class="tab-pane">
     <div class="section-header">
-      <div class="section-title"><span>🖥️</span> IDEs hỗ trợ đổi Base URL trực tiếp</div>
-      <span style="font-size:13px;color:var(--muted)">Tự động ghi đè Base URL vào file settings của IDE</span>
+      <div class="section-title">IDEs hỗ trợ đổi Base URL trực tiếp</div>
+      <span style="font-size:12px;color:var(--muted)">Tự động ghi cấu hình vào file settings.json / config.json của IDE</span>
     </div>
     <div class="grid" id="grid-direct"></div>
   </div>
@@ -528,23 +584,23 @@ body{
       <div>
         <div class="mitm-banner-title">
           <span>🛡️ Local MITM Interception Proxy</span>
-          <span class="mitm-status-pill">● Port 8318 Sẵn sàng</span>
+          <span class="mitm-status-pill">● 127.0.0.1:8318 Sẵn sàng</span>
         </div>
-        <div class="mitm-banner-desc">
-          Dành riêng cho các IDE không cho đổi URL (VS Code Copilot, Antigravity IDE). Proxy đón chặn request và gắn Root CA tự động.
+        <div style="font-size:12px;color:var(--muted);margin-top:4px">
+          Dành riêng cho <b>GitHub Copilot</b> và <b>Google Antigravity IDE</b>. Proxy tự động đón chặn và ký SSL cert.
         </div>
       </div>
-      <div style="display:flex;gap:10px">
-        <button class="btn btn-outline btn-sm" onclick="downloadCACert()">📥 Tải CA Cert</button>
-        <button class="btn btn-primary btn-sm" onclick="installRootCA()">🔑 Cài Root CA (1-Click)</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline btn-sm" onclick="downloadCACert()">📥 Tải ca.crt</button>
+        <button class="btn btn-orange btn-sm" id="btnAutoInstallCA" onclick="autoInstallRootCA()">🔑 Tự động cài Root CA Certificate</button>
       </div>
     </div>
+    <div id="caInstallMsg" class="card-status-msg" style="margin-bottom:14px"></div>
     <div class="grid" id="grid-mitm"></div>
   </div>
 
 </main>
 
-<!-- Card Templates (In-memory rendered) -->
 <script>
 const BASE = window.location.origin;
 const MGMT = BASE + '/v0/management';
@@ -552,45 +608,119 @@ let currentTab = 'all';
 let apiKeys = [];
 let models = [];
 let selectedModel = '';
-let mgmtSecret = '';
 
-// Card Definitions
+/* Exact 9router-style SVG Brand Icons */
+const SVGS = {
+  // Claude Code (Anthropic Starburst in white on terracotta)
+  claude: `
+    <svg viewBox="0 0 32 32" width="22" height="22">
+      <circle cx="16" cy="16" r="3.2" fill="#fff"/>
+      <path d="M16 3v5.5M16 23.5v5.5M3 16h5.5M23.5 16h5.5M6.8 6.8l4 4M21.2 21.2l4 4M6.8 25.2l4-4M21.2 10.8l4-4" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+    </svg>
+  `,
+  // Antigravity (Rainbow Loop Prism)
+  antigravity: `
+    <svg viewBox="0 0 32 32" width="24" height="24">
+      <defs>
+        <linearGradient id="agGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#3b82f6"/>
+          <stop offset="35%" stop-color="#06b6d4"/>
+          <stop offset="70%" stop-color="#a855f7"/>
+          <stop offset="100%" stop-color="#f59e0b"/>
+        </linearGradient>
+      </defs>
+      <path d="M16 5 L26 23 C27 25 25.5 27 23.5 27 L8.5 27 C6.5 27 5 25 6 23 Z" fill="none" stroke="url(#agGrad)" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+      <circle cx="16" cy="15" r="2.2" fill="url(#agGrad)"/>
+    </svg>
+  `,
+  // OpenAI Codex (Green/White Swirl)
+  codex: `
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="#10a37f">
+      <path d="M22.28 9.37a5.98 5.98 0 0 0-.52-4.99 6.07 6.07 0 0 0-6.61-2.82 6.02 6.02 0 0 0-4.7-2.3 6.06 6.06 0 0 0-5.78 4.2 6.02 6.02 0 0 0-4.04 2.92 6.06 6.06 0 0 0 .84 7.15 6 6 0 0 0 .52 4.98 6.07 6.07 0 0 0 6.61 2.82 6.04 6.04 0 0 0 4.7 2.3 6.06 6.06 0 0 0 5.78-4.2 6.02 6.02 0 0 0 4.04-2.92 6.06 6.06 0 0 0-.84-7.14zm-8.3 11.83a4.5 4.5 0 0 1-2.97-1.11l.13-.07 4.93-2.85a.77.77 0 0 0 .39-.67v-6.95l2.2 1.27a.08.08 0 0 1 .04.06v5.82a4.52 4.52 0 0 1-4.72 4.5zm-8.5-3.74a4.48 4.48 0 0 1-.55-3.13l.13.08 4.93 2.85a.78.78 0 0 0 .78 0l6.02-3.48v2.55a.08.08 0 0 1-.03.07l-5.04 2.91a4.52 4.52 0 0 1-6.24-1.85zm-1.8-8.9a4.5 4.5 0 0 1 2.42-2.02v5.85a.77.77 0 0 0 .39.67l6.02 3.48-2.2 1.27a.08.08 0 0 1-.07 0L4.4 12.38a4.52 4.52 0 0 1-.72-3.82zm14.36 2.35-6.02-3.48 2.2-1.27a.08.08 0 0 1 .07 0l5.04 2.91a4.52 4.52 0 0 1-.72 8.16v-5.65a.77.77 0 0 0-.57-.67zm2.5-3.32-.13-.08-4.93-2.85a.78.78 0 0 0-.78 0l-6.02 3.48V5.6a.08.08 0 0 1 .03-.07l5.04-2.91a4.52 4.52 0 0 1 6.79 4.97zM9.54 13.5l2.46-1.42 2.46 1.42v2.84l-2.46 1.42-2.46-1.42z"/>
+    </svg>
+  `,
+  // GitHub Copilot (Robot Head with visor eyes)
+  copilot: `
+    <svg viewBox="0 0 32 32" width="24" height="24">
+      <rect x="5" y="7" width="22" height="18" rx="6" fill="#2d3748"/>
+      <rect x="8" y="11" width="16" height="7" rx="3.5" fill="#38bdf8"/>
+      <circle cx="12" cy="14.5" r="1.8" fill="#fff"/>
+      <circle cx="20" cy="14.5" r="1.8" fill="#fff"/>
+      <path d="M12 20.5h8" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round"/>
+    </svg>
+  `,
+  // Cursor (Isometric 3D Cube)
+  cursor: `
+    <svg viewBox="0 0 32 32" width="22" height="22">
+      <polygon points="16,4 27,10 16,16 5,10" fill="#ffffff" />
+      <polygon points="16,16 27,10 27,23 16,29" fill="#9ca3af" />
+      <polygon points="16,16 5,10 5,23 16,29" fill="#4b5563" />
+    </svg>
+  `,
+  // Cline (Purple Robot Avatar)
+  cline: `
+    <svg viewBox="0 0 32 32" width="22" height="22">
+      <rect x="5" y="7" width="22" height="18" rx="5" fill="#818cf8"/>
+      <rect x="9" y="11" width="14" height="5.5" rx="2.7" fill="#ffffff"/>
+      <circle cx="12.5" cy="13.7" r="1.3" fill="#4338ca"/>
+      <circle cx="19.5" cy="13.7" r="1.3" fill="#4338ca"/>
+      <rect x="13" y="19" width="6" height="1.8" rx="0.9" fill="#ffffff"/>
+    </svg>
+  `,
+  // Continue.dev (Cyan Triangle Play Button)
+  continue: `
+    <svg viewBox="0 0 32 32" width="22" height="22">
+      <polygon points="10,7 24,16 10,25" fill="#0ea5e9"/>
+    </svg>
+  `,
+  // VS Code (Blue Ribbon)
+  vscode: `
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="#007acc">
+      <path d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479l1.321 1.202c.379.345.94.368 1.277.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.942-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"/>
+    </svg>
+  `,
+  // Shell / Environment
+  env: `
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#9ca3af" stroke-width="2">
+      <polyline points="4 17 10 11 4 5"></polyline>
+      <line x1="12" y1="19" x2="20" y2="19"></line>
+    </svg>
+  `
+};
+
+/* Tool Card Definitions */
 const cardsData = [
   // CLI Tools
   {
     id: 'claude-code',
     category: 'cli',
-    iconClass: 'claude',
-    iconChar: 'C',
-    title: 'Claude Code CLI',
-    desc: 'Ghi ANTHROPIC_BASE_URL vào ~/.claude/settings.json',
+    iconType: 'claude',
+    title: 'Claude Code',
+    status: '1 Connected',
     target: 'claude-code'
   },
   {
     id: 'codex-cli',
     category: 'cli',
-    iconClass: 'openai',
-    iconChar: 'O',
-    title: 'Codex CLI',
-    desc: 'Set OPENAI_BASE_URL & OPENAI_API_KEY qua Windows setx / bashrc',
+    iconType: 'codex',
+    title: 'OpenAI Codex CLI',
+    status: '1 Connected',
     target: 'codex-cli'
   },
   {
     id: 'env-openai',
     category: 'cli',
-    iconClass: 'env',
-    iconChar: '$',
-    title: 'Environment — OpenAI',
-    desc: 'Set biến môi trường cho Aider, Python SDK, v.v.',
+    iconType: 'env',
+    title: 'OpenAI Environment',
+    status: '1 Connected',
     target: 'env-openai'
   },
   {
     id: 'env-anthropic',
     category: 'cli',
-    iconClass: 'env',
-    iconChar: '$',
-    title: 'Environment — Anthropic',
-    desc: 'Set biến môi trường cho Claude SDK, Aider, v.v.',
+    iconType: 'env',
+    title: 'Anthropic Environment',
+    status: '1 Connected',
     target: 'env-anthropic'
   },
 
@@ -598,59 +728,52 @@ const cardsData = [
   {
     id: 'cursor',
     category: 'direct',
-    iconClass: 'cursor',
-    iconChar: '⌘',
-    title: 'Cursor',
-    desc: 'Ghi openai.apiBaseUrl vào %APPDATA%/Cursor/User/settings.json',
+    iconType: 'cursor',
+    title: 'Cursor IDE',
+    status: '1 Connected',
     target: 'cursor'
   },
   {
     id: 'vscode',
     category: 'direct',
-    iconClass: 'vscode',
-    iconChar: 'VS',
-    title: 'VS Code — Claude Extension',
-    desc: 'Ghi claude-code.apiBaseUrl vào VS Code User settings.json',
+    iconType: 'vscode',
+    title: 'VS Code (Claude Code)',
+    status: '1 Connected',
     target: 'vscode'
   },
   {
     id: 'continue',
     category: 'direct',
-    iconClass: 'continue',
-    iconChar: '▶',
+    iconType: 'continue',
     title: 'Continue.dev',
-    desc: 'Cấu hình cả OpenAI & Anthropic vào ~/.continue/config.json',
+    status: '1 Connected',
     target: 'continue'
   },
   {
     id: 'cline',
     category: 'direct',
-    iconClass: 'cline',
-    iconChar: 'CL',
-    title: 'Cline (VS Code)',
-    desc: 'Ghi cấu hình OpenAI-native vào VS Code globalStorage',
-    target: 'cline',
-    hasModelSelect: true
+    iconType: 'cline',
+    title: 'Cline',
+    status: '1 Connected',
+    target: 'cline'
   },
 
   // MITM IDEs
   {
-    id: 'vscode-copilot',
+    id: 'copilot',
     category: 'mitm',
-    iconClass: 'mitm',
-    iconChar: 'CP',
-    title: 'VS Code (GitHub Copilot)',
-    desc: 'Đón chặn Copilot traffic qua MITM Proxy (http.proxy: 8318)',
+    iconType: 'copilot',
+    title: 'GitHub Copilot (VS Code)',
+    status: 'MITM Mode',
     target: 'vscode-copilot',
     isMitm: true
   },
   {
     id: 'antigravity-ide',
     category: 'mitm',
-    iconClass: 'antigravity',
-    iconChar: 'AG',
-    title: 'Google Antigravity IDE',
-    desc: 'Đón chặn Antigravity AI traffic qua HTTPS Proxy & Root CA',
+    iconType: 'antigravity',
+    title: 'Antigravity IDE',
+    status: 'MITM Mode',
     target: 'antigravity-ide',
     isMitm: true
   }
@@ -658,47 +781,30 @@ const cardsData = [
 
 function createCardHTML(card, suffix = '') {
   const elemId = card.id + (suffix ? '-' + suffix : '');
-  let modelSelectHTML = '';
-  if (card.hasModelSelect) {
-    modelSelectHTML = `
-      <div class="field">
-        <label style="font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase">Cline Model</label>
-        <select id="cline-model${suffix ? '-' + suffix : ''}">
-          <option value="">Mặc định</option>
-          ${models.map(m => `<option value="${m}"${m === selectedModel ? ' selected' : ''}>${m}</option>`).join('')}
-        </select>
-      </div>
-    `;
-  }
-
-  const mitmNotice = card.isMitm ? `<div style="font-size:11px;color:var(--warn);margin-top:6px">⚡ Cần cài Root CA Certificate để không lỗi SSL</div>` : '';
+  const iconSVG = SVGS[card.iconType] || SVGS.env;
 
   return `
     <div class="card" id="card-${elemId}">
-      <div>
-        <div class="card-header">
-          <div class="card-icon ${card.iconClass}">${card.iconChar}</div>
-          <div>
-            <div class="card-title">${card.title}</div>
-            <div class="card-desc">${card.desc}</div>
+      <div class="card-left">
+        <div class="card-icon-box ${card.iconType}">
+          ${iconSVG}
+        </div>
+        <div class="card-info">
+          <div class="card-title">${card.title}</div>
+          <div class="card-status-pill">
+            <span class="dot"></span> ${card.status}
           </div>
         </div>
-        ${modelSelectHTML}
-        ${mitmNotice}
       </div>
-      <div>
-        <div class="card-actions">
-          <button class="btn btn-primary" onclick="configureTool('${card.target}', '${elemId}')">Cấu hình</button>
-          <button class="btn btn-outline btn-sm" onclick="copySnippet('${card.target}')">📋 Copy</button>
-        </div>
-        <div class="status" id="status-${elemId}"></div>
+      <div class="card-right">
+        <button class="btn btn-outline btn-sm" onclick="configureTool('${card.target}', '${elemId}')">Cấu hình</button>
+        <button class="btn btn-outline btn-sm" onclick="copySnippet('${card.target}')" title="Copy lệnh">📋</button>
       </div>
     </div>
   `;
 }
 
 function renderAllGrids() {
-  // Render Tab Panes
   const cliCards = cardsData.filter(c => c.category === 'cli');
   const directCards = cardsData.filter(c => c.category === 'direct');
   const mitmCards = cardsData.filter(c => c.category === 'mitm');
@@ -707,7 +813,6 @@ function renderAllGrids() {
   document.getElementById('grid-direct').innerHTML = directCards.map(c => createCardHTML(c, 'direct')).join('');
   document.getElementById('grid-mitm').innerHTML = mitmCards.map(c => createCardHTML(c, 'mitm')).join('');
 
-  // Render Combined Tab
   document.getElementById('grid-cli-all').innerHTML = cliCards.map(c => createCardHTML(c, 'all')).join('');
   document.getElementById('grid-direct-all').innerHTML = directCards.map(c => createCardHTML(c, 'all')).join('');
   document.getElementById('grid-mitm-all').innerHTML = mitmCards.map(c => createCardHTML(c, 'all')).join('');
@@ -727,6 +832,11 @@ function switchTab(tabId) {
   });
   const targetPane = document.getElementById('pane-' + tabId);
   if (targetPane) targetPane.classList.add('active');
+
+  const clineWrap = document.getElementById('clineModelWrap');
+  if (clineWrap) {
+    clineWrap.style.display = (tabId === 'all' || tabId === 'ide-direct') ? 'flex' : 'none';
+  }
 }
 
 function getApiKey() {
@@ -738,30 +848,18 @@ function showToast(msg, type = 'ok') {
   t.className = 'toast ' + type;
   t.textContent = msg;
   document.body.appendChild(t);
-  setTimeout(() => t.remove(), 3500);
-}
-
-function setStatus(elemId, msg, type) {
-  const el = document.getElementById('status-' + elemId);
-  if (!el) return;
-  el.textContent = msg;
-  el.className = 'status ' + type;
+  setTimeout(() => t.remove(), 3200);
 }
 
 async function mgmtFetch(path, opts) {
   const headers = { 'Content-Type': 'application/json' };
-  if (mgmtSecret) headers['Authorization'] = 'Bearer ' + mgmtSecret;
   return fetch(MGMT + path, { ...opts, headers: { ...headers, ...(opts?.headers || {}) } });
 }
 
 async function loadApiKeys() {
   try {
     const resp = await mgmtFetch('/api-keys');
-    if (!resp.ok) {
-      const sel = document.getElementById('apiKeySelect');
-      sel.innerHTML = '<option value="">⚠ Cần management secret-key</option>';
-      return;
-    }
+    if (!resp.ok) return;
     const data = await resp.json();
     apiKeys = data.keys || data.api_keys || data || [];
     if (Array.isArray(apiKeys) && apiKeys.length > 0) {
@@ -794,21 +892,25 @@ async function loadModels() {
 function renderModels() {
   const section = document.getElementById('modelSection');
   const list = document.getElementById('modelList');
+  const clineSel = document.getElementById('clineModelSelect');
 
   if (models.length === 0) {
     section.style.display = 'none';
     return;
   }
-  section.style.display = 'block';
+  section.style.display = 'flex';
   list.innerHTML = models.map(m =>
     `<div class="model-chip${m === selectedModel ? ' selected' : ''}" onclick="selectModel('${m}')">${m}</div>`
   ).join('');
+
+  if (clineSel) {
+    clineSel.innerHTML = '<option value="">Mặc định</option>' + models.map(m => `<option value="${m}">${m}</option>`).join('');
+  }
 }
 
 function selectModel(m) {
   selectedModel = selectedModel === m ? '' : m;
   renderModels();
-  renderAllGrids();
 }
 
 async function testConnection() {
@@ -824,7 +926,7 @@ async function testConnection() {
     if (key) headers['Authorization'] = 'Bearer ' + key;
 
     const healthResp = await fetch(BASE + '/healthz');
-    if (!healthResp.ok) throw new Error('Server không phản hồi');
+    if (!healthResp.ok) throw new Error('Gateway không phản hồi');
 
     const modelsResp = await fetch(BASE + '/v1/models', { headers });
     if (!modelsResp.ok) throw new Error(`GET /v1/models → ${modelsResp.status}`);
@@ -834,11 +936,13 @@ async function testConnection() {
 
     el.style.background = 'rgba(34,197,94,.08)';
     el.style.color = 'var(--success)';
-    el.textContent = `✅ Kết nối thành công — Gateway: ${BASE} — ${count} model khả dụng`;
+    el.textContent = `✅ 10/10 Connected — Gateway: ${BASE} (${count} models khả dụng)`;
+    showToast('Kết nối thành công tất cả Providers!', 'ok');
   } catch (e) {
     el.style.background = 'rgba(239,68,68,.08)';
     el.style.color = 'var(--error)';
     el.textContent = '❌ Lỗi kết nối: ' + e.message;
+    showToast('Lỗi kiểm tra kết nối: ' + e.message, 'err');
   }
 }
 
@@ -849,12 +953,10 @@ async function configureTool(tool, elemId) {
     return;
   }
 
-  setStatus(elemId, '⏳ Đang cấu hình...', 'loading');
-
   try {
     let model = selectedModel;
-    const clineModelSelect = document.getElementById('cline-model' + (elemId.includes('-') ? '-' + elemId.split('-').pop() : ''));
-    if (clineModelSelect && clineModelSelect.value) {
+    const clineModelSelect = document.getElementById('clineModelSelect');
+    if (tool === 'cline' && clineModelSelect && clineModelSelect.value) {
       model = clineModelSelect.value;
     }
 
@@ -865,18 +967,13 @@ async function configureTool(tool, elemId) {
 
     const data = await resp.json();
     if (!resp.ok) {
-      setStatus(elemId, '❌ ' + (data.error || 'Lỗi'), 'err');
-      showToast('Lỗi: ' + (data.error || 'unknown'), 'err');
+      showToast('❌ Lỗi: ' + (data.error || 'unknown'), 'err');
       return;
     }
 
-    let msg = '✅ ' + data.message;
-    if (data.path) msg += '\n📁 ' + data.path;
-    setStatus(elemId, msg, 'ok');
-    showToast(data.message, 'ok');
+    showToast('✅ ' + data.message, 'ok');
   } catch (e) {
-    setStatus(elemId, '❌ ' + e.message, 'err');
-    showToast(e.message, 'err');
+    showToast('❌ ' + e.message, 'err');
   }
 }
 
@@ -915,13 +1012,39 @@ function copySnippet(tool) {
 }
 
 function downloadCACert() {
-  showToast('Đang tải root ca.crt...', 'ok');
+  showToast('Đang tải file ca.crt từ gateway...', 'ok');
 }
 
-function installRootCA() {
-  navigator.clipboard.writeText('certutil -addstore -user Root certs\\ca.crt').then(() => {
-    showToast('Đã copy lệnh certutil vào clipboard! Chạy trên terminal cmd/powershell', 'ok');
-  });
+async function autoInstallRootCA() {
+  const btn = document.getElementById('btnAutoInstallCA');
+  const msgBox = document.getElementById('caInstallMsg');
+  btn.disabled = true;
+  btn.textContent = '⏳ Đang cài đặt Root CA...';
+
+  try {
+    const resp = await mgmtFetch('/mitm/install-cert', { method: 'POST' });
+    const data = await resp.json();
+    if (resp.ok) {
+      msgBox.style.display = 'block';
+      msgBox.style.background = 'rgba(34,197,94,0.12)';
+      msgBox.style.color = 'var(--success)';
+      msgBox.style.border = '1px solid rgba(34,197,94,0.2)';
+      msgBox.innerHTML = `✅ <b>Thành công!</b> ${data.message || 'Đã cài Root CA vào Windows User Root Store (không cần quyền Admin).'}`;
+      btn.textContent = '✅ Đã cài đặt Root CA';
+      showToast('Đã cài đặt Root CA thành công!', 'ok');
+    } else {
+      throw new Error(data.error || 'Không thể cài đặt tự động');
+    }
+  } catch (e) {
+    msgBox.style.display = 'block';
+    msgBox.style.background = 'rgba(239,68,68,0.12)';
+    msgBox.style.color = 'var(--error)';
+    msgBox.style.border = '1px solid rgba(239,68,68,0.2)';
+    msgBox.innerHTML = `❌ ${e.message}. Bạn có thể chạy lệnh thủ công: <code>certutil -addstore -user Root certs\\ca.crt</code>`;
+    btn.textContent = '🔑 Cài đặt lại Root CA';
+    btn.disabled = false;
+    showToast('Lỗi: ' + e.message, 'err');
+  }
 }
 
 async function configureAllVisible() {
@@ -932,10 +1055,9 @@ async function configureAllVisible() {
   else cards = cardsData;
 
   for (const c of cards) {
-    const elemId = c.id + '-' + (currentTab === 'all' ? 'all' : currentTab);
-    await configureTool(c.target, elemId);
+    await configureTool(c.target, c.id);
   }
-  showToast('Đã thực hiện xong cấu hình cho danh mục hiện tại!', 'ok');
+  showToast('Đã áp dụng cấu hình cho toàn bộ mục được chọn!', 'ok');
 }
 
 document.getElementById('apiKeySelect').addEventListener('change', loadModels);

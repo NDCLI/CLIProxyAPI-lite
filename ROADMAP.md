@@ -260,14 +260,16 @@ For tools that connect only to hardcoded vendor endpoints:
    - Intercepts requests targeting known AI endpoints (Copilot completions, Antigravity API domains).
    - Passthrough: non-AI domain traffic is forwarded untouched or blocked according to security policy.
 
-2. **Root Certificate Authority (CA)**:
+2. **Root Certificate Authority (CA) & 1-Click Auto-Installation**:
    - Automatically generate local Root CA certificate (`ca.crt`) and private key (`ca.key`) on first launch under `certs/` (excluded from git).
    - Dynamic on-the-fly certificate generation for intercepted domains signed by local CA.
-   - Endpoint: `GET /v0/management/mitm/ca.crt` to download the public CA certificate.
-   - 1-click installation script:
-     - Windows: `certutil -addstore -user Root certs/ca.crt`
-     - macOS: `security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain certs/ca.crt`
-     - Linux: `update-ca-certificates` or system trust store.
+   - Endpoint `GET /v0/management/mitm/ca.crt` to download the public CA certificate.
+   - **Backend 1-Click Auto-Install (`POST /v0/management/mitm/install-cert`)**:
+     - Automatically installs the certificate directly from the server without manual terminal commands:
+       - **Windows**: executes `certutil -addstore -user Root certs\ca.crt` (installs into current user's trusted root store — **no Administrator UAC elevation required**).
+       - **macOS**: executes `security add-trusted-cert -d -r trustRoot -k ~/Library/Keychains/login.keychain-db certs/ca.crt`.
+       - **Linux**: installs into user/system trust store or sets `NODE_EXTRA_CA_CERTS`.
+     - Endpoint `POST /v0/management/mitm/uninstall-cert`: cleanly uninstalls the root certificate (`certutil -delstore -user Root "CLIProxyAPI Root CA"`).
 
 3. **IDE Proxy Configuration**:
    - Backend endpoint `POST /v0/management/configure-ide`:
@@ -279,7 +281,7 @@ For tools that connect only to hardcoded vendor endpoints:
        }
        ```
        or injects `NODE_EXTRA_CA_CERTS` so strict SSL remains valid.
-     - **Antigravity IDE**: configures IDE proxy environment variables or sidecar hook.
+     - **Antigravity IDE**: configures IDE proxy environment variables (`HTTPS_PROXY`, `NODE_EXTRA_CA_CERTS`) or sidecar hook.
 
 4. **Payload Translation & Upstream Execution**:
    - Intercepted Copilot / Antigravity requests are parsed into canonical internal formats.
@@ -296,12 +298,20 @@ For tools that connect only to hardcoded vendor endpoints:
     - `🖥️ IDEs (Direct API)` — Cursor, Windsurf, VS Code (Continue.dev), VS Code (Cline).
     - `🛡️ IDEs (MITM Proxy)` — VS Code (Copilot), Google Antigravity IDE, Root CA Cert setup.
     - Server status badge (`127.0.0.1:8317`) and active port indicator.
-  - **Right Content Viewport**:
-    - Top control bar: API Key selector, Model chips picker, "Test Connection" button.
-    - Tab content dynamically switches based on active vertical tab:
-      - Clean, focused view with no clutter or endless vertical scrolling.
-      - Each tool card displays: icon, description, 1-click Auto-configure button, copyable command/JSON snippet, and status feedback badge.
-      - MITM Proxy tab displays: live proxy status (running/stopped), 1-click Root CA installation command (`certutil`), and IDE proxy injection toggles.
+- **9router-Style Visual Design & Provider Icons**:
+  - Crisp, authentic brand SVG icons for every tool and provider (matching 9router visual language):
+    - **Claude Code**: Anthropic orange sunburst icon.
+    - **Antigravity**: Google Antigravity rainbow prism/loop gradient icon.
+    - **OpenAI Codex**: OpenAI swirl icon.
+    - **GitHub Copilot**: Copilot robot visor icon.
+    - **Cursor IDE**: Cursor 3D dark cube icon.
+    - **Cline**: Cline purple robot icon.
+    - **Continue.dev**: Continue cyan forward-play icon.
+    - **Terminal / Env**: CLI terminal prompt icon.
+  - 9router card components:
+    - High-contrast dark cards with rounded borders.
+    - Left brand icon badge + title + live status pill (`● 1 Connected` / `● Sẵn sàng`).
+    - 1-click **"Tự động cài Root CA"** button in MITM Proxy section with animated progress & feedback.
 
 ---
 
