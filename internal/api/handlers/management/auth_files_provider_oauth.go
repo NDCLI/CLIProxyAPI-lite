@@ -28,10 +28,22 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type codexOAuthService interface {
-	GenerateAuthURL(state string, pkceCodes *codex.PKCECodes) (string, error)
-	ExchangeCodeForTokens(ctx context.Context, code string, pkceCodes *codex.PKCECodes) (*codex.CodexAuthBundle, error)
-	CreateTokenStorage(bundle *codex.CodexAuthBundle) *codex.CodexTokenStorage
+func parseAntigravityCallbackPayload(payload map[string]string, expectedState string) (string, error) {
+	expectedState = strings.TrimSpace(expectedState)
+	if expectedState == "" {
+		return "", errors.New("Authentication failed: state mismatch")
+	}
+	if strings.TrimSpace(payload["error"]) != "" {
+		return "", errors.New("Authentication failed")
+	}
+	if payloadState := strings.TrimSpace(payload["state"]); payloadState == "" || payloadState != expectedState {
+		return "", errors.New("Authentication failed: state mismatch")
+	}
+	authCode := strings.TrimSpace(payload["code"])
+	if authCode == "" {
+		return "", errors.New("Authentication failed: code not found")
+	}
+	return authCode, nil
 }
 
 func (h *Handler) RequestAnthropicToken(c *gin.Context) {
@@ -401,20 +413,10 @@ func (h *Handler) RequestAntigravityToken(c *gin.Context) {
 				var payload map[string]string
 				_ = json.Unmarshal(data, &payload)
 				_ = os.Remove(waitFile)
-				if errStr := strings.TrimSpace(payload["error"]); errStr != "" {
-					log.Errorf("Authentication failed: %s", errStr)
-					SetOAuthSessionError(state, "Authentication failed")
-					return
-				}
-				if payloadState := strings.TrimSpace(payload["state"]); payloadState != "" && payloadState != state {
-					log.Errorf("Authentication failed: state mismatch")
-					SetOAuthSessionError(state, "Authentication failed: state mismatch")
-					return
-				}
-				authCode = strings.TrimSpace(payload["code"])
-				if authCode == "" {
-					log.Error("Authentication failed: code not found")
-					SetOAuthSessionError(state, "Authentication failed: code not found")
+				authCode, errPayload := parseAntigravityCallbackPayload(payload, state)
+				if errPayload != nil {
+					log.Error(errPayload)
+					SetOAuthSessionError(state, errPayload.Error())
 					return
 				}
 				break

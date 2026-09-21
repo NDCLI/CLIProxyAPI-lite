@@ -22,7 +22,7 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 
 	var cfg Config
 	// Keep defaults aligned with LoadConfigOptional.
-	cfg.Host = "" // Default empty: binds to all interfaces (IPv4 + IPv6)
+	cfg.Host = DefaultHost
 	cfg.LoggingToFile = false
 	cfg.LogsMaxTotalSizeMB = 0
 	cfg.ErrorLogsMaxFiles = 10
@@ -43,6 +43,10 @@ func ParseConfigBytes(data []byte) (*Config, error) {
 
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("parse config payload: %w", err)
+	}
+
+	if strings.TrimSpace(cfg.Host) == "" {
+		cfg.Host = DefaultHost
 	}
 
 	cfg.CredentialConcurrency = cfg.CredentialConcurrency.WithDefaults()

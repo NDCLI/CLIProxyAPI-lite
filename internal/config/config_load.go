@@ -36,7 +36,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		if optional {
 			if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
 				// Missing and optional: return empty config (cloud deploy standby).
-				cfg := &Config{CredentialInFlight: DefaultCredentialInFlightConfig()}
+				cfg := &Config{Host: DefaultHost, CredentialInFlight: DefaultCredentialInFlightConfig()}
 				cfg.NormalizePluginsConfig()
 				return cfg, nil
 			}
@@ -46,14 +46,14 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 
 	// In cloud deploy mode (optional=true), if file is empty or contains only whitespace, return empty config.
 	if optional && len(bytes.TrimSpace(data)) == 0 {
-		cfg := &Config{CredentialInFlight: DefaultCredentialInFlightConfig()}
+		cfg := &Config{Host: DefaultHost, CredentialInFlight: DefaultCredentialInFlightConfig()}
 		cfg.NormalizePluginsConfig()
 		return cfg, nil
 	}
 
 	if errValidate := validateCredentialWeightYAML(data); errValidate != nil {
 		if optional {
-			cfgOptional := &Config{CredentialInFlight: DefaultCredentialInFlightConfig()}
+			cfgOptional := &Config{Host: DefaultHost, CredentialInFlight: DefaultCredentialInFlightConfig()}
 			cfgOptional.NormalizePluginsConfig()
 			return cfgOptional, nil
 		}
@@ -63,7 +63,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	// Unmarshal the YAML data into the Config struct.
 	var cfg Config
 	// Set defaults before unmarshal so that absent keys keep defaults.
-	cfg.Host = "" // Default empty: binds to all interfaces (IPv4 + IPv6)
+	cfg.Host = DefaultHost
 	cfg.LoggingToFile = false
 	cfg.LogsMaxTotalSizeMB = 0
 	cfg.ErrorLogsMaxFiles = 10
@@ -84,14 +84,17 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		if optional {
 			// In cloud deploy mode, if YAML parsing fails, return empty config instead of error.
-			cfgOptional := &Config{CredentialInFlight: DefaultCredentialInFlightConfig()}
+			cfgOptional := &Config{Host: DefaultHost, CredentialInFlight: DefaultCredentialInFlightConfig()}
 			cfgOptional.NormalizePluginsConfig()
 			return cfgOptional, nil
 		}
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
 	}
 
-	cfg.CredentialConcurrency = cfg.CredentialConcurrency.WithDefaults()
+	if strings.TrimSpace(cfg.Host) == "" {
+		cfg.Host = DefaultHost
+	}
+
 	if errValidate := cfg.CredentialInFlight.Validate(); errValidate != nil {
 		return nil, errValidate
 	}

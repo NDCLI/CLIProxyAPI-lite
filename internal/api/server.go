@@ -245,9 +245,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		s.enableKeepAlive(optionState.keepAliveTimeout, optionState.keepAliveOnTimeout)
 	}
 
+	host := strings.TrimSpace(cfg.Host)
+	if host == "" {
+		host = config.DefaultHost
+	}
+
 	// Create HTTP server
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", cfg.Host, cfg.Port),
+		Addr:    fmt.Sprintf("%s:%d", host, cfg.Port),
 		Handler: engine,
 	}
 

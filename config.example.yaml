@@ -1,6 +1,6 @@
-# Server host/interface to bind to. Default is empty ("") to bind all interfaces (IPv4 + IPv6).
-# Use "127.0.0.1" or "localhost" to restrict access to local machine only.
-host: ""
+# Server host/interface to bind to. Defaults to 127.0.0.1 for local-only access.
+# Change this only when network access is explicitly required.
+host: 127.0.0.1
 
 # Server port
 port: 8317
