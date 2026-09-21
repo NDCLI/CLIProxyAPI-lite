@@ -171,7 +171,27 @@ PUT    /v0/management/codex-api-key
 - Per-account actions: refresh, disable, delete
 - Quota info (calls `POST /v0/management/quota/fetch`)
 
-#### 3. Settings (`/settings`)
+#### 3. Connect (`/connect`)
+- **CLI/IDE quick setup cards** — one card per tool, each with:
+  - Tool logo/icon and name
+  - The exact env vars or config to set (pre-filled with the current server address and a configured API key)
+  - Copy-to-clipboard button for each command/snippet
+  - "Test connection" button that pings `/v1/models` with the key
+- Supported tools (cards):
+  - Claude Code CLI — `ANTHROPIC_BASE_URL` + `ANTHROPIC_API_KEY`
+  - Codex CLI — `OPENAI_BASE_URL` + `OPENAI_API_KEY`
+  - Cursor — OpenAI API Base URL + Key
+  - Windsurf — OpenAI Compatible provider settings
+  - VS Code (Continue.dev) — `config.json` snippet
+  - VS Code (Cline) — extension settings
+  - aider — env vars for both OpenAI and Anthropic modes
+  - Python SDK — code snippet (OpenAI + Anthropic)
+  - Node.js SDK — code snippet
+  - cURL — ready-to-run commands
+- Auto-detect server address from `window.location` for the snippets
+- Link to full docs: `docs/cli-ide-setup.md`
+
+#### 4. Settings (`/settings`)
 - API keys: show current proxy API keys, add/remove
 - Endpoint reference: copy-paste examples for OpenAI-compatible and Anthropic-compatible
 - Model list: calls `GET /v1/models` and displays available models
@@ -329,4 +349,24 @@ curl http://127.0.0.1:8317/v1/messages \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{"model":"claude-sonnet-4-20250514","max_tokens":1024,"messages":[{"role":"user","content":"Hello"}]}'
+```
+
+---
+
+## Quick reference: connect CLI & IDE tools
+
+After the server is running, connect your favorite tools. Full guide: [`docs/cli-ide-setup.md`](docs/cli-ide-setup.md)
+
+```bash
+# Claude Code CLI
+export ANTHROPIC_BASE_URL=http://127.0.0.1:8317
+export ANTHROPIC_API_KEY=YOUR-LOCAL-API-KEY
+
+# Codex CLI
+export OPENAI_BASE_URL=http://127.0.0.1:8317/v1
+export OPENAI_API_KEY=YOUR-LOCAL-API-KEY
+
+# Cursor / Windsurf / other OpenAI-compatible IDEs
+# Set API Base URL to: http://127.0.0.1:8317/v1
+# Set API Key to: YOUR-LOCAL-API-KEY
 ```
