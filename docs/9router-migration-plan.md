@@ -48,10 +48,10 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 ### Phase 3 — English and Vietnamese localization
 
-- Make English the default and persisted locale.
-- Add Vietnamese translations for every visible string, including API errors and form validation.
-- Add a language selector and persistence that survives reload and deep links.
-- Add a source check that reports missing translation keys in either language.
+- ~~Make English the default and persisted locale.~~
+- ~~Add Vietnamese translations for every visible string, including API errors and form validation.~~
+- ~~Add a language selector and persistence that survives reload and deep links.~~
+- ~~Add a source check that reports missing translation keys in either language.~~
 
 ### Phase 4 — Endpoint & Key and Providers
 
@@ -116,6 +116,8 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Endpoint-key backend slice implemented | `e04306a6` | Source-owned routes and handlers now support masked listing, generated/explicit create, rotation, deletion, optimistic revisions, persistence, and focused contract tests; build and targeted tests pass |
 | 2026-09-22 | Provider read-model slice implemented | `f1520269` | `GET /v0/management/providers`, detail, and model lookup return normalized secret-free runtime metadata; focused tests cover masking and management authentication |
 | 2026-09-22 | Source-owned shell and legacy sidebar restored | `552af703`, `a9c03538` | `/management-next.html` serves embedded shell assets; hash routes, responsive navigation, English/Vietnamese bundles, and source asset tests verified |
+| 2026-09-22 | Management localization completed | `a52620b4` | English default, persisted language selector, complete en/vi source key parity check, and translated provider runtime statuses verified by `go test ./internal/managementasset` |
+| 2026-09-22 | Provider model discovery shown in UI | `044433f3` | Providers page retrieves credential-scoped model inventory from the normalized `GET /providers/:id/models` endpoint; empty and error states are localized |
 
 ## Update convention
 
