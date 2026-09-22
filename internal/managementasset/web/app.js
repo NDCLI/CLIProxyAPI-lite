@@ -43,7 +43,8 @@ async function api(path, options = {}) {
     throw error;
   }
   if (!response.ok) {
-    const error = new Error("server_error");
+    const body = await response.json().catch(() => ({}));
+    const error = new Error(body.error?.message || "server_error");
     error.status = response.status;
     throw error;
   }
@@ -378,16 +379,51 @@ async function renderAuthFiles(page) {
 }
 
 async function renderCombos(page) {
-  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  const formHTML = item => `<form id="combo-form" class="status-panel combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><div class="card-title"><h2>${t(item?.id ? "combo.edit" : "combo.create")}</h2></div><div class="settings-grid"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" required></label><label>${t("combo.model")}<input class="text-input" name="model" value="${escapeHTML(item?.model || "")}" required></label></div><label>${t("combo.targets")}<textarea class="text-input" name="targets" rows="4" required placeholder="codex:gpt-5&#10;claude:sonnet">${escapeHTML((item?.targets || []).map(target => `${target.provider}:${target.model}`).join("\n"))}</textarea><span class="hint">${t("combo.targetsHint")}</span></label><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="actions"><button class="primary compact" type="submit">${t("combo.save")}</button><button class="secondary" id="validate-combo" type="button">${t("combo.validate")}</button>${item?.id ? `<button class="secondary" id="cancel-combo" type="button">${t("action.cancel")}</button>` : ""}<span class="form-message" id="combo-message" aria-live="polite"></span></div></form>`;
+  const targetList = targets => targets.map(target => `${target.provider}/${target.model}`).join(" → ");
+  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + formHTML() + `<div id="combos-list" class="loading">${t("common.loading")}</div>`;
+  const values = form => ({id: form.elements.id.value.trim(), name: form.elements.name.value.trim(), model: form.elements.model.value.trim(), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: form.elements.targets.value.split("\n").filter(Boolean).map((line, index) => { const separator = line.indexOf(":"); return separator < 1 ? {provider: "", model: ""} : {provider: line.slice(0, separator).trim(), model: line.slice(separator + 1).trim()}; })});
+  const bindForm = item => {
+    const form = document.getElementById("combo-form");
+    const message = document.getElementById("combo-message");
+    const validate = async () => {
+      message.textContent = t("common.loading");
+      const result = await api("/combos/validate", {method: "POST", body: JSON.stringify(values(form))});
+      message.textContent = result.item ? t("combo.valid") : t("common.error");
+    };
+    document.getElementById("validate-combo").addEventListener("click", async () => { try { await validate(); } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = error.message; } });
+    const cancel = document.getElementById("cancel-combo");
+    if (cancel) cancel.addEventListener("click", () => renderCombos(page));
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      const submit = form.querySelector('[type="submit"]');
+      submit.disabled = true;
+      try {
+        const value = values(form);
+        await validate();
+        if (value.id) await api(`/combos/${encodeURIComponent(value.id)}`, {method: "PATCH", body: JSON.stringify(value)});
+        else await api("/combos", {method: "POST", body: JSON.stringify(value)});
+        await renderCombos(page);
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        message.textContent = error.message;
+      } finally { submit.disabled = false; }
+    });
+  };
   const load = async () => {
     try {
       const response = await api("/combos");
       const items = response.items || [];
-      page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + (items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ready">${item.enabled ? t("capability.ready") : t("capability.unavailable")}</span></div><p>${escapeHTML(item.model)} · ${item.targets.map(target => escapeHTML(`${target.provider}/${target.model}`)).join(" → ")}</p><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${t("combo.delete")}</button></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`);
-      document.getElementById("refresh").addEventListener("click", load);
-      page.querySelectorAll("[data-delete-combo]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("combo.confirmDelete"))) return; await api(`/combos/${encodeURIComponent(button.dataset.deleteCombo)}`, {method: "DELETE"}); await load(); }));
-    } catch (error) { if (error.message === "invalid_key") return logout(); page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
+      document.getElementById("combos-list").className = "";
+      document.getElementById("combos-list").innerHTML = items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ${item.enabled ? "ready" : "partial"}">${item.enabled ? t("capability.ready") : t("providers.disabled")}</span></div><p>${escapeHTML(item.model)} · ${escapeHTML(targetList(item.targets || []))}</p><div class="actions"><button class="secondary" data-edit-combo="${escapeHTML(item.id)}">${t("combo.edit")}</button><button class="secondary" data-duplicate-combo="${escapeHTML(item.id)}">${t("combo.duplicate")}</button><button class="secondary" data-toggle-combo="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${item.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${t("combo.delete")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`;
+      page.querySelectorAll("[data-edit-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.editCombo); if (item) { document.getElementById("combo-form").outerHTML = formHTML(item); bindForm(item); document.getElementById("combo-form").scrollIntoView({behavior: "smooth", block: "start"}); } }));
+      page.querySelectorAll("[data-duplicate-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.duplicateCombo); if (item) { document.getElementById("combo-form").outerHTML = formHTML({...item, id: "", name: `${item.name} copy`}); bindForm(); document.getElementById("combo-form").scrollIntoView({behavior: "smooth", block: "start"}); } }));
+      page.querySelectorAll("[data-toggle-combo]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api(`/combos/${encodeURIComponent(button.dataset.toggleCombo)}`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
+      page.querySelectorAll("[data-delete-combo]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("combo.confirmDelete"))) return; button.disabled = true; try { await api(`/combos/${encodeURIComponent(button.dataset.deleteCombo)}`, {method: "DELETE"}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
+    } catch (error) { if (error.message === "invalid_key") return logout(); document.getElementById("combos-list").className = "error"; document.getElementById("combos-list").textContent = t("common.error"); }
   };
+  bindForm();
+  document.getElementById("refresh").addEventListener("click", load);
   await load();
 }
 

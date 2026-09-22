@@ -77,6 +77,23 @@ func (s *Store) List() []Definition {
 	return append([]Definition(nil), s.items...)
 }
 
+func (s *Store) Get(id string) (Definition, bool) {
+	if s == nil {
+		return Definition{}, false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, item := range s.items {
+		if item.ID == strings.TrimSpace(id) {
+			return item, true
+		}
+	}
+	return Definition{}, false
+}
+
+// Validate checks a definition without persisting it.
+func Validate(def Definition) (Definition, error) { return validate(def) }
+
 // Resolve returns enabled targets for a client-facing combo model.
 func (s *Store) Resolve(model string) ([]Target, bool) {
 	if s == nil {
