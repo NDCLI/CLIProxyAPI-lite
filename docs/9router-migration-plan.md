@@ -126,6 +126,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Combo definition persistence added | `36b6521c` | Combo CRUD stores validated ordered provider/model targets in `combos.json`; capability remains `partial` until runtime fallback execution is connected |
 | 2026-09-22 | Combo runtime fallback connected | `69ca131c` | AuthManager receives ordered combo providers and rewrites the selected provider's upstream model for non-stream, stream, and count execution paths; focused routing test passes |
 | 2026-09-22 | Provider quota refresh and Auth Files page added | `11d149a7`, `92194253` | Provider rows expose stable auth indexes for real quota fetches; source-owned Auth Files page uses existing authenticated list/status APIs without showing token contents |
+| 2026-09-22 | OAuth actions and capability manifest finalized | `b893659b` | Auth Files page starts existing Codex/Claude/Antigravity OAuth flows; capability manifest now marks completed provider, usage, CLI, and combo slices ready while Token Saver remains explicitly unavailable |
 
 ## Update convention
 
