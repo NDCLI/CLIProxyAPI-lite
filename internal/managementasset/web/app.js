@@ -14,6 +14,7 @@ const routes = [
   ["usage", "nav.usage", "US", "usage"],
   ["quota", "nav.quota", "QU", "quota"],
   ["logs", "nav.logs", "LG", "logs"],
+  ["settings", "nav.settings", "ST", "system_settings"],
   ["token-saver", "nav.tokenSaver", "TS", "token_saver"],
   ["cli-tools", "nav.cliTools", "CL", "cli_tools"]
 ];
@@ -385,6 +386,29 @@ async function renderLogs(page) {
   }
 }
 
+async function renderSettings(page) {
+  page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  try {
+    const settings = (await api("/system-settings")).item || {};
+    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="status-panel"><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label><label><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> ${t("settings.logging")}</label><label><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> ${t("settings.usage")}</label><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" value="${Number(settings.request_retry || 0)}"></label></div><div class="actions"><button class="primary compact" type="submit">${t("settings.save")}</button><span class="form-message" id="settings-message"></span></div></form>`;
+    const load = () => renderSettings(page);
+    document.getElementById("refresh").addEventListener("click", load);
+    document.getElementById("settings-form").addEventListener("submit", async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const message = document.getElementById("settings-message");
+      try {
+        await api("/system-settings", {method: "PATCH", body: JSON.stringify({logging_to_file: form.elements.logging_to_file.checked, usage_statistics_enabled: form.elements.usage_statistics_enabled.checked, request_retry: Number(form.elements.request_retry.value)})});
+        message.textContent = t("settings.saved");
+      } catch (error) { message.textContent = t("common.error"); }
+    });
+  } catch (error) {
+    if (error.message === "invalid_key") return logout();
+    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<div class="error">${t("common.error")}</div>`;
+    document.getElementById("refresh").addEventListener("click", () => renderSettings(page));
+  }
+}
+
 function renderPage(name) {
   const page = document.getElementById("page");
   switch (name) {
@@ -394,6 +418,7 @@ function renderPage(name) {
     case "usage": renderUsage(page); break;
     case "quota": renderQuota(page); break;
     case "logs": renderLogs(page); break;
+    case "settings": renderSettings(page); break;
     case "token-saver": renderStatusPage(page, "token_saver", "page.tokenSaver"); break;
     case "cli-tools": renderCLITools(page); break;
     default: renderOverview(page);

@@ -212,6 +212,8 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/providers/:id/models", s.mgmt.GetProviderModels)
 		mgmt.GET("/cli-tools", s.mgmt.GetCLITools)
 		mgmt.GET("/cli-tools/:id", s.mgmt.GetCLITool)
+		mgmt.GET("/system-settings", s.mgmt.GetSystemSettings)
+		mgmt.PATCH("/system-settings", s.mgmt.PatchSystemSettings)
 		mgmt.POST("/configure-tool", s.mgmt.ConfigureTool)
 		mgmt.POST("/import/9router", s.mgmt.Import9RouterAccounts)
 		mgmt.GET("/mitm/ca.crt", s.mgmt.DownloadMITMCA)
