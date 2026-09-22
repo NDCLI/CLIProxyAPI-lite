@@ -13,6 +13,7 @@ const routes = [
   ["combo", "nav.combo", "CO", "combos"],
   ["usage", "nav.usage", "US", "usage"],
   ["quota", "nav.quota", "QU", "quota"],
+  ["logs", "nav.logs", "LG", "logs"],
   ["token-saver", "nav.tokenSaver", "TS", "token_saver"],
   ["cli-tools", "nav.cliTools", "CL", "cli_tools"]
 ];
@@ -369,6 +370,21 @@ async function renderQuota(page) {
   }
 }
 
+async function renderLogs(page) {
+  page.innerHTML = pageHeader("kicker.liveData", "logs.title", "logs.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  document.getElementById("refresh").addEventListener("click", () => renderLogs(page));
+  try {
+    const response = await api("/logs?limit=200");
+    const lines = response.lines || [];
+    page.innerHTML = pageHeader("kicker.liveData", "logs.title", "logs.description", true) + (lines.length ? `<pre class="log-output">${escapeHTML(lines.join("\n"))}</pre>` : `<div class="empty">${t("logs.empty")}</div>`);
+    document.getElementById("refresh").addEventListener("click", () => renderLogs(page));
+  } catch (error) {
+    if (error.message === "invalid_key") return logout();
+    page.innerHTML = pageHeader("kicker.liveData", "logs.title", "logs.description", true) + `<div class="error">${t("logs.unavailable")}</div>`;
+    document.getElementById("refresh").addEventListener("click", () => renderLogs(page));
+  }
+}
+
 function renderPage(name) {
   const page = document.getElementById("page");
   switch (name) {
@@ -377,6 +393,7 @@ function renderPage(name) {
     case "combo": renderStatusPage(page, "combos", "page.combo"); break;
     case "usage": renderUsage(page); break;
     case "quota": renderQuota(page); break;
+    case "logs": renderLogs(page); break;
     case "token-saver": renderStatusPage(page, "token_saver", "page.tokenSaver"); break;
     case "cli-tools": renderCLITools(page); break;
     default: renderOverview(page);

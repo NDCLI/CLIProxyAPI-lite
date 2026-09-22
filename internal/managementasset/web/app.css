@@ -99,6 +99,7 @@ button { color: inherit; }
 .form-message { min-height: 20px; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .empty, .loading, .error { padding: 30px; border: 1px dashed var(--line); border-radius: 13px; color: var(--muted); text-align: center; }
 .error { color: var(--danger); }
+.log-output { max-height: 70vh; margin: 0; overflow: auto; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #0d1114; color: #cbd5e1; font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
 
 .table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
