@@ -224,7 +224,22 @@ async function renderProviders(page) {
   try {
     const response = await api("/providers");
     const providers = response.items || [];
-    document.getElementById("providers").innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("providers.empty")}</div>`;
+    const container = document.getElementById("providers");
+    container.innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td><td><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${t("providers.models")}</button></td></tr>`).join("")}</tbody></table></div><div id="provider-models" class="provider-models"></div>` : `<div class="empty">${t("providers.empty")}</div>`;
+    container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
+      button.disabled = true;
+      const modelsPanel = document.getElementById("provider-models");
+      modelsPanel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
+      try {
+        const models = (await api(`/providers/${encodeURIComponent(button.dataset.providerModels)}/models`)).items || [];
+        modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("providers.availableModels")}</h2></div>${models.length ? `<div class="model-list">${models.map(model => `<code>${escapeHTML(model.display_name || model.id)}</code>`).join("")}</div>` : `<div class="empty">${t("providers.modelsEmpty")}</div>`}</section>`;
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        modelsPanel.innerHTML = `<div class="error">${t("common.error")}</div>`;
+      } finally {
+        button.disabled = false;
+      }
+    }));
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     document.getElementById("providers").innerHTML = `<div class="error">${t("common.error")}</div>`;

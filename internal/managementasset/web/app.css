@@ -89,6 +89,9 @@ button { color: inherit; }
 .danger-button { color: var(--danger); }
 .secondary:disabled, .danger-button:disabled { opacity: .55; cursor: wait; }
 .tool-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.provider-models { margin-top: 14px; }
+.model-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.model-list code { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #101417; color: #c7d8e8; font-size: 12px; }
 .tool-form { display: grid; gap: 14px; }
 .tool-form label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .form-message { min-height: 20px; color: var(--muted); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
