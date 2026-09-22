@@ -16,6 +16,7 @@ const routes = [
   ["quota", "nav.quota", "QU", "quota"],
   ["logs", "nav.logs", "LG", "logs"],
   ["settings", "nav.settings", "ST", "system_settings"],
+  ["plugins", "nav.plugins", "PL", "plugins"],
   ["token-saver", "nav.tokenSaver", "TS", "token_saver"],
   ["cli-tools", "nav.cliTools", "CL", "cli_tools"]
 ];
@@ -476,6 +477,20 @@ async function renderSettings(page) {
   }
 }
 
+async function renderPlugins(page) {
+  page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  const load = async () => {
+    try {
+      const response = await api("/plugins");
+      const plugins = response.plugins || [];
+      page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + (plugins.length ? `<section class="grid">${plugins.map(plugin => `<article class="card"><div class="card-title"><h2>${escapeHTML(plugin.metadata?.name || plugin.id)}</h2><span class="badge ${plugin.effective_enabled ? "ready" : "partial"}">${plugin.effective_enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div><p>${escapeHTML(plugin.metadata?.version || plugin.id)}</p><div class="actions"><button class="secondary" data-plugin-enabled="${escapeHTML(plugin.id)}" data-enabled="${Boolean(plugin.enabled)}">${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("plugins.empty")}</div>`);
+      document.getElementById("refresh").addEventListener("click", load);
+      page.querySelectorAll("[data-plugin-enabled]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api(`/plugins/${encodeURIComponent(button.dataset.pluginEnabled)}/enabled`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
+    } catch (error) { if (error.message === "invalid_key") return logout(); page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
+  };
+  await load();
+}
+
 function renderPage(name) {
   const page = document.getElementById("page");
   switch (name) {
@@ -487,6 +502,7 @@ function renderPage(name) {
     case "quota": renderQuota(page); break;
     case "logs": renderLogs(page); break;
     case "settings": renderSettings(page); break;
+    case "plugins": renderPlugins(page); break;
     case "token-saver": renderStatusPage(page, "token_saver", "page.tokenSaver"); break;
     case "cli-tools": renderCLITools(page); break;
     default: renderOverview(page);
