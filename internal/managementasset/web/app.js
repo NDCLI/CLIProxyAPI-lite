@@ -269,8 +269,8 @@ const cliTools = [
   ["env-anthropic", "Anthropic environment", false]
 ];
 
-function renderCLITools(page) {
-  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2>${escapeHTML(label)}</h2><span class="badge ready">${t("capability.ready")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t("cli.model")}<input class="text-input" name="model" autocomplete="off"></label><div class="actions"><button class="primary compact" type="submit">${t("cli.apply")}</button>${reset ? `<button class="secondary" type="button" data-reset>${t("cli.reset")}</button>` : ""}</div><div class="form-message" aria-live="polite"></div></form>`).join("")}</div>`;
+async function renderCLITools(page) {
+  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2>${escapeHTML(label)}</h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t("cli.model")}<input class="text-input" name="model" autocomplete="off"></label><div class="actions"><button class="primary compact" type="submit">${t("cli.apply")}</button>${reset ? `<button class="secondary" type="button" data-reset>${t("cli.reset")}</button>` : ""}</div><div class="form-message" aria-live="polite"></div></form>`).join("")}</div>`;
   page.querySelectorAll("[data-tool]").forEach(form => {
     const message = form.querySelector(".form-message");
     form.addEventListener("submit", async event => {
@@ -306,6 +306,19 @@ function renderCLITools(page) {
       }
     });
   });
+  try {
+    const statusByID = new Map(((await api("/cli-tools")).items || []).map(item => [item.id, item]));
+    page.querySelectorAll("[data-tool]").forEach(form => {
+      const item = statusByID.get(form.dataset.tool);
+      const badge = form.querySelector("[data-tool-status]");
+      if (!badge) return;
+      const configured = Boolean(item?.configured);
+      badge.className = `badge ${configured ? "ready" : "partial"}`;
+      badge.textContent = t(configured ? "cli.configured" : "cli.notConfigured");
+    });
+  } catch (error) {
+    if (error.message === "invalid_key") logout();
+  }
 }
 
 async function renderUsage(page, filter = {}) {
