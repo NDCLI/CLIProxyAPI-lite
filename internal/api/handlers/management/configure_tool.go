@@ -512,7 +512,7 @@ func configureEnvOpenAI(serverAddr, apiKey, model string) (configureToolResponse
 			Message: msg,
 		}, nil
 	}
-	msg := fmt.Sprintf("Set these in your shell profile:\nexport OPENAI_BASE_URL=%s/v1\nexport OPENAI_API_KEY=%s", serverAddr, apiKey)
+	msg := fmt.Sprintf("Set OPENAI_BASE_URL=%s/v1 and OPENAI_API_KEY in your shell profile (the key is intentionally omitted)", serverAddr)
 	if model != "" {
 		msg += fmt.Sprintf("\nexport OPENAI_MODEL=%s", model)
 	}
@@ -544,7 +544,7 @@ func configureEnvAnthropic(serverAddr, apiKey, model string) (configureToolRespo
 			Message: msg,
 		}, nil
 	}
-	msg := fmt.Sprintf("Set these in your shell profile:\nexport ANTHROPIC_BASE_URL=%s\nexport ANTHROPIC_API_KEY=%s", serverAddr, apiKey)
+	msg := fmt.Sprintf("Set ANTHROPIC_BASE_URL=%s and ANTHROPIC_API_KEY in your shell profile (the key is intentionally omitted)", serverAddr)
 	if model != "" {
 		msg += fmt.Sprintf("\nexport ANTHROPIC_MODEL=%s", model)
 	}

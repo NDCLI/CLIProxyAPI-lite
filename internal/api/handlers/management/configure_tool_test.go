@@ -3,6 +3,7 @@ package management
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
@@ -88,6 +89,22 @@ func TestConfigureAndResetCodexCLIPreservesUnrelatedSettings(t *testing.T) {
 	authData, _ = os.ReadFile(filepath.Join(codexDir, "auth.json"))
 	if contains(string(authData), "gateway-key") || !contains(string(authData), "keep-me") {
 		t.Fatalf("reset removed unrelated auth or retained gateway key: %s", authData)
+	}
+}
+
+func TestConfigureEnvMessagesDoNotEchoAPIKey(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("environment configuration uses setx on Windows")
+	}
+	key := "secret-env-key"
+	for _, configure := range []func(string, string, string) (configureToolResponse, error){configureEnvOpenAI, configureEnvAnthropic} {
+		response, errConfigure := configure("http://127.0.0.1:8317", key, "gpt-5")
+		if errConfigure != nil {
+			t.Fatalf("configure env failed: %v", errConfigure)
+		}
+		if contains(response.Message, key) {
+			t.Fatalf("environment configuration echoed API key: %s", response.Message)
+		}
 	}
 }
 
