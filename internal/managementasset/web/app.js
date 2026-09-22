@@ -227,7 +227,7 @@ async function renderProviders(page) {
     const response = await api("/providers");
     const providers = response.items || [];
     const container = document.getElementById("providers");
-    container.innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${t("providers.models")}</button><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></td></tr>`).join("")}</tbody></table></div><div id="provider-models" class="provider-models"></div>` : `<div class="empty">${t("providers.empty")}</div>`;
+    container.innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${t("providers.models")}</button><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${provider.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="secondary" data-provider-quota="${escapeHTML(provider.auth_index)}" data-provider-name="${escapeHTML(provider.provider)}">${t("quota.refresh")}</button></div></td></tr>`).join("")}</tbody></table></div><div id="provider-models" class="provider-models"></div>` : `<div class="empty">${t("providers.empty")}</div>`;
     container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
       button.disabled = true;
       const modelsPanel = document.getElementById("provider-models");
@@ -253,6 +253,18 @@ async function renderProviders(page) {
         if (error.message === "invalid_key") return logout();
         button.disabled = false;
       }
+    }));
+    container.querySelectorAll("[data-provider-quota]").forEach(button => button.addEventListener("click", async () => {
+      button.disabled = true;
+      const modelsPanel = document.getElementById("provider-models");
+      modelsPanel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
+      try {
+        const quota = await api("/quota/fetch", {method: "POST", body: JSON.stringify({auth_index: button.dataset.providerQuota, provider: button.dataset.providerName})});
+        modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("quota.result")}</h2></div><pre class="quota-output">${escapeHTML(JSON.stringify(quota, null, 2))}</pre></section>`;
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        modelsPanel.innerHTML = `<div class="error">${t("quota.unavailable")}</div>`;
+      } finally { button.disabled = false; }
     }));
   } catch (error) {
     if (error.message === "invalid_key") return logout();

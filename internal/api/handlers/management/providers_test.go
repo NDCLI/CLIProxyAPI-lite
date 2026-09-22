@@ -51,7 +51,7 @@ func TestProvidersAreNormalizedAndSecretFree(t *testing.T) {
 	if response.SchemaVersion != 1 || len(response.Items) != 2 {
 		t.Fatalf("unexpected response: %#v", response)
 	}
-	if response.Items[0].ID != "claude-credential" || response.Items[0].AuthType != coreauth.AuthKindAPIKey || !response.Items[0].Enabled {
+	if response.Items[0].ID != "claude-credential" || response.Items[0].AuthIndex == "" || response.Items[0].AuthType != coreauth.AuthKindAPIKey || !response.Items[0].Enabled {
 		t.Fatalf("unexpected API-key provider: %#v", response.Items[0])
 	}
 	if response.Items[1].Label != "codex.json" || response.Items[1].Enabled || response.Items[1].Status != string(coreauth.StatusDisabled) {
