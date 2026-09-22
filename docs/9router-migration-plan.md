@@ -41,10 +41,10 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 ### Phase 2 — New management shell
 
-- Build a source-owned frontend shell and router instead of DOM injection into the legacy bundle.
-- Implement the 9router navigation groups and responsive sidebar: Endpoint & Key, Providers, Combo & Vision Adapter, Usage, Quota Tracker, Token Saver, and CLI Tools.
-- Add shared layout primitives for cards, tables, forms, dialogs, toasts, loading states, empty states, and error states.
-- Make deep links, refresh, browser back/forward, collapsed navigation, and mobile layout work consistently.
+- ~~Build a source-owned frontend shell and router instead of DOM injection into the legacy bundle.~~
+- ~~Implement the navigation groups and responsive sidebar: Endpoint & Key, Providers, Combo & Vision Adapter, Usage, Quota Tracker, Token Saver, and CLI Tools.~~
+- ~~Add shared layout primitives for cards, tables, forms, loading states, empty states, and error states.~~
+- ~~Make deep links, refresh, browser back/forward, collapsed navigation, and mobile layout work consistently.~~
 
 ### Phase 3 — English and Vietnamese localization
 
@@ -115,6 +115,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Versioned management contracts and capability states defined | `04c0c6d9` | `docs/9router-management-api-contracts.md`; runtime manifest at `GET /v0/management/capabilities` |
 | 2026-09-22 | Endpoint-key backend slice implemented | `e04306a6` | Source-owned routes and handlers now support masked listing, generated/explicit create, rotation, deletion, optimistic revisions, persistence, and focused contract tests; build and targeted tests pass |
 | 2026-09-22 | Provider read-model slice implemented | `f1520269` | `GET /v0/management/providers`, detail, and model lookup return normalized secret-free runtime metadata; focused tests cover masking and management authentication |
+| 2026-09-22 | Source-owned shell and legacy sidebar restored | `552af703`, `a9c03538` | `/management-next.html` serves embedded shell assets; hash routes, responsive navigation, English/Vietnamese bundles, and source asset tests verified |
 
 ## Update convention
 
