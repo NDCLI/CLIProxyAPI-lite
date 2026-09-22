@@ -118,6 +118,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Source-owned shell and legacy sidebar restored | `552af703`, `a9c03538` | `/management-next.html` serves embedded shell assets; hash routes, responsive navigation, English/Vietnamese bundles, and source asset tests verified |
 | 2026-09-22 | Management localization completed | `a52620b4` | English default, persisted language selector, complete en/vi source key parity check, and translated provider runtime statuses verified by `go test ./internal/managementasset` |
 | 2026-09-22 | Provider model discovery shown in UI | `044433f3` | Providers page retrieves credential-scoped model inventory from the normalized `GET /providers/:id/models` endpoint; empty and error states are localized |
+| 2026-09-22 | Provider enable/disable added | `e201e6ec` | Authenticated `PATCH /v0/management/providers/:id` delegates to the existing auth persistence workflow; focused test proves the credential state is changed |
 
 ## Update convention
 
