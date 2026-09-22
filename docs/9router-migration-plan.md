@@ -85,7 +85,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 ### Phase 9 — Remaining 9router management areas
 
-- ~~Add the remaining applicable pages: auth files, OAuth, logs/translator, proxy pools, skills, media providers, system information, and quick start.~~
+- Add the remaining applicable pages: auth files, OAuth, logs/translator, proxy pools, skills, media providers, system information, and quick start. Auth files, OAuth, logs, and Quick Start are implemented; proxy pools, skills, media providers, and system information remain unavailable without matching Go authorities.
 - Reuse the shared shell, localization, permissions, and error handling from earlier phases.
 - Mark a page unavailable until its backend behavior is complete and tested.
 
