@@ -474,12 +474,22 @@ function usageTable(records) {
 
 async function renderQuota(page) {
   page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="loading">${t("common.loading")}</div>`;
-  document.getElementById("refresh").addEventListener("click", () => renderQuota(page));
   try {
-    const response = await api("/quota/providers");
-    const providers = response.providers || [];
-    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (providers.length ? `<section class="grid">${providers.map(provider => `<article class="card"><h2>${escapeHTML(provider.name || provider.id || provider.provider || t("quota.provider"))}</h2><p>${escapeHTML(provider.description || provider.id || "")}</p></article>`).join("")}</section>` : `<div class="empty">${t("common.empty")}</div>`);
+    const [authResponse, providerResponse] = await Promise.all([api("/auth-files"), api("/quota/providers")]);
+    const credentials = (authResponse.files || []).filter(file => file.supports_quota);
+    const quotaProviders = providerResponse.providers || [];
+    const canReset = credential => quotaProviders.some(provider => provider.supports_reset && (provider.supported_providers || []).some(name => String(name).toLowerCase() === String(credential.provider).toLowerCase()));
+    const cards = credentials.map(credential => `<article class="card"><div class="card-title"><h2>${escapeHTML(credential.label || credential.name || credential.id)}</h2><span class="badge ${credential.unavailable ? "partial" : "ready"}">${escapeHTML(providerStatusLabel(credential.status))}</span></div><p>${escapeHTML(credential.provider || "-")}</p><div class="actions"><button class="secondary" data-quota-fetch="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${t("quota.refresh")}</button>${canReset(credential) ? `<button class="secondary" data-quota-reset="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${t("quota.reset")}</button>` : ""}</div></article>`).join("");
+    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `<section class="grid">${cards}</section>` : `<div class="empty">${t("quota.empty")}</div>`) + `<section id="quota-result" class="provider-models"></section>`;
     document.getElementById("refresh").addEventListener("click", () => renderQuota(page));
+    const result = document.getElementById("quota-result");
+    const show = value => {
+      const groups = (value.groups || []).flatMap(group => (group.buckets || []).map(bucket => `<li><strong>${escapeHTML(group.displayName || t("quota.provider"))}</strong>: ${Math.round(Number(bucket.remainingFraction || 0) * 100)}% ${t("quota.remaining")}${bucket.resetTime ? ` · ${escapeHTML(new Date(bucket.resetTime).toLocaleString(state.locale))}` : ""}</li>`));
+      const summary = (value.summary || []).map(metric => `<li>${escapeHTML(metric.label || metric.key)}: ${escapeHTML(`${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)}</li>`);
+      result.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("quota.result")}</h2></div>${value.subscription?.plan ? `<p>${escapeHTML(value.subscription.plan)}</p>` : ""}<ul class="quota-list">${summary.join("")}${groups.join("")}</ul></section>`;
+    };
+    page.querySelectorAll("[data-quota-fetch]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; result.innerHTML = `<div class="loading">${t("common.loading")}</div>`; try { show(await api("/quota/fetch", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaFetch, provider: button.dataset.provider})})); } catch (error) { if (error.message === "invalid_key") return logout(); result.innerHTML = `<div class="error">${escapeHTML(error.message === "server_error" ? t("quota.unavailable") : error.message)}</div>`; } finally { button.disabled = false; } }));
+    page.querySelectorAll("[data-quota-reset]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("quota.confirmReset"))) return; button.disabled = true; try { await api("/quota/reset", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaReset, provider: button.dataset.provider})}); await renderQuota(page); } catch (error) { if (error.message === "invalid_key") return logout(); result.innerHTML = `<div class="error">${escapeHTML(error.message)}</div>`; button.disabled = false; } }));
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="error">${t("common.error")}</div>`;

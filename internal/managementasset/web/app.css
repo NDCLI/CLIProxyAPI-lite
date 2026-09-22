@@ -94,6 +94,7 @@ button { color: inherit; }
 .model-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .model-list code { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #101417; color: #c7d8e8; font-size: 12px; }
 .quota-output { margin: 0; overflow: auto; color: #c7d8e8; font: 12px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; }
+.quota-list { display: grid; gap: 8px; margin: 0; padding-left: 20px; color: var(--muted); font-size: 13px; }
 .usage-filters { display: grid; grid-template-columns: repeat(2, minmax(150px, 1fr)) repeat(2, minmax(190px, 1fr)) minmax(120px, .6fr) auto; gap: 10px; align-items: end; margin-bottom: 18px; }
 .usage-filters label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .tool-form { display: grid; gap: 14px; }
