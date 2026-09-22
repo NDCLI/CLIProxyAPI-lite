@@ -111,7 +111,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Isolated `test` branch created and pushed | `6db4e2ba` | `origin/test` exists and tracks the branch |
 | 2026-09-22 | 9router architecture/sidebar/API inventory captured | `6db4e2ba` | Local 9router `v0.5.81` source inspection |
 | 2026-09-22 | Migration rules and checklist recorded | `4fa0061a` | This document |
-| 2026-09-22 | Entity, API, and persistence ownership mapped | Pending ledger update | `docs/9router-data-api-map.md`; verified against 9router schema/routes and Go management routes/config/auth/usage stores |
+| 2026-09-22 | Entity, API, and persistence ownership mapped | `a391e856` | `docs/9router-data-api-map.md`; verified against 9router schema/routes and Go management routes/config/auth/usage stores |
 
 ## Update convention
 

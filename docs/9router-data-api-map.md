@@ -64,4 +64,3 @@ The migration must not introduce a second database that competes with existing r
 2. Add contract tests for masked keys, normalized providers, usage records, quota, CLI status, and unavailable capabilities.
 3. Implement new persistence only for domains with no Go authority, beginning with combos after the management shell and core provider contracts are stable.
 4. Remove the legacy management bundle only after every required route is backed by one of the authorities listed above.
-
