@@ -308,20 +308,30 @@ function renderCLITools(page) {
   });
 }
 
-async function renderUsage(page) {
-  page.innerHTML = pageHeader("kicker.liveData", "usage.title", "usage.description", true) + `<div class="loading">${t("common.loading")}</div>`;
-  document.getElementById("refresh").addEventListener("click", () => renderUsage(page));
+async function renderUsage(page, filter = {}) {
+  const filters = `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><button class="secondary" id="usage-apply">${t("usage.applyFilters")}</button></section>`;
+  const renderHeader = () => pageHeader("kicker.liveData", "usage.title", "usage.description", true) + filters;
+  page.innerHTML = renderHeader() + `<div class="loading">${t("common.loading")}</div>`;
+  const apply = () => renderUsage(page, {provider: document.getElementById("usage-provider").value.trim(), model: document.getElementById("usage-model").value.trim(), status: document.getElementById("usage-status").value});
+  document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
+  document.getElementById("usage-apply").addEventListener("click", apply);
+  const query = new URLSearchParams({limit: "200"});
+  if (filter.provider) query.set("provider", filter.provider);
+  if (filter.model) query.set("model", filter.model);
+  if (filter.status) query.set("status", filter.status);
   try {
-    const response = await api("/usage-history?limit=200");
-    const records = response.records || [];
-    const totals = records.reduce((sum, row) => ({requests: sum.requests + 1, tokens: sum.tokens + Number(row.total_tokens || 0), input: sum.input + Number(row.input_tokens || 0), output: sum.output + Number(row.output_tokens || 0), cached: sum.cached + Number(row.cached_tokens || 0)}), {requests: 0, tokens: 0, input: 0, output: 0, cached: 0});
-    const metrics = [["common.requests", totals.requests], ["common.tokens", totals.tokens], ["usage.input", totals.input], ["usage.output", totals.output], ["usage.cached", totals.cached]];
-    page.innerHTML = pageHeader("kicker.liveData", "usage.title", "usage.description", true) + `<section class="grid">${metrics.map(([label, value]) => `<article class="card"><h3>${t(label)}</h3><div class="metric">${value.toLocaleString()}</div></article>`).join("")}</section><section style="margin-top:14px">${usageTable(records)}</section>`;
-    document.getElementById("refresh").addEventListener("click", () => renderUsage(page));
+    const [recordsResponse, summaryResponse] = await Promise.all([api(`/usage/records?${query}`), api(`/usage/summary?${query}`)]);
+    const records = recordsResponse.items || [];
+    const summary = summaryResponse.item || {};
+    const metrics = [["common.requests", summary.requests || 0], ["common.tokens", summary.total_tokens || 0], ["usage.input", summary.input_tokens || 0], ["usage.output", summary.output_tokens || 0], ["usage.cached", summary.cached_tokens || 0]];
+    page.innerHTML = renderHeader() + `<section class="grid">${metrics.map(([label, value]) => `<article class="card"><h3>${t(label)}</h3><div class="metric">${Number(value).toLocaleString()}</div></article>`).join("")}</section><section style="margin-top:14px">${usageTable(records)}</section>`;
+    document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
+    document.getElementById("usage-apply").addEventListener("click", apply);
   } catch (error) {
     if (error.message === "invalid_key") return logout();
-    page.innerHTML = pageHeader("kicker.liveData", "usage.title", "usage.description", true) + `<div class="error">${t("common.error")}</div>`;
-    document.getElementById("refresh").addEventListener("click", () => renderUsage(page));
+    page.innerHTML = renderHeader() + `<div class="error">${t("common.error")}</div>`;
+    document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
+    document.getElementById("usage-apply").addEventListener("click", apply);
   }
 }
 

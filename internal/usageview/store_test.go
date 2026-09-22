@@ -38,3 +38,20 @@ func TestConfigurePersistenceReloadsHistory(t *testing.T) {
 		t.Fatalf("reloaded snapshot = %#v", got)
 	}
 }
+
+func TestFilteredSnapshotMatchesProviderModelAndStatus(t *testing.T) {
+	history.Lock()
+	history.items = nil
+	history.Unlock()
+	failed := true
+	Add(Record{Timestamp: time.Unix(1, 0), Provider: "codex", Model: "gpt-5", Failed: true})
+	Add(Record{Timestamp: time.Unix(2, 0), Provider: "claude", Model: "sonnet", Alias: "fast", Failed: false})
+	got := FilteredSnapshot(10, Filter{Provider: "claude", Model: "fast", Failed: &failed})
+	if len(got) != 0 {
+		t.Fatalf("filtered failed records = %#v, want none", got)
+	}
+	got = FilteredSnapshot(10, Filter{Provider: "claude", Model: "fast"})
+	if len(got) != 1 || got[0].Model != "sonnet" {
+		t.Fatalf("filtered records = %#v", got)
+	}
+}

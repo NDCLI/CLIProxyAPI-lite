@@ -28,6 +28,15 @@ type Record struct {
 	Failed              bool      `json:"failed"`
 }
 
+// Filter limits records exposed by the management usage read model.
+type Filter struct {
+	Provider string
+	Model    string
+	Failed   *bool
+	From     time.Time
+	To       time.Time
+}
+
 var history struct {
 	sync.RWMutex
 	items []Record
@@ -115,16 +124,36 @@ func Add(record Record) {
 }
 
 func Snapshot(limit int) []Record {
+	return FilteredSnapshot(limit, Filter{})
+}
+
+// FilteredSnapshot returns newest-first records matching the supplied non-secret filters.
+func FilteredSnapshot(limit int, filter Filter) []Record {
 	if limit <= 0 || limit > maxRecords {
 		limit = maxRecords
 	}
 	history.RLock()
 	defer history.RUnlock()
-	start := len(history.items) - limit
-	if start < 0 {
-		start = 0
+	items := make([]Record, 0, limit)
+	for index := len(history.items) - 1; index >= 0 && len(items) < limit; index-- {
+		record := history.items[index]
+		if filter.Provider != "" && !strings.EqualFold(record.Provider, filter.Provider) {
+			continue
+		}
+		if filter.Model != "" && !strings.EqualFold(record.Model, filter.Model) && !strings.EqualFold(record.Alias, filter.Model) {
+			continue
+		}
+		if filter.Failed != nil && record.Failed != *filter.Failed {
+			continue
+		}
+		if !filter.From.IsZero() && record.Timestamp.Before(filter.From) {
+			continue
+		}
+		if !filter.To.IsZero() && record.Timestamp.After(filter.To) {
+			continue
+		}
+		items = append(items, record)
 	}
-	out := append([]Record(nil), history.items[start:]...)
-	sort.SliceStable(out, func(i, j int) bool { return out[i].Timestamp.After(out[j].Timestamp) })
-	return out
+	sort.SliceStable(items, func(i, j int) bool { return items[i].Timestamp.After(items[j].Timestamp) })
+	return items
 }
