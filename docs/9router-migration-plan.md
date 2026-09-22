@@ -63,7 +63,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 - ~~Add persisted combo definitions with ordered providers, model matching, fallback rules, and vision capability metadata.~~
 - ~~Implement create, edit, duplicate, validate, enable/disable, and delete flows.~~
-- Route requests through the selected combo and expose the actual fallback result in logs and usage data.
+- ~~Route requests through the selected combo and expose the actual fallback result in logs and usage data.~~
 
 ### Phase 6 — Usage and Quota Tracker
 
@@ -130,6 +130,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | OAuth completion polling added | `ceb88f77` | Auth Files page polls the authenticated OAuth session status and refreshes credentials after successful login, with localized failure and timeout states |
 | 2026-09-22 | Source-owned UI became default entrypoint | `40e227b2` | `/management.html` and `/` serve the source-owned shell; safe-mode configuration and `/management-legacy.html` retain the legacy editor for compatibility |
 | 2026-09-22 | Combo management controls completed | `b681d53b` | Authenticated create, validate, edit, duplicate, enable/disable, and delete flows use persisted Go combo definitions; focused handler/store/asset tests and server build pass |
+| 2026-09-22 | Combo fallback observability completed | `8c87ff13` | Request logs retain the actual upstream request while Usage now shows requested model, selected provider, and upstream model; focused combo-routing and management asset tests pass |
 
 ## Update convention
 
