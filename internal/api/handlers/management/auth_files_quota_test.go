@@ -66,3 +66,13 @@ func TestQuotaObservationPayloadExcludesCooldownState(t *testing.T) {
 		t.Fatalf("cooldown backoff leaked: %#v", payload)
 	}
 }
+
+func TestBuildAuthFileEntryMarksPassiveQuotaProviders(t *testing.T) {
+	h := &Handler{}
+	for _, provider := range []string{"claude", "codex", "devin", "antigravity"} {
+		entry := h.buildAuthFileEntryLocked(&coreauth.Auth{ID: provider, FileName: provider + ".json", Provider: provider, Attributes: map[string]string{"path": provider + ".json"}})
+		if entry["supports_quota"] != true || entry["quota_observation"] != true {
+			t.Fatalf("provider %q entry = %#v, want passive quota support", provider, entry)
+		}
+	}
+}

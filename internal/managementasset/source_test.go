@@ -7,7 +7,11 @@ import (
 )
 
 func TestSourceManagementAssets(t *testing.T) {
-	for _, name := range []string{"index.html", "app.css", "app.js", "i18n/en.json", "i18n/vi.json"} {
+	for _, name := range []string{
+		"index.html", "app.css", "app.js", "i18n/en.json", "i18n/vi.json",
+		"providers/antigravity.png", "providers/codex.png", "providers/claude.png",
+		"providers/gemini.png", "providers/openai.png",
+	} {
 		body, contentType, ok := SourceManagementAsset(name)
 		if !ok || len(body) == 0 || contentType == "" {
 			t.Fatalf("asset %q unavailable", name)

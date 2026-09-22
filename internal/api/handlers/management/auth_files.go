@@ -692,6 +692,13 @@ func (h *Handler) buildAuthFileEntryLocked(auth *coreauth.Auth, quotaSupported .
 			entry["quota_provider"] = auth.Provider
 		}
 	}
+	// Claude, Codex, and Devin expose quota watermarks on ordinary upstream responses.
+	// Keep them visible in Quota Tracker even when no optional quota plugin is loaded.
+	if supportsManagementQuota(auth.Provider) {
+		entry["supports_quota"] = true
+		entry["quota_provider"] = auth.Provider
+		entry["quota_observation"] = true
+	}
 	if auth.Metadata != nil {
 		if probe, okProbe := auth.Metadata["quota_probe"]; okProbe && probe != nil {
 			entry["supports_quota"] = true

@@ -26,6 +26,10 @@ const app = document.getElementById("app");
 const escapeHTML = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[char]));
 const t = key => state.messages[key] || key;
 const iconPaths = {
+  refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
+  arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
+  user: '<circle cx="12" cy="8" r="3"/><path d="M5 21v-2a7 7 0 0 1 14 0v2"/>',
   grid: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
   rocket: '<path d="M13 5c2.8-2.8 6.2-2.5 6.2-2.5S19.5 6 16.7 8.8l-3.2 3.2-3.5-3.5L13 5Z"/><path d="m10 8.5-4.8.9L2.5 12l3.5.7M13.5 12l.9 4.8 2.6 2.7.7-3.5M9.5 14.5l-2 2"/><circle cx="15.5" cy="6.2" r="1"/>',
   key: '<circle cx="8" cy="15" r="3"/><path d="m10.2 12.8 7.3-7.3 2 2-1.4 1.4 1.3 1.3-2.1 2.1-1.3-1.3-3.7 3.7"/>',
@@ -44,6 +48,26 @@ const iconPaths = {
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
 };
 const icon = (name, className = "") => `<svg class="icon ${className}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name] || ""}</svg>`;
+
+const providerBrands = {
+  antigravity: ["Antigravity", "antigravity"], codex: ["OpenAI Codex", "codex"],
+  claude: ["Claude", "claude"], anthropic: ["Anthropic", "claude"],
+  gemini: ["Google Gemini", "gemini"], "gemini-cli": ["Gemini CLI", "gemini"],
+  "gemini-cli-oauth": ["Gemini CLI", "gemini"], vertex: ["Vertex AI", "gemini"],
+  qwen: ["Qwen", "qwen"], kimi: ["Kimi", "kimi"], "kimi-coding": ["Kimi Coding", "kimi"],
+  openai: ["OpenAI", "openai"], "openai-compatibility": ["OpenAI Compatible", "openai"],
+  cursor: ["Cursor", "cursor"], cline: ["Cline", "cline"], continue: ["Continue", "continue"],
+  iflow: ["iFlow", "iflow"], github: ["GitHub", "github"]
+};
+function providerIdentity(name, compact = false) {
+  const key = String(name || "").toLowerCase();
+  const brand = Object.hasOwn(providerBrands, key) ? providerBrands[key] : null;
+  return `<span class="provider-identity ${compact ? "compact" : ""}"><span class="provider-logo">${brand ? `<img src="/management-next/providers/${brand[1]}.png" alt="" width="32" height="32">` : icon("server")}</span><span>${escapeHTML(brand?.[0] || name || t("providers.status.unknown"))}</span></span>`;
+}
+
+function metricCard(label, value, symbol) {
+  return `<article class="card metric-card"><span class="metric-icon">${icon(symbol)}</span><h3>${t(label)}</h3><div class="metric">${Number(value || 0).toLocaleString(state.locale)}</div></article>`;
+}
 
 async function loadMessages() {
   const response = await fetch(`/management-next/i18n/${state.locale}.json`);
@@ -64,7 +88,7 @@ async function api(path, options = {}) {
   }
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));
-    const error = new Error(body.error?.message || "server_error");
+    const error = new Error(typeof body.error === "string" ? body.error : body.error?.message || "server_error");
     error.status = response.status;
     throw error;
   }
@@ -124,7 +148,8 @@ async function loadCapabilities() {
 
 function navHTML(active) {
   return routes.map(([id, label, iconName]) => {
-    return `<button class="nav-link ${active === id ? "active" : ""}" data-route="${id}" title="${escapeHTML(t(label))}"><span class="nav-icon">${icon(iconName)}</span><span class="nav-label">${t(label)}</span></button>`;
+    const group = {overview: "nav.group.workspace", endpoint: "nav.group.gateway", usage: "nav.group.monitor", settings: "nav.group.tools"}[id];
+    return `${group ? `<div class="nav-group">${t(group)}</div>` : ""}<button class="nav-link ${active === id ? "active" : ""}" ${active === id ? 'aria-current="page"' : ""} data-route="${id}" title="${escapeHTML(t(label))}"><span class="nav-icon">${icon(iconName)}</span><span class="nav-label">${t(label)}</span></button>`;
   }).join("");
 }
 
@@ -134,7 +159,7 @@ function renderShell() {
     <div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
     <nav class="nav">${navHTML(active)}</nav>
     <div class="sidebar-footer"><button class="sidebar-action" id="collapse" title="${t(state.collapsed ? "action.expand" : "action.collapse")}">${icon("chevrons")}<span>${t(state.collapsed ? "action.expand" : "action.collapse")}</span></button><button class="sidebar-action" id="logout" title="${t("action.logout")}">${icon("logout")}<span>${t("action.logout")}</span></button></div>
-  </aside><section class="workspace"><header class="topbar"><div class="topbar-context"><span class="topbar-dot"></span><span>${t("app.name")}</span></div><div class="topbar-actions"><button class="top-button icon-button" id="locale" title="${state.locale === "en" ? "Vietnamese" : "English"}">${icon("globe")}<span>${state.locale === "en" ? "VI" : "EN"}</span></button><button class="top-button icon-button" id="logout-top" title="${t("action.logout")}">${icon("logout")}<span>${t("action.logout")}</span></button></div></header><main class="content" id="page"></main></section></div>`;
+  </aside><section class="workspace"><header class="topbar"><div class="topbar-context"><span class="topbar-dot"></span><span>${t("app.name")}</span><span class="breadcrumb-divider">/</span><strong>${t(routes.find(route => route[0] === active)[1])}</strong></div><div class="topbar-actions"><button class="top-button icon-button" id="locale" title="${state.locale === "en" ? "Vietnamese" : "English"}">${icon("globe")}<span>${state.locale === "en" ? "VI" : "EN"}</span></button><button class="top-button icon-button" id="logout-top" title="${t("action.logout")}">${icon("logout")}<span>${t("action.logout")}</span></button></div></header><main class="content" id="page" data-page="${active}"></main></section></div>`;
   app.querySelectorAll("[data-route]").forEach(button => button.addEventListener("click", () => { location.hash = `#/${button.dataset.route}`; }));
   document.getElementById("locale").addEventListener("click", changeLocale);
   document.getElementById("logout").addEventListener("click", logout);
@@ -162,17 +187,29 @@ function logout() {
 }
 
 function pageHeader(kicker, title, description, refresh = false) {
-  return `<div class="page-head"><div><div class="eyebrow">${t(kicker)}</div><h1>${t(title)}</h1><p>${t(description)}</p></div>${refresh ? `<button class="refresh" id="refresh">${t("action.refresh")}</button>` : ""}</div>`;
+  const route = routes.find(entry => entry[0] === routeName());
+  return `<div class="page-head"><div class="page-heading"><span class="page-symbol">${icon(route?.[2] || "grid")}</span><div><h1>${t(title)}</h1><p>${t(description)}</p></div></div>${refresh ? `<button class="refresh" id="refresh">${icon("refresh")}${t("action.refresh")}</button>` : ""}</div>`;
 }
 
 function capabilityCard(item) {
   const route = routes.find(entry => entry[3] === item.id);
   if (!route) return "";
-  return `<article class="card"><div class="card-title"><h2>${t(route[1])}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><p>${escapeHTML(reasonLabel(item.reason_code) || statusLabel(item.state))}</p></article>`;
+  return `<a class="card capability-card" href="#/${route[0]}"><div class="card-title"><span class="feature-icon">${icon(route[2])}</span><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><h2>${t(route[1])}</h2><p>${t(`section.${route[0]}`)}</p><span class="card-arrow">${icon("arrow")}</span></a>`;
 }
 
-function renderOverview(page) {
-  page.innerHTML = pageHeader("kicker.migration", "dashboard.title", "dashboard.description") + `<section class="grid">${[...state.capabilities.values()].filter(item => routes.some(route => route[3] === item.id)).map(capabilityCard).join("")}</section>`;
+async function renderOverview(page) {
+  page.innerHTML = pageHeader("kicker.migration", "dashboard.title", "dashboard.description", true) + `<div id="overview-metrics" class="loading">${t("common.loading")}</div><div class="section-head"><h2>${t("dashboard.workspace")}</h2><a class="text-link" href="#/quick-start">${t("nav.quickStart")}${icon("arrow")}</a></div><section class="grid">${[...state.capabilities.values()].filter(item => routes.some(route => route[3] === item.id)).map(capabilityCard).join("")}</section>`;
+  document.getElementById("refresh").addEventListener("click", () => renderOverview(page));
+  const container = page.querySelector("#overview-metrics");
+  try {
+    const [providers, usage] = await Promise.all([api("/providers"), api("/usage/summary")]);
+    container.className = "metrics-grid";
+    container.innerHTML = metricCard("providers.accounts", (providers.items || []).length, "user") + metricCard("providers.active", (providers.items || []).filter(item => item.enabled && item.status === "active").length, "shield") + metricCard("common.requests", usage.item?.requests, "chart") + metricCard("common.tokens", usage.item?.total_tokens, "zap");
+  } catch (error) {
+    if (error.message === "invalid_key") return logout();
+    container.className = "error";
+    container.textContent = t("common.error");
+  }
 }
 
 async function renderQuickStart(page) {
@@ -181,7 +218,7 @@ async function renderQuickStart(page) {
     const [keys, authFiles] = await Promise.all([api("/endpoint-keys"), api("/auth-files")]);
     const activeKeys = (keys.items || []).length;
     const credentials = (authFiles.files || []).filter(file => !file.disabled).length;
-    page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${t("quickStart.manageKeys")}</button></div></section><section class="grid"><article class="card"><h3>${t("quickStart.keys")}</h3><div class="metric">${activeKeys}</div></article><article class="card"><h3>${t("quickStart.credentials")}</h3><div class="metric">${credentials}</div></article></section>`;
+    page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><h2>${t("quickStart.stepOne")}</h2><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${t("quickStart.manageKeys")}</button></div></section><section class="grid"><article class="card"><span class="feature-icon">${icon("key")}</span><h3>${t("quickStart.stepTwo")}</h3><p>${t("quickStart.keys")}</p><div class="metric">${activeKeys}</div></article><article class="card"><span class="feature-icon">${icon("shield")}</span><h3>${t("quickStart.credentials")}</h3><div class="metric">${credentials}</div></article><article class="card"><span class="feature-icon">${icon("terminal")}</span><h3>${t("quickStart.stepThree")}</h3><p>${t("cli.description")}</p><a class="text-link" href="#/cli-tools">${t("quickStart.connectTools")}${icon("arrow")}</a></article></section>`;
     document.getElementById("quick-start-copy").addEventListener("click", () => copyText(document.getElementById("quick-start-url").value));
     document.getElementById("quick-start-keys").addEventListener("click", () => { location.hash = "#/endpoint"; });
     document.getElementById("refresh").addEventListener("click", () => renderQuickStart(page));
@@ -194,7 +231,7 @@ async function renderQuickStart(page) {
 
 function renderStatusPage(page, capabilityID, titleKey) {
   const item = capability(capabilityID);
-  page.innerHTML = pageHeader("kicker.management", titleKey, "partial.description") + `<section class="status-panel"><div class="card-title"><h2>${t("status.backend")}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><p>${escapeHTML(reasonLabel(item.reason_code) || t("partial.description"))}</p></section>`;
+  page.innerHTML = pageHeader("kicker.management", titleKey, "partial.description") + `<section class="status-panel unavailable-panel"><span class="unavailable-icon">${icon("zap")}</span><div class="card-title"><h2>${t(titleKey)}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><p>${escapeHTML(reasonLabel(item.reason_code) || t("partial.description"))}</p></section>`;
 }
 
 async function copyText(value) {
@@ -267,7 +304,27 @@ async function renderProviders(page) {
     const response = await api("/providers");
     const providers = response.items || [];
     const container = document.getElementById("providers");
-    container.innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${t("providers.models")}</button><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${provider.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="secondary" data-provider-quota="${escapeHTML(provider.auth_index)}" data-provider-name="${escapeHTML(provider.provider)}">${t("quota.refresh")}</button></div></td></tr>`).join("")}</tbody></table></div><div id="provider-models" class="provider-models"></div>` : `<div class="empty">${t("providers.empty")}</div>`;
+    const groups = new Map();
+    for (const provider of providers) {
+      const key = provider.provider || "unknown";
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(provider);
+    }
+    container.innerHTML = `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="provider-search" type="search" placeholder="${t("providers.search")}" aria-label="${t("providers.search")}"></label><a class="primary compact" href="#/auth-files">${icon("user")}${t("providers.manageAccounts")}</a></div><div class="provider-summary"><span><strong>${groups.size}</strong> ${t("providers.type")}</span><span><strong>${providers.length}</strong> ${t("providers.accounts")}</span><span class="ok"><strong>${providers.filter(item => item.enabled && item.status === "active").length}</strong> ${t("providers.active")}</span></div><div class="provider-groups">${[...groups].map(([name, accounts]) => `<section class="provider-group"><header class="provider-group-head">${providerIdentity(name)}<span class="badge">${accounts.length} ${t("providers.accounts")}</span></header><div class="account-list">${accounts.map(provider => `<article class="account-row" data-account><div class="account-main"><span class="account-avatar">${icon("user")}</span><div><strong class="account-name">${escapeHTML(provider.label || provider.id || "-")}</strong><div class="account-meta"><span class="badge ${provider.enabled && provider.status === "active" ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.enabled ? provider.status : "disabled"))}</span><span>${Number(provider.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(provider.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></div></div><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${icon("grid")}${t("providers.models")}</button><button class="secondary" data-provider-quota="${escapeHTML(provider.auth_index)}" data-provider-name="${escapeHTML(provider.provider)}">${icon("gauge")}${t("quota.refresh")}</button><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${icon(provider.enabled ? "zap" : "shield")}${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></article>`).join("")}</div></section>`).join("")}</div><div id="provider-empty" class="empty" ${providers.length ? "hidden" : ""}>${t("providers.empty")}</div><div id="provider-models" class="provider-models" aria-live="polite"></div>`;
+    document.getElementById("provider-search").addEventListener("input", event => {
+      const query = event.target.value.trim().toLocaleLowerCase();
+      let visible = 0;
+      container.querySelectorAll(".provider-group").forEach(group => {
+        let matches = 0;
+        group.querySelectorAll("[data-account]").forEach(row => {
+          row.hidden = !(group.querySelector(".provider-identity").textContent + " " + row.querySelector(".account-name").textContent).toLocaleLowerCase().includes(query);
+          if (!row.hidden) matches++;
+        });
+        group.hidden = !matches;
+        visible += matches;
+      });
+      document.getElementById("provider-empty").hidden = visible > 0;
+    });
     container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
       button.disabled = true;
       const modelsPanel = document.getElementById("provider-models");
@@ -324,7 +381,7 @@ const cliTools = [
 ];
 
 async function renderCLITools(page) {
-  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2>${escapeHTML(label)}</h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t("cli.model")}<input class="text-input" name="model" autocomplete="off"></label><div class="actions"><button class="primary compact" type="submit">${t("cli.apply")}</button><button class="secondary" type="button" data-copy-config>${t("cli.copyConfig")}</button>${reset ? `<button class="secondary" type="button" data-reset>${t("cli.reset")}</button>` : ""}</div><div class="form-message" aria-live="polite"></div></form>`).join("")}</div>`;
+  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2 class="tool-title">${providerIdentity(({"claude-code":"claude", "codex-cli":"codex", "env-openai":"openai", "env-anthropic":"anthropic"})[id] || id, true)}<span>${escapeHTML(label)}</span></h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t("cli.model")}<input class="text-input" name="model" autocomplete="off"></label><div class="actions"><button class="primary compact" type="submit">${t("cli.apply")}</button><button class="secondary" type="button" data-copy-config>${t("cli.copyConfig")}</button>${reset ? `<button class="secondary" type="button" data-reset>${t("cli.reset")}</button>` : ""}</div><div class="form-message" aria-live="polite"></div></form>`).join("")}</div>`;
   page.querySelectorAll("[data-tool]").forEach(form => {
     const message = form.querySelector(".form-message");
     form.addEventListener("submit", async event => {
@@ -383,7 +440,7 @@ async function renderCLITools(page) {
 }
 
 async function renderAuthFiles(page) {
-  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-actions"><button class="secondary" data-oauth="codex">${t("authFiles.loginCodex")}</button><button class="secondary" data-oauth="anthropic">${t("authFiles.loginClaude")}</button><button class="secondary" data-oauth="antigravity">${t("authFiles.loginAntigravity")}</button></div><div id="auth-files-content" class="loading">${t("common.loading")}</div>`;
+  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-actions"><button class="secondary" data-oauth="codex">${providerIdentity("codex", true)}${t("authFiles.loginCodex")}</button><button class="secondary" data-oauth="anthropic">${providerIdentity("claude", true)}${t("authFiles.loginClaude")}</button><button class="secondary" data-oauth="antigravity">${providerIdentity("antigravity", true)}${t("authFiles.loginAntigravity")}</button></div><div id="auth-files-content" class="loading">${t("common.loading")}</div>`;
   page.querySelectorAll("[data-oauth]").forEach(button => button.addEventListener("click", async () => {
     button.disabled = true;
     try {
@@ -414,7 +471,7 @@ async function renderAuthFiles(page) {
       const files = response.files || [];
       const content = document.getElementById("auth-files-content");
       content.className = "";
-      content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => `<tr><td>${escapeHTML(file.name || file.id || "-")}</td><td>${escapeHTML(file.provider || file.type || "-")}</td><td>${escapeHTML(file.disabled ? t("providers.disabled") : t("providers.active"))}</td><td><button class="secondary" data-auth-toggle="${escapeHTML(file.name || file.id)}" data-disabled="${Boolean(file.disabled)}">${file.disabled ? t("providers.enable") : t("providers.disable")}</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("authFiles.empty")}</div>`;
+      content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => `<tr><td>${escapeHTML(file.name || file.id || "-")}</td><td>${providerIdentity(file.provider || file.type, true)}</td><td><span class="badge ${file.disabled ? "partial" : "ready"}">${escapeHTML(file.disabled ? t("providers.disabled") : t("providers.active"))}</span></td><td><button class="secondary" data-auth-toggle="${escapeHTML(file.name || file.id)}" data-disabled="${Boolean(file.disabled)}">${file.disabled ? t("providers.enable") : t("providers.disable")}</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("authFiles.empty")}</div>`;
       document.getElementById("refresh").addEventListener("click", load);
       page.querySelectorAll("[data-auth-toggle]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api("/auth-files/status", {method: "PATCH", body: JSON.stringify({name: button.dataset.authToggle, disabled: button.dataset.disabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
     } catch (error) { if (error.message === "invalid_key") return logout(); document.getElementById("auth-files-content").innerHTML = `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
@@ -425,7 +482,7 @@ async function renderAuthFiles(page) {
 async function renderCombos(page) {
   const formHTML = item => `<form id="combo-form" class="status-panel combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><div class="card-title"><h2>${t(item?.id ? "combo.edit" : "combo.create")}</h2></div><div class="settings-grid"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" required></label><label>${t("combo.model")}<input class="text-input" name="model" value="${escapeHTML(item?.model || "")}" required></label></div><label>${t("combo.targets")}<textarea class="text-input" name="targets" rows="4" required placeholder="codex:gpt-5&#10;claude:sonnet">${escapeHTML((item?.targets || []).map(target => `${target.provider}:${target.model}`).join("\n"))}</textarea><span class="hint">${t("combo.targetsHint")}</span></label><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="actions"><button class="primary compact" type="submit">${t("combo.save")}</button><button class="secondary" id="validate-combo" type="button">${t("combo.validate")}</button>${item?.id ? `<button class="secondary" id="cancel-combo" type="button">${t("action.cancel")}</button>` : ""}<span class="form-message" id="combo-message" aria-live="polite"></span></div></form>`;
   const targetList = targets => targets.map(target => `${target.provider}/${target.model}`).join(" → ");
-  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + formHTML() + `<div id="combos-list" class="loading">${t("common.loading")}</div>`;
+  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="combo-layout">${formHTML()}<section class="combo-collection"><div class="section-head"><h2>${t("combo.saved")}</h2></div><div id="combos-list" class="loading">${t("common.loading")}</div></section></div>`;
   const values = form => ({id: form.elements.id.value.trim(), name: form.elements.name.value.trim(), model: form.elements.model.value.trim(), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: form.elements.targets.value.split("\n").filter(Boolean).map((line, index) => { const separator = line.indexOf(":"); return separator < 1 ? {provider: "", model: ""} : {provider: line.slice(0, separator).trim(), model: line.slice(separator + 1).trim()}; })});
   const bindForm = item => {
     const form = document.getElementById("combo-form");
@@ -459,7 +516,7 @@ async function renderCombos(page) {
       const response = await api("/combos");
       const items = response.items || [];
       document.getElementById("combos-list").className = "";
-      document.getElementById("combos-list").innerHTML = items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ${item.enabled ? "ready" : "partial"}">${item.enabled ? t("capability.ready") : t("providers.disabled")}</span></div><p>${escapeHTML(item.model)} · ${escapeHTML(targetList(item.targets || []))}</p><div class="actions"><button class="secondary" data-edit-combo="${escapeHTML(item.id)}">${t("combo.edit")}</button><button class="secondary" data-duplicate-combo="${escapeHTML(item.id)}">${t("combo.duplicate")}</button><button class="secondary" data-toggle-combo="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${item.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${t("combo.delete")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`;
+      document.getElementById("combos-list").innerHTML = items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ${item.enabled ? "ready" : "partial"}">${item.enabled ? t("capability.ready") : t("providers.disabled")}</span></div><p class="combo-model">${icon("route")}${escapeHTML(item.model)}</p><ol class="target-chain">${(item.targets || []).map(target => `<li>${providerIdentity(target.provider, true)}<code>${escapeHTML(target.model)}</code></li>`).join("")}</ol><div class="actions"><button class="secondary" data-edit-combo="${escapeHTML(item.id)}">${t("combo.edit")}</button><button class="secondary" data-duplicate-combo="${escapeHTML(item.id)}">${t("combo.duplicate")}</button><button class="secondary" data-toggle-combo="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${item.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${t("combo.delete")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`;
       page.querySelectorAll("[data-edit-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.editCombo); if (item) { document.getElementById("combo-form").outerHTML = formHTML(item); bindForm(item); document.getElementById("combo-form").scrollIntoView({behavior: "smooth", block: "start"}); } }));
       page.querySelectorAll("[data-duplicate-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.duplicateCombo); if (item) { document.getElementById("combo-form").outerHTML = formHTML({...item, id: "", name: `${item.name} copy`}); bindForm(); document.getElementById("combo-form").scrollIntoView({behavior: "smooth", block: "start"}); } }));
       page.querySelectorAll("[data-toggle-combo]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api(`/combos/${encodeURIComponent(button.dataset.toggleCombo)}`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
@@ -499,7 +556,7 @@ async function renderUsage(page, filter = {}) {
     const records = recordsResponse.items || [];
     const summary = summaryResponse.item || {};
     const metrics = [["common.requests", summary.requests || 0], ["common.tokens", summary.total_tokens || 0], ["usage.input", summary.input_tokens || 0], ["usage.output", summary.output_tokens || 0], ["usage.cached", summary.cached_tokens || 0]];
-    page.innerHTML = renderHeader() + `<section class="grid">${metrics.map(([label, value]) => `<article class="card"><h3>${t(label)}</h3><div class="metric">${Number(value).toLocaleString()}</div></article>`).join("")}</section><section style="margin-top:14px">${usageTable(records)}</section>`;
+    page.innerHTML = renderHeader() + `<section class="metrics-grid usage-metrics">${metrics.map(([label, value], index) => metricCard(label, value, ["chart", "zap", "arrow", "arrow", "shield"][index])).join("")}</section><section style="margin-top:14px">${usageTable(records)}</section>`;
     document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
     document.getElementById("usage-apply").addEventListener("click", apply);
   } catch (error) {
@@ -508,6 +565,48 @@ async function renderUsage(page, filter = {}) {
     document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
     document.getElementById("usage-apply").addEventListener("click", apply);
   }
+}
+
+function quotaFamily(name) {
+  const lower = String(name || "").toLowerCase();
+  if (lower.includes("claude")) return "Claude";
+  if (lower.includes("gpt")) return "GPT";
+  if (lower.includes("gemini") || lower.includes("flash") || lower.includes("pro")) return "Gemini";
+  return "Other";
+}
+
+function quotaWindow(resetTime) {
+  if (!resetTime) return "week";
+  const diff = new Date(resetTime).getTime() - Date.now();
+  return diff > 0 && diff <= 24 * 60 * 60 * 1000 ? "5h" : "week";
+}
+
+function quotaResetLabel(resetTime) {
+  if (!resetTime) return "";
+  const timestamp = new Date(resetTime).getTime();
+  if (!Number.isFinite(timestamp)) return "";
+  const minutes = Math.max(0, Math.ceil((timestamp - Date.now()) / 60000));
+  if (minutes <= 0) return "Đã đặt lại";
+  if (minutes < 60) return `còn ${minutes} phút`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return `còn ${hours} giờ${rest ? ` ${rest} phút` : ""}`;
+}
+
+function renderQuotaCockpit(value) {
+  const families = new Map();
+  for (const group of value.groups || []) {
+    for (const bucket of group.buckets || []) {
+      const family = quotaFamily(group.displayName);
+      const window = quotaWindow(bucket.resetTime);
+      const key = `${family}:${window}`;
+      const remaining = Math.max(0, Math.min(1, Number(bucket.remainingFraction) || 0));
+      const current = families.get(key);
+      if (!current || remaining < current.remaining) families.set(key, {family, window, remaining, resetTime: bucket.resetTime || ""});
+    }
+  }
+  if (!families.size) return "";
+  return `<div class="quota-cockpit-grid">${[...families.values()].sort((a, b) => `${a.family}${a.window}`.localeCompare(`${b.family}${b.window}`)).map(row => `<section class="quota-family-card"><div class="quota-family-heading"><strong>${escapeHTML(row.family)}</strong><span>${row.window === "5h" ? "5h" : "Tuần"}</span></div><div class="quota-family-value"><span>${Math.round(row.remaining * 100)}%</span><span>${t("quota.remaining")}</span></div><progress max="1" value="${row.remaining}" aria-label="${escapeHTML(`${row.family} ${row.window}`)}"></progress>${row.resetTime ? `<span class="quota-reset" title="${escapeHTML(new Date(row.resetTime).toLocaleString(state.locale))}">${escapeHTML(quotaResetLabel(row.resetTime))}</span>` : ""}</section>`).join("")}</div>`;
 }
 
 function usageTable(records) {
@@ -523,17 +622,24 @@ async function renderQuota(page) {
     const credentials = (authResponse.files || []).filter(file => file.supports_quota);
     const quotaProviders = providerResponse.providers || [];
     const canReset = credential => quotaProviders.some(provider => provider.supports_reset && (provider.supported_providers || []).some(name => String(name).toLowerCase() === String(credential.provider).toLowerCase()));
-    const cards = credentials.map(credential => `<article class="card"><div class="card-title"><h2>${escapeHTML(credential.label || credential.name || credential.id)}</h2><span class="badge ${credential.unavailable ? "partial" : "ready"}">${escapeHTML(providerStatusLabel(credential.status))}</span></div><p>${escapeHTML(credential.provider || "-")}</p><div class="actions"><button class="secondary" data-quota-fetch="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${t("quota.refresh")}</button>${canReset(credential) ? `<button class="secondary" data-quota-reset="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${t("quota.reset")}</button>` : ""}</div></article>`).join("");
-    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `<section class="grid">${cards}</section>` : `<div class="empty">${t("quota.empty")}</div>`) + `<section id="quota-result" class="provider-models"></section>`;
+    const cards = credentials.map(credential => { const observed = credential.quota?.observed_at ? new Date(credential.quota.observed_at).toLocaleString(state.locale) : t("quota.neverObserved"); return `<article class="card quota-card"><div class="card-title"><h2>${escapeHTML(credential.label || credential.email || credential.name || credential.id)}</h2><span class="badge ${credential.unavailable ? "partial" : "ready"}">${escapeHTML(providerStatusLabel(credential.status))}</span></div><div class="quota-brand">${providerIdentity(credential.provider, true)}</div><p class="quota-observed">${t("quota.lastObserved")}: ${escapeHTML(observed)}</p><div class="quota-card-result" data-quota-result="${escapeHTML(credential.auth_index)}"><div class="loading">${t("common.loading")}</div></div><div class="actions"><button class="secondary" data-quota-fetch="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.refresh")}</button>${canReset(credential) ? `<button class="secondary" data-quota-reset="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${t("quota.reset")}</button>` : ""}</div></article>`; }).join("");
+    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `<section class="grid quota-grid">${cards}</section>` : `<div class="empty">${t("quota.empty")}</div>`);
     document.getElementById("refresh").addEventListener("click", () => renderQuota(page));
-    const result = document.getElementById("quota-result");
-    const show = value => {
-      const groups = (value.groups || []).flatMap(group => (group.buckets || []).map(bucket => `<li><strong>${escapeHTML(group.displayName || t("quota.provider"))}</strong>: ${Math.round(Number(bucket.remainingFraction || 0) * 100)}% ${t("quota.remaining")}${bucket.resetTime ? ` · ${escapeHTML(new Date(bucket.resetTime).toLocaleString(state.locale))}` : ""}</li>`));
-      const summary = (value.summary || []).map(metric => `<li>${escapeHTML(metric.label || metric.key)}: ${escapeHTML(`${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)}</li>`);
-      result.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("quota.result")}</h2></div>${value.subscription?.plan ? `<p>${escapeHTML(value.subscription.plan)}</p>` : ""}<ul class="quota-list">${summary.join("")}${groups.join("")}</ul></section>`;
+    const renderResult = (target, value) => {
+      const resetLabel = resetTime => { if (!resetTime) return ""; const timestamp = new Date(resetTime).getTime(); if (!Number.isFinite(timestamp)) return ""; const minutes = Math.max(0, Math.ceil((timestamp - Date.now()) / 60000)); if (minutes <= 0) return "Đã đặt lại"; if (minutes < 60) return `còn ${minutes} phút`; const hours = Math.floor(minutes / 60); const rest = minutes % 60; return `còn ${hours} giờ${rest ? ` ${rest} phút` : ""}`; };
+      const groups = (value.groups || []).flatMap(group => (group.buckets || []).map(bucket => { const remaining = Math.round(Number(bucket.remainingFraction || 0) * 100); const models = bucket.description ? `<details class="quota-shared-models"><summary>${t("quota.sharedModels")}</summary><span>${escapeHTML(bucket.description)}</span></details>` : ""; return `<li class="quota-row"><div class="quota-row-main"><strong>${escapeHTML(group.displayName || t("quota.provider"))}</strong><span class="quota-percent">${remaining}% ${t("quota.remaining")}</span></div><progress max="1" value="${Math.max(0, Math.min(1, Number(bucket.remainingFraction) || 0))}" aria-label="${escapeHTML(group.displayName || t("quota.remaining"))}"></progress>${bucket.resetTime ? `<span class="quota-reset" title="${escapeHTML(new Date(bucket.resetTime).toLocaleString(state.locale))}">${escapeHTML(resetLabel(bucket.resetTime))}</span>` : ""}${models}</li>`; }));
+      const summary = (value.summary || []).map(metric => { const labels = {credit_amount: "quota.creditAmount", minimum_credit_amount: "quota.minimumCredit", observed_signals: "quota.observedSignals"}; return `<li><strong>${t(labels[metric.key] || metric.label || metric.key)}</strong><span>${escapeHTML(`${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)}</span></li>`; });
+      const signalRows = Object.entries(value.signals || {}).map(([key, signal]) => `<li><strong>${escapeHTML(key)}</strong><code>${escapeHTML(signal)}</code></li>`).join("");
+      const cockpit = renderQuotaCockpit(value);
+      const observed = value.observed_at ? `<p class="quota-observed">${t("quota.lastObserved")}: ${escapeHTML(new Date(value.observed_at).toLocaleString(state.locale))}</p>` : "";
+      const availability = typeof value.credits_available === "boolean" ? `<span class="badge ${value.credits_available ? "ready" : "partial"}">${t(value.credits_available ? "quota.creditsAvailable" : "quota.creditsUnavailable")}</span>` : "";
+      const empty = summary.length || cockpit || groups.length || signalRows ? "" : `<div class="empty quota-empty-note">${t("quota.noObservation")}</div>`;
+      target.innerHTML = `${observed}${value.subscription?.plan ? `<p>${escapeHTML(value.subscription.plan)}</p>` : ""}<div class="quota-result-heading"><strong>${t("quota.result")}</strong>${availability}</div>${summary.length ? `<ul class="quota-list">${summary.join("")}</ul>` : ""}${cockpit}${signalRows ? `<details class="quota-signals"><summary>${t("quota.signals")}</summary><ul class="quota-list">${signalRows}</ul></details>` : ""}${empty}`;
     };
-    page.querySelectorAll("[data-quota-fetch]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; result.innerHTML = `<div class="loading">${t("common.loading")}</div>`; try { show(await api("/quota/fetch", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaFetch, provider: button.dataset.provider})})); } catch (error) { if (error.message === "invalid_key") return logout(); result.innerHTML = `<div class="error">${escapeHTML(error.message === "server_error" ? t("quota.unavailable") : error.message)}</div>`; } finally { button.disabled = false; } }));
-    page.querySelectorAll("[data-quota-reset]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("quota.confirmReset"))) return; button.disabled = true; try { await api("/quota/reset", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaReset, provider: button.dataset.provider})}); await renderQuota(page); } catch (error) { if (error.message === "invalid_key") return logout(); result.innerHTML = `<div class="error">${escapeHTML(error.message)}</div>`; button.disabled = false; } }));
+    const fetchQuota = async button => { const target = page.querySelector(`[data-quota-result="${CSS.escape(button.dataset.quotaFetch)}"]`); if (!target) return; button.disabled = true; target.innerHTML = `<div class="loading">${t("common.loading")}</div>`; try { renderResult(target, await api("/quota/fetch", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaFetch, provider: button.dataset.provider})})); } catch (error) { if (error.message === "invalid_key") return logout(); const message = /status 401/.test(error.message) ? t("quota.authRequired") : error.message === "server_error" ? t("quota.unavailable") : error.message; target.innerHTML = `<div class="error">${escapeHTML(message)}</div>`; } finally { button.disabled = false; } };
+    page.querySelectorAll("[data-quota-fetch]").forEach(button => button.addEventListener("click", () => fetchQuota(button)));
+    await Promise.all([...page.querySelectorAll("[data-quota-fetch]")].map(fetchQuota));
+    page.querySelectorAll("[data-quota-reset]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("quota.confirmReset"))) return; button.disabled = true; try { await api("/quota/reset", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaReset, provider: button.dataset.provider})}); await renderQuota(page); } catch (error) { if (error.message === "invalid_key") return logout(); const target = page.querySelector(`[data-quota-result="${CSS.escape(button.dataset.quotaReset)}"]`); if (target) target.innerHTML = `<div class="error">${escapeHTML(error.message)}</div>`; button.disabled = false; } }));
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="error">${t("common.error")}</div>`;
@@ -560,7 +666,7 @@ async function renderSettings(page) {
   page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<div class="loading">${t("common.loading")}</div>`;
   try {
     const settings = (await api("/system-settings")).item || {};
-    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="status-panel"><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label><label><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> ${t("settings.logging")}</label><label><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> ${t("settings.usage")}</label><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" value="${Number(settings.request_retry || 0)}"></label></div><div class="actions"><button class="primary compact" type="submit">${t("settings.save")}</button><span class="form-message" id="settings-message"></span></div></form>`;
+    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="status-panel"><h2 class="tool-title">${icon("server")}${t("settings.connection")}</h2><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label></div><h2 class="tool-title">${icon("settings")}${t("settings.behavior")}</h2><div class="settings-grid"><label><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> ${t("settings.logging")}</label><label><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> ${t("settings.usage")}</label><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" value="${Number(settings.request_retry || 0)}"></label></div><div class="actions"><button class="primary compact" type="submit">${t("settings.save")}</button><span class="form-message" id="settings-message"></span></div></form>`;
     const load = () => renderSettings(page);
     document.getElementById("refresh").addEventListener("click", load);
     document.getElementById("settings-form").addEventListener("submit", async event => {
@@ -585,7 +691,7 @@ async function renderPlugins(page) {
     try {
       const response = await api("/plugins");
       const plugins = response.plugins || [];
-      page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + (plugins.length ? `<section class="grid">${plugins.map(plugin => `<article class="card"><div class="card-title"><h2>${escapeHTML(plugin.metadata?.name || plugin.id)}</h2><span class="badge ${plugin.effective_enabled ? "ready" : "partial"}">${plugin.effective_enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div><p>${escapeHTML(plugin.metadata?.version || plugin.id)}</p><div class="actions"><button class="secondary" data-plugin-enabled="${escapeHTML(plugin.id)}" data-enabled="${Boolean(plugin.enabled)}">${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("plugins.empty")}</div>`);
+      page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + (plugins.length ? `<section class="grid">${plugins.map(plugin => `<article class="card"><div class="card-title"><h2 class="tool-title">${icon("puzzle")}${escapeHTML(plugin.metadata?.name || plugin.id)}</h2><span class="badge ${plugin.effective_enabled ? "ready" : "partial"}">${plugin.effective_enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div><p>${escapeHTML(plugin.metadata?.version || plugin.id)}</p><div class="actions"><button class="secondary" data-plugin-enabled="${escapeHTML(plugin.id)}" data-enabled="${Boolean(plugin.enabled)}">${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("plugins.empty")}</div>`);
       document.getElementById("refresh").addEventListener("click", load);
       page.querySelectorAll("[data-plugin-enabled]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api(`/plugins/${encodeURIComponent(button.dataset.pluginEnabled)}/enabled`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
     } catch (error) { if (error.message === "invalid_key") return logout(); page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }

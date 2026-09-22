@@ -1,16 +1,21 @@
 package management
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	codexauth "github.com/router-for-me/CLIProxyAPI/v7/internal/auth/codex"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/misc"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
 	log "github.com/sirupsen/logrus"
@@ -83,6 +88,15 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 	if provider == "" {
 		provider = auth.Provider
 	}
+	if native, handledNative, errNative := h.fetchNativeQuota(c.Request.Context(), auth, provider); handledNative {
+		if errNative != nil {
+			log.WithError(errNative).Warnf("native quota fetch failed for provider %s", provider)
+			c.JSON(http.StatusBadGateway, gin.H{"error": errNative.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, native)
+		return
+	}
 
 	if host != nil {
 		req := pluginapi.QuotaFetchRequest{
@@ -128,7 +142,404 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 		}
 	}
 
+	// Claude, Codex, and Devin expose quota watermarks on ordinary upstream responses.
+	// Return the latest observed snapshot so the tracker remains useful without a plugin.
+	if supportsManagementQuota(auth.Provider) {
+		c.JSON(http.StatusOK, quotaObservationResponse(auth))
+		return
+	}
+
 	c.JSON(http.StatusNotImplemented, gin.H{"error": "no quota provider available for credential"})
+}
+
+// fetchNativeQuota mirrors 9router's provider-specific usage fetchers. It reads
+// quota APIs directly and never sends a generation request, so opening the tracker
+// does not consume model quota.
+func (h *Handler) fetchNativeQuota(ctx context.Context, auth *coreauth.Auth, providerOverride string) (pluginapi.QuotaFetchResponse, bool, error) {
+	if auth == nil {
+		return pluginapi.QuotaFetchResponse{}, false, nil
+	}
+	provider := strings.ToLower(strings.TrimSpace(providerOverride))
+	if provider == "" {
+		provider = strings.ToLower(strings.TrimSpace(auth.Provider))
+	}
+	if provider != "codex" && provider != "claude" && provider != "antigravity" {
+		return pluginapi.QuotaFetchResponse{}, false, nil
+	}
+	token, errToken := h.resolveTokenForAuth(ctx, auth, "")
+	if errToken != nil || strings.TrimSpace(token) == "" {
+		if errToken != nil {
+			return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("quota authentication failed: %w", errToken)
+		}
+		return pluginapi.QuotaFetchResponse{}, true, fmt.Errorf("quota authentication token not found")
+	}
+
+	client := &http.Client{Transport: h.apiCallTransport(auth, "")}
+	requestJSON := func(method, endpoint string, body []byte, headers map[string]string) ([]byte, int, error) {
+		var reader io.Reader
+		if len(body) > 0 {
+			reader = strings.NewReader(string(body))
+		}
+		req, errReq := http.NewRequestWithContext(ctx, method, endpoint, reader)
+		if errReq != nil {
+			return nil, 0, errReq
+		}
+		for key, value := range headers {
+			req.Header.Set(key, value)
+		}
+		resp, errDo := client.Do(req)
+		if errDo != nil {
+			return nil, 0, errDo
+		}
+		defer func() { _ = resp.Body.Close() }()
+		data, errRead := io.ReadAll(resp.Body)
+		if errRead != nil {
+			return nil, resp.StatusCode, errRead
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			return data, resp.StatusCode, fmt.Errorf("quota API returned status %d", resp.StatusCode)
+		}
+		return data, resp.StatusCode, nil
+	}
+
+	baseHeaders := map[string]string{"Authorization": "Bearer " + token, "Accept": "application/json"}
+	switch provider {
+	case "codex":
+		if accountID := metadataString(auth, "account_id", "accountId", "chatgptAccountId"); accountID != "" {
+			baseHeaders["ChatGPT-Account-ID"] = accountID
+		}
+		baseHeaders["Originator"] = "codex_cli_rs"
+		data, status, errFetch := requestJSON(http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", nil, baseHeaders)
+		if status == http.StatusUnauthorized {
+			if refreshed, errRefresh := h.refreshCodexQuotaToken(ctx, auth); errRefresh == nil && refreshed != "" {
+				baseHeaders["Authorization"] = "Bearer " + refreshed
+				data, _, errFetch = requestJSON(http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", nil, baseHeaders)
+			}
+		}
+		if errFetch != nil {
+			return pluginapi.QuotaFetchResponse{}, true, errFetch
+		}
+		return parseCodexNativeQuota(data), true, nil
+	case "claude":
+		headers := map[string]string{"Authorization": "Bearer " + token, "Accept": "application/json", "anthropic-beta": "oauth-2025-04-20", "anthropic-version": "2023-06-01"}
+		data, _, errFetch := requestJSON(http.MethodGet, "https://api.anthropic.com/api/oauth/usage", nil, headers)
+		if errFetch != nil {
+			return pluginapi.QuotaFetchResponse{}, true, errFetch
+		}
+		return parseClaudeNativeQuota(data), true, nil
+	case "antigravity":
+		project := metadataString(auth, "project_id", "cloudaicompanionProject", "projectId")
+		if project == "" {
+			loadBody, _ := json.Marshal(map[string]any{"metadata": map[string]string{"ideType": "ANTIGRAVITY"}})
+			loadHeaders := map[string]string{"Authorization": "Bearer " + token, "Accept": "application/json", "Content-Type": "application/json", "User-Agent": misc.AntigravityLoadCodeAssistUserAgent("")}
+			loadData, _, errLoad := requestJSON(http.MethodPost, "https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist", loadBody, loadHeaders)
+			if errLoad == nil {
+				project = firstJSONString(loadData, "cloudaicompanionProject", "projectId", "project")
+			}
+		}
+		body := map[string]any{}
+		if project != "" {
+			body["project"] = project
+		}
+		requestBody, _ := json.Marshal(body)
+		headers := map[string]string{"Authorization": "Bearer " + token, "Accept": "application/json", "Content-Type": "application/json", "User-Agent": misc.AntigravityRequestUserAgent(""), "X-Client-Name": "antigravity"}
+		data, _, errFetch := requestJSON(http.MethodPost, "https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels", requestBody, headers)
+		if errFetch != nil {
+			return pluginapi.QuotaFetchResponse{}, true, errFetch
+		}
+		return parseAntigravityNativeQuota(data, antigravityVisibleModels(auth)), true, nil
+	}
+	return pluginapi.QuotaFetchResponse{}, false, nil
+}
+
+func (h *Handler) refreshCodexQuotaToken(ctx context.Context, auth *coreauth.Auth) (string, error) {
+	if auth == nil || auth.Metadata == nil {
+		return "", fmt.Errorf("codex refresh token not found")
+	}
+	refreshToken, _ := auth.Metadata["refresh_token"].(string)
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return "", fmt.Errorf("codex refresh token not found")
+	}
+	td, errRefresh := codexauth.NewCodexAuthWithProxyURL(h.cfg, auth.ProxyURL).RefreshTokensWithRetry(ctx, refreshToken, 3)
+	if errRefresh != nil {
+		return "", errRefresh
+	}
+	if td == nil || strings.TrimSpace(td.AccessToken) == "" {
+		return "", fmt.Errorf("codex token refresh returned empty access_token")
+	}
+	auth.Metadata["id_token"] = td.IDToken
+	auth.Metadata["access_token"] = td.AccessToken
+	if strings.TrimSpace(td.RefreshToken) != "" {
+		auth.Metadata["refresh_token"] = td.RefreshToken
+	}
+	if strings.TrimSpace(td.AccountID) != "" {
+		auth.Metadata["account_id"] = td.AccountID
+	}
+	auth.Metadata["email"] = td.Email
+	auth.Metadata["expired"] = td.Expire
+	auth.Metadata["last_refresh"] = time.Now().Format(time.RFC3339)
+	if h.postAuthPersistHook != nil {
+		if errPersist := h.postAuthPersistHook(ctx, auth); errPersist != nil {
+			log.WithError(errPersist).Warn("failed to persist refreshed Codex quota token")
+		}
+	}
+	return td.AccessToken, nil
+}
+
+func parseCodexNativeQuota(data []byte) pluginapi.QuotaFetchResponse {
+	result := pluginapi.QuotaFetchResponse{}
+	result.Subscription = &pluginapi.QuotaSubscription{Plan: gjson.GetBytes(data, "plan_type").String()}
+	rateLimit := gjson.GetBytes(data, "rate_limit")
+	if !rateLimit.Exists() {
+		rateLimit = gjson.GetBytes(data, "rate_limits")
+	}
+	if !rateLimit.Exists() {
+		rateLimit = gjson.GetBytes(data, "rate_limits_by_limit_id.codex")
+	}
+	for _, item := range []struct {
+		keys  []string
+		label string
+	}{{[]string{"primary_window", "primary"}, "Primary (5h)"}, {[]string{"secondary_window", "secondary"}, "Weekly"}} {
+		window := gjson.Result{}
+		for _, key := range item.keys {
+			window = rateLimit.Get(key)
+			if window.Exists() {
+				break
+			}
+		}
+		if !window.Exists() {
+			continue
+		}
+		used := window.Get("used_percent").Float()
+		result.Groups = append(result.Groups, pluginapi.QuotaGroup{DisplayName: item.label, Buckets: []pluginapi.QuotaBucket{{Window: item.label, RemainingFraction: math.Max(0, math.Min(1, (100-used)/100)), ResetTime: gjsonResetTime(window.Get("reset_at"))}}})
+	}
+	return result
+}
+
+func parseClaudeNativeQuota(data []byte) pluginapi.QuotaFetchResponse {
+	result := pluginapi.QuotaFetchResponse{Subscription: &pluginapi.QuotaSubscription{Plan: "Claude Code"}}
+	for _, item := range []struct{ key, label string }{{"five_hour", "Session (5h)"}, {"seven_day", "Weekly (7d)"}} {
+		window := gjson.GetBytes(data, item.key)
+		if !window.Exists() {
+			continue
+		}
+		used := window.Get("utilization").Float()
+		result.Groups = append(result.Groups, pluginapi.QuotaGroup{DisplayName: item.label, Buckets: []pluginapi.QuotaBucket{{Window: item.label, RemainingFraction: math.Max(0, math.Min(1, (100-used)/100)), ResetTime: gjsonResetTime(window.Get("resets_at"))}}})
+	}
+	return result
+}
+
+func parseAntigravityNativeQuota(data []byte, allowedNames ...map[string]string) pluginapi.QuotaFetchResponse {
+	result := pluginapi.QuotaFetchResponse{}
+	allowed := map[string]string(nil)
+	if len(allowedNames) > 0 {
+		allowed = allowedNames[0]
+	}
+	seen := make(map[string]struct{})
+	gjson.GetBytes(data, "models").ForEach(func(key, value gjson.Result) bool {
+		quota := value.Get("quotaInfo")
+		if !quota.Exists() {
+			return true
+		}
+		displayName := value.Get("displayName").String()
+		if displayName == "" {
+			displayName = key.String()
+		}
+		lowerName := strings.ToLower(displayName)
+		if strings.HasPrefix(lowerName, "tab_") || strings.Contains(lowerName, "image") ||
+			(!strings.Contains(lowerName, "pro") && !strings.Contains(lowerName, "flash") && !strings.Contains(lowerName, "gpt") && !strings.Contains(lowerName, "claude")) {
+			return true
+		}
+		if len(allowed) > 0 {
+			canonical, ok := allowed[lowerName]
+			if !ok {
+				canonical, ok = allowed[antigravityModelNameKey(displayName)]
+			}
+			if !ok {
+				return true
+			}
+			displayName = canonical
+		}
+		if _, exists := seen[displayName]; exists {
+			return true
+		}
+		seen[displayName] = struct{}{}
+		remaining := math.Max(0, math.Min(1, quota.Get("remainingFraction").Float()))
+		resetTime := quota.Get("resetTime").String()
+		result.Groups = append(result.Groups, pluginapi.QuotaGroup{DisplayName: displayName, Buckets: []pluginapi.QuotaBucket{{RemainingFraction: remaining, ResetTime: resetTime}}})
+		return true
+	})
+	if len(allowed) > 0 {
+		bucketsByBase := make(map[string]pluginapi.QuotaBucket, len(result.Groups))
+		for _, group := range result.Groups {
+			if len(group.Buckets) > 0 {
+				bucketsByBase[antigravityModelNameKey(group.DisplayName)] = group.Buckets[0]
+			}
+		}
+		added := make(map[string]struct{}, len(result.Groups))
+		for _, group := range result.Groups {
+			added[group.DisplayName] = struct{}{}
+		}
+		visibleNames := make(map[string]string, len(allowed))
+		for _, name := range allowed {
+			visibleNames[strings.ToLower(name)] = name
+		}
+		for _, name := range visibleNames {
+			lowerName := strings.ToLower(name)
+			if strings.HasPrefix(lowerName, "tab_") || strings.Contains(lowerName, "image") ||
+				(!strings.Contains(lowerName, "pro") && !strings.Contains(lowerName, "flash") && !strings.Contains(lowerName, "gpt") && !strings.Contains(lowerName, "claude")) {
+				continue
+			}
+			if _, exists := added[name]; exists {
+				continue
+			}
+			if bucket, ok := bucketsByBase[antigravityModelNameKey(name)]; ok {
+				result.Groups = append(result.Groups, pluginapi.QuotaGroup{DisplayName: name, Buckets: []pluginapi.QuotaBucket{bucket}})
+				added[name] = struct{}{}
+			}
+		}
+	}
+	sort.Slice(result.Groups, func(i, j int) bool { return result.Groups[i].DisplayName < result.Groups[j].DisplayName })
+	return result
+}
+
+func antigravityModelNameKey(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	for _, suffix := range []string{" (high)", " (medium)", " (low)"} {
+		name = strings.TrimSuffix(name, suffix)
+	}
+	return name
+}
+
+func antigravityVisibleModels(auth *coreauth.Auth) map[string]string {
+	if auth == nil {
+		return nil
+	}
+	models := registry.GetGlobalRegistry().GetModelsForClient(auth.ID)
+	if len(models) == 0 {
+		return nil
+	}
+	allowed := make(map[string]string, len(models))
+	for _, model := range models {
+		if model == nil {
+			continue
+		}
+		name := strings.TrimSpace(model.DisplayName)
+		if name == "" {
+			name = strings.TrimSpace(model.ID)
+		}
+		if name != "" {
+			lowerName := strings.ToLower(strings.TrimSpace(name))
+			allowed[lowerName] = name
+			if antigravityModelNameKey(name) == lowerName {
+				allowed[antigravityModelNameKey(name)] = name
+			}
+		}
+	}
+	return allowed
+}
+
+func gjsonResetTime(value gjson.Result) string {
+	if value.Type == gjson.Number {
+		unix := value.Int()
+		if unix > 0 && unix < 1000000000000 {
+			unix *= 1000
+		}
+		return time.UnixMilli(unix).UTC().Format(time.RFC3339)
+	}
+	return value.String()
+}
+
+func metadataString(auth *coreauth.Auth, keys ...string) string {
+	if auth == nil || auth.Metadata == nil {
+		return ""
+	}
+	for _, key := range keys {
+		if value, ok := auth.Metadata[key].(string); ok && strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func firstJSONString(data []byte, keys ...string) string {
+	for _, key := range keys {
+		if value := gjson.GetBytes(data, key); value.Exists() && value.Type == gjson.String && strings.TrimSpace(value.String()) != "" {
+			return strings.TrimSpace(value.String())
+		}
+	}
+	return ""
+}
+
+func quotaObservationResponse(auth *coreauth.Auth) gin.H {
+	response := gin.H{"groups": []pluginapi.QuotaGroup{}, "summary": []pluginapi.QuotaMetric{}, "signals": map[string]string{}}
+	if auth == nil {
+		return response
+	}
+	if strings.EqualFold(strings.TrimSpace(auth.Provider), "antigravity") {
+		if hint, okHint := coreauth.GetAntigravityCreditsHint(auth.ID); okHint && hint.Known {
+			response["credits_available"] = hint.Available
+			response["summary"] = []pluginapi.QuotaMetric{
+				{Key: "credit_amount", Label: "AI credits", Value: hint.CreditAmount, Unit: "credits"},
+				{Key: "minimum_credit_amount", Label: "Minimum credit", Value: hint.MinCreditAmount, Unit: "credits"},
+			}
+		}
+	}
+	signals := make(map[string]string, len(auth.Quota.Signals))
+	for key, value := range auth.Quota.Signals {
+		signals[key] = value
+	}
+	response["signals"] = signals
+	if !auth.Quota.ObservedAt.IsZero() {
+		response["observed_at"] = auth.Quota.ObservedAt
+	}
+	keys := make([]string, 0, len(signals))
+	for key := range signals {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	groups := make([]pluginapi.QuotaGroup, 0)
+	for _, key := range keys {
+		value := strings.TrimSpace(signals[key])
+		lower := strings.ToLower(key)
+		percent, okPercent := quotaPercent(value)
+		if !okPercent || (!strings.Contains(lower, "used-percent") && !strings.Contains(lower, "remaining-percent")) {
+			continue
+		}
+		remaining := percent
+		if strings.Contains(lower, "used-percent") {
+			remaining = 1 - percent
+		}
+		if remaining < 0 {
+			remaining = 0
+		}
+		if remaining > 1 {
+			remaining = 1
+		}
+		groups = append(groups, pluginapi.QuotaGroup{DisplayName: key, Buckets: []pluginapi.QuotaBucket{{RemainingFraction: remaining, Description: value}}})
+	}
+	response["groups"] = groups
+	if len(groups) == 0 && len(signals) > 0 {
+		response["summary"] = []pluginapi.QuotaMetric{{Key: "observed_signals", Label: "Observed quota signals", Value: float64(len(signals)), Unit: "headers"}}
+	}
+	return response
+}
+
+func supportsManagementQuota(provider string) bool {
+	return coreauth.ProviderSupportsQuotaObservation(provider) || strings.EqualFold(strings.TrimSpace(provider), "antigravity")
+}
+
+func quotaPercent(value string) (float64, bool) {
+	value = strings.TrimSpace(strings.TrimSuffix(value, "%"))
+	parsed, errParse := strconv.ParseFloat(value, 64)
+	if errParse != nil {
+		return 0, false
+	}
+	if parsed > 1 {
+		parsed /= 100
+	}
+	return parsed, parsed >= 0 && parsed <= 1
 }
 
 // ResetCredentialQuota resets quota or usage for a credential.

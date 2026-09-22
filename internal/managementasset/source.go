@@ -21,6 +21,8 @@ func SourceManagementAsset(name string) ([]byte, string, bool) {
 		contentType = "text/javascript; charset=utf-8"
 	case "i18n/en.json", "i18n/vi.json":
 		contentType = "application/json; charset=utf-8"
+	case "providers/antigravity.png", "providers/codex.png", "providers/claude.png", "providers/gemini.png", "providers/qwen.png", "providers/kimi.png", "providers/openai.png", "providers/cursor.png", "providers/cline.png", "providers/continue.png", "providers/iflow.png", "providers/github.png":
+		contentType = "image/png"
 	default:
 		return nil, "", false
 	}
