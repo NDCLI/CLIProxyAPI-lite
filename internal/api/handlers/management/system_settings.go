@@ -70,12 +70,27 @@ func (h *Handler) PatchSystemSettings(c *gin.Context) {
 		h.cfg.Routing.Strategy = strategy
 	}
 	if body.RequestRetry != nil {
+		if *body.RequestRetry < 0 {
+			h.mu.Unlock()
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_retry", "message": "Request retry must not be negative"}})
+			return
+		}
 		h.cfg.RequestRetry = *body.RequestRetry
 	}
 	if body.MaxRetryCredentials != nil {
+		if *body.MaxRetryCredentials < 0 {
+			h.mu.Unlock()
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_retry", "message": "Max retry credentials must not be negative"}})
+			return
+		}
 		h.cfg.MaxRetryCredentials = *body.MaxRetryCredentials
 	}
 	if body.MaxRetryInterval != nil {
+		if *body.MaxRetryInterval < 0 {
+			h.mu.Unlock()
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_retry", "message": "Max retry interval must not be negative"}})
+			return
+		}
 		h.cfg.MaxRetryInterval = *body.MaxRetryInterval
 	}
 	snapshot, ok := h.saveConfigAndSnapshotLocked(c)
