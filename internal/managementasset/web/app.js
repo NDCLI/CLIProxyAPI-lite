@@ -343,7 +343,22 @@ async function renderAuthFiles(page) {
     try {
       const response = await api(`/${button.dataset.oauth}-auth-url`);
       if (response.url) window.open(response.url, "_blank", "noopener");
-      if (response.state) { const message = document.getElementById("auth-oauth-status") || document.createElement("div"); message.id = "auth-oauth-status"; message.className = "form-message"; message.textContent = t("authFiles.loginWaiting"); page.querySelector(".auth-actions").appendChild(message); }
+      if (response.state) {
+        const state = response.state;
+        const message = document.getElementById("auth-oauth-status") || document.createElement("div");
+        message.id = "auth-oauth-status"; message.className = "form-message"; message.textContent = t("authFiles.loginWaiting"); page.querySelector(".auth-actions").appendChild(message);
+        let attempts = 0;
+        const poll = async () => {
+          if (++attempts > 150) { message.textContent = t("authFiles.loginTimeout"); return; }
+          try {
+            const status = await api(`/get-auth-status?state=${encodeURIComponent(state)}`);
+            if (status.status === "ok") { message.textContent = t("authFiles.loginSuccess"); await load(); return; }
+            if (status.status === "error") { message.textContent = status.error || t("authFiles.loginFailed"); return; }
+          } catch (_) { message.textContent = t("authFiles.loginFailed"); return; }
+          setTimeout(poll, 2000);
+        };
+        setTimeout(poll, 1500);
+      }
     } catch (error) { if (error.message === "invalid_key") return logout(); }
     finally { button.disabled = false; }
   }));
