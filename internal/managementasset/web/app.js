@@ -93,16 +93,15 @@ async function loadCapabilities() {
 }
 
 function navHTML(active) {
-  return routes.map(([id, label, icon, capabilityID]) => {
-    const item = capabilityID ? capability(capabilityID) : {state: "ready"};
-    return `<button class="nav-link ${active === id ? "active" : ""}" data-route="${id}" title="${escapeHTML(t(label))}"><span class="nav-icon">${icon}</span><span class="nav-label">${t(label)}</span><span class="nav-dot ${item.state}"></span></button>`;
+  return routes.map(([id, label, icon]) => {
+    return `<button class="nav-link ${active === id ? "active" : ""}" data-route="${id}" title="${escapeHTML(t(label))}"><span class="nav-icon">${icon}</span><span class="nav-label">${t(label)}</span></button>`;
   }).join("");
 }
 
 function renderShell() {
   const active = routeName();
   app.innerHTML = `<div class="app-shell ${state.collapsed ? "collapsed" : ""}"><aside class="sidebar">
-    <div class="brand"><span class="brand-mark">9</span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
+    <div class="brand"><span class="brand-mark">CP</span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
     <nav class="nav">${navHTML(active)}</nav>
     <div class="sidebar-footer"><button class="sidebar-action" id="collapse"><b>↔</b><span>${t(state.collapsed ? "action.expand" : "action.collapse")}</span></button><button class="sidebar-action" id="logout"><b>↪</b><span>${t("action.logout")}</span></button></div>
   </aside><section class="workspace"><header class="topbar"><button class="top-button" id="locale">${state.locale === "en" ? "VI" : "EN"}</button><button class="top-button" id="logout-top">${t("action.logout")}</button></header><main class="content" id="page"></main></section></div>`;

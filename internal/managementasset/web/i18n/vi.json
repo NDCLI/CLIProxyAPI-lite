@@ -1,7 +1,7 @@
 {
   "app.name": "CLIProxyAPI",
   "app.documentTitle": "Quản lý CLIProxyAPI",
-  "app.subtitle": "Bản xem trước quản lý 9router",
+  "app.subtitle": "Quản lý cục bộ",
   "action.back": "Quay lại",
   "action.collapse": "Thu gọn thanh bên",
   "action.expand": "Mở rộng thanh bên",
@@ -51,7 +51,7 @@
   "error.server": "Máy chủ trả về phản hồi không mong đợi.",
   "kicker.liveData": "Dữ liệu backend trực tiếp",
   "kicker.management": "Quản lý",
-  "kicker.migration": "Chuyển đổi 9router",
+  "kicker.migration": "Quản lý",
   "kicker.openai": "Tương thích OpenAI",
   "kicker.quotaProviders": "Provider từ backend",
   "nav.cliTools": "Công cụ CLI",

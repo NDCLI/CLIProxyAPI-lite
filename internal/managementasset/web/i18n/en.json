@@ -1,7 +1,7 @@
 {
   "app.name": "CLIProxyAPI",
   "app.documentTitle": "CLIProxyAPI Management",
-  "app.subtitle": "9router management preview",
+  "app.subtitle": "Local management",
   "action.back": "Back",
   "action.collapse": "Collapse sidebar",
   "action.expand": "Expand sidebar",
@@ -51,7 +51,7 @@
   "error.server": "The server returned an unexpected response.",
   "kicker.liveData": "Live backend data",
   "kicker.management": "Management",
-  "kicker.migration": "9router migration",
+  "kicker.migration": "Management",
   "kicker.openai": "OpenAI compatible",
   "kicker.quotaProviders": "Backend providers",
   "nav.cliTools": "CLI Tools",
