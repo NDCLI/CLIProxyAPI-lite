@@ -110,9 +110,8 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | --- | --- | --- | --- |
 | 2026-09-22 | Isolated `test` branch created and pushed | `6db4e2ba` | `origin/test` exists and tracks the branch |
 | 2026-09-22 | 9router architecture/sidebar/API inventory captured | `6db4e2ba` | Local 9router `v0.5.81` source inspection |
-| 2026-09-22 | Migration rules and checklist recorded | pending | This document |
+| 2026-09-22 | Migration rules and checklist recorded | `4fa0061a` | This document |
 
 ## Update convention
 
 Each implementation commit must update this document when a checklist item is genuinely complete. Strike through the exact completed item, add the commit hash and verification evidence to the ledger, and leave unfinished work visible. A green build alone does not complete a feature if the corresponding UI and backend behavior are not verified.
-
