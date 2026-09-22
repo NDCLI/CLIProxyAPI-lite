@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 )
 
 func TestGetCapabilitiesContract(t *testing.T) {
@@ -61,5 +62,36 @@ func TestGetCapabilitiesContract(t *testing.T) {
 		if capability.State != "ready" && capability.ReasonCode == "" {
 			t.Errorf("capability %q has state %q without reason_code", capability.ID, capability.State)
 		}
+	}
+}
+
+func TestGetCapabilitiesUsesManagementAuthentication(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := &Handler{
+		cfg:            &config.Config{RemoteManagement: config.RemoteManagement{SecretKey: "configured"}},
+		failedAttempts: make(map[string]*attemptInfo),
+		localPassword:  "test-management-key",
+	}
+	router := gin.New()
+	management := router.Group("/v0/management")
+	management.Use(handler.Middleware())
+	management.GET("/capabilities", handler.GetCapabilities)
+
+	unauthorized := httptest.NewRecorder()
+	unauthorizedRequest := httptest.NewRequest(http.MethodGet, "/v0/management/capabilities", nil)
+	unauthorizedRequest.RemoteAddr = "127.0.0.1:12345"
+	router.ServeHTTP(unauthorized, unauthorizedRequest)
+	if unauthorized.Code != http.StatusUnauthorized {
+		t.Fatalf("unauthorized status = %d, want %d", unauthorized.Code, http.StatusUnauthorized)
+	}
+
+	authorized := httptest.NewRecorder()
+	authorizedRequest := httptest.NewRequest(http.MethodGet, "/v0/management/capabilities", nil)
+	authorizedRequest.RemoteAddr = "127.0.0.1:12345"
+	authorizedRequest.Header.Set("Authorization", "Bearer test-management-key")
+	router.ServeHTTP(authorized, authorizedRequest)
+	if authorized.Code != http.StatusOK {
+		t.Fatalf("authorized status = %d, want %d body=%s", authorized.Code, http.StatusOK, authorized.Body.String())
 	}
 }
