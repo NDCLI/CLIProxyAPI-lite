@@ -73,3 +73,8 @@ docker-compose.override.yml
 
 # Local LLM Wiki vault
 .llm-wiki
+
+# Local management panel bundle
+!static/
+!static/management.html
+usage-history.json

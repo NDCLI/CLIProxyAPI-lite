@@ -90,6 +90,8 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.DELETE("/api-keys", s.mgmt.DeleteAPIKeys)
 		mgmt.GET("/api-key-usage", s.mgmt.GetAPIKeyUsage)
 		mgmt.GET("/usage-queue", s.mgmt.GetUsageQueue)
+		mgmt.GET("/usage-history", s.mgmt.GetUsageHistory)
+		mgmt.GET("/usage-history/stream", s.mgmt.StreamUsageHistory)
 
 		mgmt.GET("/gemini-api-key", s.mgmt.GetGeminiKeys)
 		mgmt.PUT("/gemini-api-key", s.mgmt.PutGeminiKeys)
@@ -331,8 +333,6 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 
 	if _, err := os.Stat(filePath); err != nil {
 		if os.IsNotExist(err) {
-			// Synchronously ensure management.html is available with a detached context.
-			// Control panel bootstrap should not be canceled by client disconnects.
 			if !managementasset.EnsureLatestManagementHTML(context.Background(), managementasset.StaticDir(s.configFilePath), cfg.ProxyURL, cfg.RemoteManagement.PanelGitHubRepository) {
 				c.AbortWithStatus(http.StatusNotFound)
 				return
@@ -360,6 +360,9 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 	} else {
 		log.Warn("management control panel asset does not match quota email patch marker")
 	}
+	body, _ = managementasset.AddEndpointCard(body)
+	body, _ = managementasset.AddUsageHistoryTab(body)
+	body, _ = managementasset.AddUsageLivePolling(body)
 	c.Header("Cache-Control", "no-cache")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
 }

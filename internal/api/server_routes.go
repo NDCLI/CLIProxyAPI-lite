@@ -30,7 +30,6 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
-	webui "github.com/router-for-me/CLIProxyAPI/v7/web"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -128,11 +127,12 @@ func (s *Server) setupRoutes() {
 		v1beta.GET("/models/*action", s.geminiGetHandler(geminiHandlers))
 	}
 
-	serveConnectUI := func(c *gin.Context) {
-		c.Data(http.StatusOK, "text/html; charset=utf-8", webui.ConnectHTML)
-	}
-	s.engine.GET("/", serveConnectUI)
-	s.engine.GET("/connect", serveConnectUI)
+	// Management is the single UI entry point. Keep /connect as a compatibility
+	// alias so old bookmarks do not reopen the retired setup page.
+	s.engine.GET("/", s.serveManagementControlPanel)
+	s.engine.GET("/connect", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/management.html")
+	})
 
 	// OAuth callback endpoints (reuse main server port)
 	// These endpoints receive provider redirects and persist

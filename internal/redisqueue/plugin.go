@@ -8,6 +8,7 @@ import (
 	"time"
 
 	internallogging "github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/usageview"
 	coresession "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/session"
 	coreusage "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/usage"
 )
@@ -21,6 +22,29 @@ type usageQueuePlugin struct{}
 func (p *usageQueuePlugin) HandleUsage(ctx context.Context, record coreusage.Record) {
 	if p == nil {
 		return
+	}
+	usageDetail := coreusage.EnsureTokenBreakdownForProvider(record.Detail, record.Provider, record.ExecutorType)
+	failed := record.Failed
+	if !failed {
+		failed = !resolveSuccess(ctx)
+	}
+	breakdown := usageDetail.TokenBreakdown
+	if breakdown.TotalTokens > 0 || failed {
+		usageview.Add(usageview.Record{
+			Timestamp:           record.RequestedAt,
+			Provider:            record.Provider,
+			Model:               record.Model,
+			Alias:               record.Alias,
+			Endpoint:            resolveEndpoint(ctx),
+			InputTokens:         breakdown.Input.TotalTokens,
+			CachedTokens:        breakdown.Input.CacheReadTokens,
+			CacheCreationTokens: breakdown.Input.CacheWriteTokens,
+			OutputTokens:        breakdown.Output.TotalTokens,
+			ReasoningTokens:     breakdown.Output.ReasoningTokens,
+			TotalTokens:         breakdown.TotalTokens,
+			LatencyMs:           record.Latency.Milliseconds(),
+			Failed:              failed,
+		})
 	}
 	if !Enabled() || !UsageStatisticsEnabled() {
 		return
@@ -81,7 +105,6 @@ func (p *usageQueuePlugin) HandleUsage(ctx context.Context, record coreusage.Rec
 		parentSessionID = ""
 	}
 
-	usageDetail := coreusage.EnsureTokenBreakdownForProvider(record.Detail, record.Provider, record.ExecutorType)
 	tokens := tokenStats{
 		InputTokens:            usageDetail.InputTokens,
 		OutputTokens:           usageDetail.OutputTokens,
@@ -93,10 +116,6 @@ func (p *usageQueuePlugin) HandleUsage(ctx context.Context, record coreusage.Rec
 		TotalTokens:            usageDetail.TotalTokens,
 	}
 
-	failed := record.Failed
-	if !failed {
-		failed = !resolveSuccess(ctx)
-	}
 	fail := resolveFail(ctx, record, failed)
 
 	stream := record.Stream
