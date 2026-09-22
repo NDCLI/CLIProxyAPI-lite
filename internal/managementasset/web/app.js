@@ -218,9 +218,9 @@ async function renderProviders(page) {
   page.innerHTML = pageHeader("kicker.liveData", "page.providers", "providers.description", true) + `<div id="providers"><div class="loading">${t("common.loading")}</div></div>`;
   document.getElementById("refresh").addEventListener("click", () => renderProviders(page));
   try {
-    const response = await api("/auth-files");
-    const files = response.files || [];
-    document.getElementById("providers").innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th></tr></thead><tbody>${files.map(file => `<tr><td>${escapeHTML(file.label || file.name || file.id || "-")}</td><td>${escapeHTML(file.provider || file.type || "-")}</td><td><span class="badge ${file.disabled || file.unavailable ? "partial" : "ready"}">${escapeHTML(file.disabled ? t("providers.disabled") : file.unavailable ? t("providers.unavailable") : file.status || t("providers.active"))}</span></td><td>${Number(file.success || 0).toLocaleString()}</td><td>${Number(file.failed || 0).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("providers.empty")}</div>`;
+    const response = await api("/providers");
+    const providers = response.items || [];
+    document.getElementById("providers").innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(provider.status || t("providers.active"))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("providers.empty")}</div>`;
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     document.getElementById("providers").innerHTML = `<div class="error">${t("common.error")}</div>`;
