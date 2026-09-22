@@ -35,6 +35,8 @@
   "cli.apiKey": "Endpoint API key",
   "cli.apply": "Apply configuration",
   "cli.confirmReset": "Remove the CLIProxyAPI-lite configuration for this tool?",
+  "cli.configCopied": "Safe configuration copied without the API key.",
+  "cli.copyConfig": "Copy safe config",
   "cli.configured": "Configured",
   "cli.description": "Configure supported local clients through the authenticated Go backend.",
   "cli.model": "Model (optional)",

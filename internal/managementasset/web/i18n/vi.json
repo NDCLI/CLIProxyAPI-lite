@@ -35,6 +35,8 @@
   "cli.apiKey": "Khóa API endpoint",
   "cli.apply": "Áp dụng cấu hình",
   "cli.confirmReset": "Xóa cấu hình CLIProxyAPI-lite của công cụ này?",
+  "cli.configCopied": "Đã sao chép cấu hình an toàn, không kèm khóa API.",
+  "cli.copyConfig": "Sao chép cấu hình an toàn",
   "cli.configured": "Đã cấu hình",
   "cli.description": "Cấu hình các ứng dụng local được hỗ trợ qua backend Go có xác thực.",
   "cli.model": "Model (không bắt buộc)",

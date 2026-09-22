@@ -305,7 +305,7 @@ const cliTools = [
 ];
 
 async function renderCLITools(page) {
-  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2>${escapeHTML(label)}</h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t("cli.model")}<input class="text-input" name="model" autocomplete="off"></label><div class="actions"><button class="primary compact" type="submit">${t("cli.apply")}</button>${reset ? `<button class="secondary" type="button" data-reset>${t("cli.reset")}</button>` : ""}</div><div class="form-message" aria-live="polite"></div></form>`).join("")}</div>`;
+  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2>${escapeHTML(label)}</h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t("cli.model")}<input class="text-input" name="model" autocomplete="off"></label><div class="actions"><button class="primary compact" type="submit">${t("cli.apply")}</button><button class="secondary" type="button" data-copy-config>${t("cli.copyConfig")}</button>${reset ? `<button class="secondary" type="button" data-reset>${t("cli.reset")}</button>` : ""}</div><div class="form-message" aria-live="polite"></div></form>`).join("")}</div>`;
   page.querySelectorAll("[data-tool]").forEach(form => {
     const message = form.querySelector(".form-message");
     form.addEventListener("submit", async event => {
@@ -326,6 +326,13 @@ async function renderCLITools(page) {
       }
     });
     const reset = form.querySelector("[data-reset]");
+    form.querySelector("[data-copy-config]").addEventListener("click", async () => {
+      const model = form.elements.model.value.trim() || "MODEL";
+      const endpoint = `${location.origin}/v1`;
+      const config = `Endpoint: ${endpoint}\nModel: ${model}\nAPI key: \$ENDPOINT_API_KEY`;
+      await copyText(config);
+      message.textContent = t("cli.configCopied");
+    });
     if (reset) reset.addEventListener("click", async () => {
       if (!confirm(t("cli.confirmReset"))) return;
       reset.disabled = true;

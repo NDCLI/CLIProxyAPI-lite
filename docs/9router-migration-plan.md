@@ -80,7 +80,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 ### Phase 8 — CLI Tools
 
 - ~~Implement backend status and configuration APIs for the supported CLI tools.~~
-- Generate real, copyable commands/configuration for Claude, Codex, OpenCode, and other supported clients.
+- Generate real, copyable commands/configuration for Claude, Codex, OpenCode, and other supported clients. Supported clients now expose a safe endpoint/model snippet; OpenCode remains unavailable because no Go writer exists.
 - Keep generated secrets masked and ensure copied configuration uses the selected endpoint and model settings.
 
 ### Phase 9 — Remaining 9router management areas
