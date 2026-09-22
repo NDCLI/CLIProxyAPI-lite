@@ -128,6 +128,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Provider quota refresh and Auth Files page added | `11d149a7`, `92194253` | Provider rows expose stable auth indexes for real quota fetches; source-owned Auth Files page uses existing authenticated list/status APIs without showing token contents |
 | 2026-09-22 | OAuth actions and capability manifest finalized | `b893659b` | Auth Files page starts existing Codex/Claude/Antigravity OAuth flows; capability manifest now marks completed provider, usage, CLI, and combo slices ready while Token Saver remains explicitly unavailable |
 | 2026-09-22 | OAuth completion polling added | `ceb88f77` | Auth Files page polls the authenticated OAuth session status and refreshes credentials after successful login, with localized failure and timeout states |
+| 2026-09-22 | Source-owned UI became default entrypoint | `40e227b2` | `/management.html` and `/` serve the source-owned shell; safe-mode configuration and `/management-legacy.html` retain the legacy editor for compatibility |
 
 ## Update convention
 
