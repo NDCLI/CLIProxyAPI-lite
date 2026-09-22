@@ -428,15 +428,27 @@ async function renderCombos(page) {
 }
 
 async function renderUsage(page, filter = {}) {
-  const filters = `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><button class="secondary" id="usage-apply">${t("usage.applyFilters")}</button></section>`;
+  const localDateTime = value => {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "" : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+  const filters = `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterFrom")}<input id="usage-from" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.from))}"></label><label>${t("usage.filterTo")}<input id="usage-to" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.to))}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><button class="secondary" id="usage-apply">${t("usage.applyFilters")}</button></section>`;
   const renderHeader = () => pageHeader("kicker.liveData", "usage.title", "usage.description", true) + filters;
   page.innerHTML = renderHeader() + `<div class="loading">${t("common.loading")}</div>`;
-  const apply = () => renderUsage(page, {provider: document.getElementById("usage-provider").value.trim(), model: document.getElementById("usage-model").value.trim(), status: document.getElementById("usage-status").value});
+  const apply = () => {
+    const timestamp = id => {
+      const value = document.getElementById(id).value;
+      return value ? new Date(value).toISOString() : "";
+    };
+    renderUsage(page, {provider: document.getElementById("usage-provider").value.trim(), model: document.getElementById("usage-model").value.trim(), from: timestamp("usage-from"), to: timestamp("usage-to"), status: document.getElementById("usage-status").value});
+  };
   document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
   document.getElementById("usage-apply").addEventListener("click", apply);
   const query = new URLSearchParams({limit: "200"});
   if (filter.provider) query.set("provider", filter.provider);
   if (filter.model) query.set("model", filter.model);
+  if (filter.from) query.set("from", filter.from);
+  if (filter.to) query.set("to", filter.to);
   if (filter.status) query.set("status", filter.status);
   try {
     const [recordsResponse, summaryResponse] = await Promise.all([api(`/usage/records?${query}`), api(`/usage/summary?${query}`)]);
@@ -456,8 +468,8 @@ async function renderUsage(page, filter = {}) {
 
 function usageTable(records) {
   if (!records.length) return `<div class="empty">${t("common.empty")}</div>`;
-  const rows = records.slice(0, 100).map(row => `<tr><td>${escapeHTML(new Date(row.timestamp).toLocaleString(state.locale))}</td><td>${escapeHTML(row.alias || "-")}</td><td>${escapeHTML(row.provider || "-")}</td><td>${escapeHTML(row.model || "-")}</td><td>${Number(row.input_tokens || 0).toLocaleString()}</td><td>${Number(row.output_tokens || 0).toLocaleString()}</td><td class="${row.failed ? "failed" : "ok"}">${t(row.failed ? "usage.failed" : "usage.ok")}</td></tr>`).join("");
-  return `<div class="table-wrap"><table><thead><tr><th>${t("usage.time")}</th><th>${t("usage.requestedModel")}</th><th>${t("usage.provider")}</th><th>${t("usage.upstreamModel")}</th><th>${t("usage.input")}</th><th>${t("usage.output")}</th><th>${t("usage.status")}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const rows = records.slice(0, 100).map(row => `<tr><td>${escapeHTML(new Date(row.timestamp).toLocaleString(state.locale))}</td><td>${escapeHTML(row.alias || "-")}</td><td>${escapeHTML(row.provider || "-")}</td><td>${escapeHTML(row.model || "-")}</td><td>${Number(row.input_tokens || 0).toLocaleString()}</td><td>${Number(row.output_tokens || 0).toLocaleString()}</td><td>${Number(row.latency_ms || 0).toLocaleString()} ms</td><td class="${row.failed ? "failed" : "ok"}">${t(row.failed ? "usage.failed" : "usage.ok")}</td></tr>`).join("");
+  return `<div class="table-wrap"><table><thead><tr><th>${t("usage.time")}</th><th>${t("usage.requestedModel")}</th><th>${t("usage.provider")}</th><th>${t("usage.upstreamModel")}</th><th>${t("usage.input")}</th><th>${t("usage.output")}</th><th>${t("usage.latency")}</th><th>${t("usage.status")}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 async function renderQuota(page) {
