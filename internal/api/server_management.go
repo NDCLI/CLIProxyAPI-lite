@@ -28,6 +28,10 @@ func (s *Server) registerManagementRoutes() {
 	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
 	{
 		mgmt.GET("/capabilities", s.mgmt.GetCapabilities)
+		mgmt.GET("/endpoint-keys", s.mgmt.GetEndpointKeys)
+		mgmt.POST("/endpoint-keys", s.mgmt.PostEndpointKey)
+		mgmt.PATCH("/endpoint-keys/:id", s.mgmt.PatchEndpointKey)
+		mgmt.DELETE("/endpoint-keys/:id", s.mgmt.DeleteEndpointKey)
 		mgmt.GET("/config", s.mgmt.GetConfig)
 		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
 		mgmt.PUT("/config.yaml", s.mgmt.PutConfigYAML)
@@ -367,4 +371,27 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 	body, _ = managementasset.AddRouterNavigation(body)
 	c.Header("Cache-Control", "no-cache")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
+}
+
+func (s *Server) serveSourceManagementControlPanel(c *gin.Context) {
+	s.serveSourceManagementAssetName(c, "index.html")
+}
+
+func (s *Server) serveSourceManagementAsset(c *gin.Context) {
+	s.serveSourceManagementAssetName(c, c.Param("asset"))
+}
+
+func (s *Server) serveSourceManagementAssetName(c *gin.Context, name string) {
+	cfg := s.cfg
+	if cfg == nil || cfg.Home.Enabled || cfg.RemoteManagement.DisableControlPanel {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	body, contentType, ok := managementasset.SourceManagementAsset(name)
+	if !ok {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+	c.Header("Cache-Control", "no-cache")
+	c.Data(http.StatusOK, contentType, body)
 }

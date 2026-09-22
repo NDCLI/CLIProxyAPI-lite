@@ -24,7 +24,7 @@ func (h *Handler) GetCapabilities(c *gin.Context) {
 	c.JSON(http.StatusOK, managementCapabilitiesResponse{
 		SchemaVersion: managementCapabilitiesSchemaVersion,
 		Capabilities: []managementCapability{
-			{ID: "endpoint_keys", State: "partial", ReasonCode: "normalized_contract_required"},
+			{ID: "endpoint_keys", State: "ready"},
 			{ID: "providers", State: "partial", ReasonCode: "normalized_contract_required"},
 			{ID: "combos", State: "planned", ReasonCode: "backend_not_implemented"},
 			{ID: "usage", State: "partial", ReasonCode: "durable_history_not_implemented"},
