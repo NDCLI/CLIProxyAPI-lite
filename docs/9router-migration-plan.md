@@ -75,11 +75,11 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 - Implement the real token-saver capabilities represented by 9router (RTK, Headroom, Caveman, Ponytail, and PXPIPE where supported by the backend).
 - Expose status, configuration, start/stop/restart, and diagnostics through authenticated management APIs.
-- Show an explicit unavailable state for a capability that has no safe Go implementation; do not expose a working-looking toggle.
+- ~~Show an explicit unavailable state for a capability that has no safe Go implementation; do not expose a working-looking toggle.~~
 
 ### Phase 8 — CLI Tools
 
-- Implement backend status and configuration APIs for the supported CLI tools.
+- ~~Implement backend status and configuration APIs for the supported CLI tools.~~
 - Generate real, copyable commands/configuration for Claude, Codex, OpenCode, and other supported clients.
 - Keep generated secrets masked and ensure copied configuration uses the selected endpoint and model settings.
 
@@ -98,7 +98,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 ### Phase 11 — Verification and release gate
 
-- Run Go formatting, unit/integration tests, and `go build -o test-output ./cmd/server`.
+- ~~Run Go formatting, unit/integration tests, and `go build -o test-output ./cmd/server`.~~
 - Build and lint the frontend, then exercise every management API against a clean test configuration.
 - Verify English and Vietnamese at desktop and narrow/mobile widths, including deep links and reloads.
 - Check that credentials do not appear in source, generated assets, logs, screenshots, or Git history introduced by this migration.
@@ -134,6 +134,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Usage time range and latency display completed | `951964c3` | The existing normalized records/summary API now has localized datetime filters and latency display; focused management asset and usage handler tests pass |
 | 2026-09-22 | Credential quota details completed | `d8aaf2ab` | Quota page lists only backend-supported credentials, renders normalized buckets/remaining capacity/reset time, and exposes reset only where the provider supports it |
 | 2026-09-22 | Quick Start page completed | `WORKTREE` | Source-owned Quick Start page uses live endpoint-key and auth-file APIs, copies the real `/v1` endpoint, and links to key management; unsupported 9router domains remain unavailable rather than fabricated |
+| 2026-09-22 | CLI/Token Saver verification gates completed | `b9ea29fe` | Supported CLI status/configuration and explicit Token Saver unavailable state are covered by focused tests; full `go test ./...` and `go build -o test-output.exe ./cmd/server` pass on `test` |
 
 ## Update convention
 
