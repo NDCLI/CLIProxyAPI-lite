@@ -15,6 +15,7 @@ func TestSourceManagementRoutes(t *testing.T) {
 		contentType string
 		contains    string
 	}{
+		{path: "/management.html", contentType: "text/html", contains: `id="app"`},
 		{path: "/management-next.html", contentType: "text/html", contains: `id="app"`},
 		{path: "/management-next/app.css", contentType: "text/css", contains: ".app-shell"},
 		{path: "/management-next/app.js", contentType: "text/javascript", contains: "loadCapabilities"},
@@ -37,6 +38,16 @@ func TestSourceManagementRoutes(t *testing.T) {
 				t.Fatalf("response does not contain %q", test.contains)
 			}
 		})
+	}
+}
+
+func TestLegacyManagementControlPanelRemainsAvailable(t *testing.T) {
+	server := newTestServer(t)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/management-legacy.html", nil)
+	server.engine.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusOK)
 	}
 }
 

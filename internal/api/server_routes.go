@@ -51,7 +51,8 @@ func (s *Server) setupRoutes() {
 	s.engine.GET("/healthz", healthzHandler)
 	s.engine.HEAD("/healthz", healthzHandler)
 
-	s.engine.GET("/management.html", s.serveManagementControlPanel)
+	s.engine.GET("/management.html", s.serveDefaultManagementControlPanel)
+	s.engine.GET("/management-legacy.html", s.serveManagementControlPanel)
 	s.engine.GET("/management-next.html", s.serveSourceManagementControlPanel)
 	s.engine.GET("/management-next/*asset", s.serveSourceManagementAsset)
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
@@ -131,7 +132,7 @@ func (s *Server) setupRoutes() {
 
 	// Management is the single UI entry point. Keep /connect as a compatibility
 	// alias so old bookmarks do not reopen the retired setup page.
-	s.engine.GET("/", s.serveManagementControlPanel)
+	s.engine.GET("/", s.serveDefaultManagementControlPanel)
 	s.engine.GET("/connect", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/management.html")
 	})

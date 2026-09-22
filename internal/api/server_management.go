@@ -386,6 +386,16 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
 }
 
+// serveDefaultManagementControlPanel serves the source-owned UI as the normal entry point.
+// Safe-mode configuration retains the legacy panel because it exposes the complete config editor.
+func (s *Server) serveDefaultManagementControlPanel(c *gin.Context) {
+	if c.Query("safe-mode") == "configure" {
+		s.serveManagementControlPanel(c)
+		return
+	}
+	s.serveSourceManagementControlPanel(c)
+}
+
 func (s *Server) serveSourceManagementControlPanel(c *gin.Context) {
 	s.serveSourceManagementAssetName(c, "index.html")
 }
