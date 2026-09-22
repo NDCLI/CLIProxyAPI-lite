@@ -35,8 +35,8 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 ### Phase 1 — Architecture and data mapping
 
 - ~~Map each 9router entity and API to the existing Go configuration, auth store, usage store, management assets, and request pipeline.~~
-- Define versioned management API contracts for providers, endpoint keys, combos, usage, quota, token saver, CLI tools, logs, and system settings.
-- Decide which 9router capabilities are supported directly, which require a Go equivalent, and which remain unavailable until a real backend exists.
+- ~~Define versioned management API contracts for providers, endpoint keys, combos, usage, quota, token saver, CLI tools, logs, and system settings.~~
+- ~~Decide which 9router capabilities are supported directly, which require a Go equivalent, and which remain unavailable until a real backend exists.~~
 - Add contract tests before replacing the UI so the migration does not depend on visual behavior.
 
 ### Phase 2 — New management shell
@@ -112,6 +112,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | 9router architecture/sidebar/API inventory captured | `6db4e2ba` | Local 9router `v0.5.81` source inspection |
 | 2026-09-22 | Migration rules and checklist recorded | `4fa0061a` | This document |
 | 2026-09-22 | Entity, API, and persistence ownership mapped | `a391e856` | `docs/9router-data-api-map.md`; verified against 9router schema/routes and Go management routes/config/auth/usage stores |
+| 2026-09-22 | Versioned management contracts and capability states defined | Pending ledger update | `docs/9router-management-api-contracts.md`; runtime manifest at `GET /v0/management/capabilities` |
 
 ## Update convention
 
