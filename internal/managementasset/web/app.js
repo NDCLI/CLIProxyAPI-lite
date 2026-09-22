@@ -7,24 +7,43 @@ const state = {
 };
 
 const routes = [
-  ["overview", "nav.overview", "OV"],
-  ["quick-start", "nav.quickStart", "QS"],
-  ["endpoint", "nav.endpoint", "EP", "endpoint_keys"],
-  ["providers", "nav.providers", "PR", "providers"],
-  ["auth-files", "nav.authFiles", "AF", "providers"],
-  ["combo", "nav.combo", "CO", "combos"],
-  ["usage", "nav.usage", "US", "usage"],
-  ["quota", "nav.quota", "QU", "quota"],
-  ["logs", "nav.logs", "LG", "logs"],
-  ["settings", "nav.settings", "ST", "system_settings"],
-  ["plugins", "nav.plugins", "PL", "plugins"],
-  ["token-saver", "nav.tokenSaver", "TS", "token_saver"],
-  ["cli-tools", "nav.cliTools", "CL", "cli_tools"]
+  ["overview", "nav.overview", "grid"],
+  ["quick-start", "nav.quickStart", "rocket"],
+  ["endpoint", "nav.endpoint", "key", "endpoint_keys"],
+  ["providers", "nav.providers", "server", "providers"],
+  ["auth-files", "nav.authFiles", "shield", "providers"],
+  ["combo", "nav.combo", "route", "combos"],
+  ["usage", "nav.usage", "chart", "usage"],
+  ["quota", "nav.quota", "gauge", "quota"],
+  ["logs", "nav.logs", "terminal", "logs"],
+  ["settings", "nav.settings", "settings", "system_settings"],
+  ["plugins", "nav.plugins", "puzzle", "plugins"],
+  ["token-saver", "nav.tokenSaver", "zap", "token_saver"],
+  ["cli-tools", "nav.cliTools", "command", "cli_tools"]
 ];
 
 const app = document.getElementById("app");
 const escapeHTML = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[char]));
 const t = key => state.messages[key] || key;
+const iconPaths = {
+  grid: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
+  rocket: '<path d="M13 5c2.8-2.8 6.2-2.5 6.2-2.5S19.5 6 16.7 8.8l-3.2 3.2-3.5-3.5L13 5Z"/><path d="m10 8.5-4.8.9L2.5 12l3.5.7M13.5 12l.9 4.8 2.6 2.7.7-3.5M9.5 14.5l-2 2"/><circle cx="15.5" cy="6.2" r="1"/>',
+  key: '<circle cx="8" cy="15" r="3"/><path d="m10.2 12.8 7.3-7.3 2 2-1.4 1.4 1.3 1.3-2.1 2.1-1.3-1.3-3.7 3.7"/>',
+  server: '<rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01M11 7h6M11 17h6"/>',
+  shield: '<path d="M12 3 20 6v5c0 5-3.4 8.3-8 10-4.6-1.7-8-5-8-10V6l8-3Z"/><path d="m8.5 12 2.2 2.2 4.8-4.8"/>',
+  route: '<circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h2a4 4 0 0 0 4-4V10a4 4 0 0 1 4-4"/>',
+  chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  gauge: '<path d="M4.5 16a8 8 0 1 1 15 0"/><path d="m12 12 4-4"/><path d="M12 20h.01"/>',
+  terminal: '<path d="m5 7 4 4-4 4M12 17h7"/><rect x="3" y="3" width="18" height="18" rx="2"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.2 2.2-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5v.2h-3.2v-.2a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1-2.2-2.2.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H5v-3.2h.2a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1 2.2-2.2.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.5V4h3.2v.2a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1 2.2 2.2-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.2V14h-.2a1.7 1.7 0 0 0-1.5 1Z"/>',
+  puzzle: '<path d="M8.5 4H6a2 2 0 0 0-2 2v2.5a2 2 0 1 0 0 4V15a2 2 0 0 0 2 2h2.5a2 2 0 1 1 4 0H15a2 2 0 0 0 2-2v-2.5a2 2 0 1 0 0-4V6a2 2 0 0 0-2-2h-2.5a2 2 0 1 1-4 0Z"/>',
+  zap: '<path d="m13 2-9 12h7l-1 8 10-13h-7l1-7Z"/>',
+  command: '<path d="M9 3v4a2 2 0 0 1-2 2H3M15 3v4a2 2 0 0 0 2 2h4M9 21v-4a2 2 0 0 0-2-2H3M15 21v-4a2 2 0 0 1 2-2h4"/><path d="M9 9h6v6H9z"/>',
+  chevrons: '<path d="m9 5-5 7 5 7M15 5l5 7-5 7"/>',
+  logout: '<path d="M10 17l5-5-5-5M15 12H3M12 4h5a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-5"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'
+};
+const icon = (name, className = "") => `<svg class="icon ${className}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name] || ""}</svg>`;
 
 async function loadMessages() {
   const response = await fetch(`/management-next/i18n/${state.locale}.json`);
@@ -77,7 +96,7 @@ function providerStatusLabel(status) {
 
 function renderLogin(error = "") {
   app.innerHTML = `<main class="login-shell"><section class="login-card">
-    <div class="brand"><span class="brand-mark">CP</span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
+    <div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
     <h1>${t("auth.title")}</h1><p>${t("auth.description")}</p>
     <form id="login-form"><div class="field"><label for="management-key">${t("auth.key")}</label><input id="management-key" type="password" autocomplete="current-password" placeholder="${t("auth.keyPlaceholder")}" value="${escapeHTML(state.key)}" required /></div>
     <span class="hint">${t("auth.sessionOnly")}</span><button class="primary" type="submit">${t("action.login")}</button><div class="form-error">${escapeHTML(error)}</div></form>
@@ -104,18 +123,18 @@ async function loadCapabilities() {
 }
 
 function navHTML(active) {
-  return routes.map(([id, label, icon]) => {
-    return `<button class="nav-link ${active === id ? "active" : ""}" data-route="${id}" title="${escapeHTML(t(label))}"><span class="nav-icon">${icon}</span><span class="nav-label">${t(label)}</span></button>`;
+  return routes.map(([id, label, iconName]) => {
+    return `<button class="nav-link ${active === id ? "active" : ""}" data-route="${id}" title="${escapeHTML(t(label))}"><span class="nav-icon">${icon(iconName)}</span><span class="nav-label">${t(label)}</span></button>`;
   }).join("");
 }
 
 function renderShell() {
   const active = routeName();
   app.innerHTML = `<div class="app-shell ${state.collapsed ? "collapsed" : ""}"><aside class="sidebar">
-    <div class="brand"><span class="brand-mark">CP</span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
+    <div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
     <nav class="nav">${navHTML(active)}</nav>
-    <div class="sidebar-footer"><button class="sidebar-action" id="collapse"><b>↔</b><span>${t(state.collapsed ? "action.expand" : "action.collapse")}</span></button><button class="sidebar-action" id="logout"><b>↪</b><span>${t("action.logout")}</span></button></div>
-  </aside><section class="workspace"><header class="topbar"><button class="top-button" id="locale">${state.locale === "en" ? "VI" : "EN"}</button><button class="top-button" id="logout-top">${t("action.logout")}</button></header><main class="content" id="page"></main></section></div>`;
+    <div class="sidebar-footer"><button class="sidebar-action" id="collapse" title="${t(state.collapsed ? "action.expand" : "action.collapse")}">${icon("chevrons")}<span>${t(state.collapsed ? "action.expand" : "action.collapse")}</span></button><button class="sidebar-action" id="logout" title="${t("action.logout")}">${icon("logout")}<span>${t("action.logout")}</span></button></div>
+  </aside><section class="workspace"><header class="topbar"><div class="topbar-context"><span class="topbar-dot"></span><span>${t("app.name")}</span></div><div class="topbar-actions"><button class="top-button icon-button" id="locale" title="${state.locale === "en" ? "Vietnamese" : "English"}">${icon("globe")}<span>${state.locale === "en" ? "VI" : "EN"}</span></button><button class="top-button icon-button" id="logout-top" title="${t("action.logout")}">${icon("logout")}<span>${t("action.logout")}</span></button></div></header><main class="content" id="page"></main></section></div>`;
   app.querySelectorAll("[data-route]").forEach(button => button.addEventListener("click", () => { location.hash = `#/${button.dataset.route}`; }));
   document.getElementById("locale").addEventListener("click", changeLocale);
   document.getElementById("logout").addEventListener("click", logout);
