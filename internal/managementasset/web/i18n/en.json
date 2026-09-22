@@ -169,7 +169,9 @@
   "usage.output": "Output",
   "usage.ok": "OK",
   "usage.provider": "Provider",
+  "usage.requestedModel": "Requested model",
   "usage.status": "Status",
   "usage.time": "Time",
-  "usage.title": "Usage"
+  "usage.title": "Usage",
+  "usage.upstreamModel": "Upstream model"
 }

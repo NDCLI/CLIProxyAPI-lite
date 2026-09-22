@@ -169,7 +169,9 @@
   "usage.output": "Đầu ra",
   "usage.ok": "Thành công",
   "usage.provider": "Nhà cung cấp",
+  "usage.requestedModel": "Model đã yêu cầu",
   "usage.status": "Trạng thái",
   "usage.time": "Thời gian",
-  "usage.title": "Sử dụng"
+  "usage.title": "Sử dụng",
+  "usage.upstreamModel": "Model upstream"
 }
