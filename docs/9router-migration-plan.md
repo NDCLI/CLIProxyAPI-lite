@@ -122,6 +122,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Filterable usage read model added | `7b46d604` | `GET /usage/records` and `/usage/summary` share provider/model/status/time filters over persisted usage history; UI shows totals and filtered request rows |
 | 2026-09-22 | CLI tool status contract added | `884ee43a` | `GET /cli-tools` reports secret-free configured state for supported clients; the UI now displays the actual status before apply/reset |
 | 2026-09-22 | Read-only Logs page added | `cce67e39` | Source-owned UI reads the existing authenticated logs endpoint and explicitly reports when file logging is unavailable |
+| 2026-09-22 | System settings page added | `da6ee593` | `GET/PATCH /system-settings` exposes only allow-listed non-secret settings; focused test proves secrets are not returned and changes persist |
 
 ## Update convention
 
