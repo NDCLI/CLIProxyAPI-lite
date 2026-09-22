@@ -26,7 +26,7 @@ func (h *Handler) GetCapabilities(c *gin.Context) {
 		Capabilities: []managementCapability{
 			{ID: "endpoint_keys", State: "ready"},
 			{ID: "providers", State: "partial", ReasonCode: "normalized_contract_required"},
-			{ID: "combos", State: "partial", ReasonCode: "execution_fallback_not_implemented"},
+			{ID: "combos", State: "ready"},
 			{ID: "usage", State: "partial", ReasonCode: "durable_history_not_implemented"},
 			{ID: "quota", State: "ready"},
 			{ID: "token_saver", State: "unavailable", ReasonCode: "backend_not_implemented"},

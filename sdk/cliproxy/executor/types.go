@@ -11,6 +11,12 @@ import (
 // RequestedModelMetadataKey stores the client-requested model name in Options.Metadata.
 const RequestedModelMetadataKey = "requested_model"
 
+// ComboTargetModelsMetadataKey stores provider-to-model targets for a combo route.
+const ComboTargetModelsMetadataKey = "combo_target_models"
+
+// ComboProviderMetadataKey identifies the provider selected for the current auth attempt.
+const ComboProviderMetadataKey = "combo_provider"
+
 // RequestPathMetadataKey stores the inbound HTTP request path (e.g. "/v1/images/generations") in Options.Metadata.
 // It is optional and may be absent for non-HTTP executions.
 const RequestPathMetadataKey = "request_path"
@@ -123,6 +129,8 @@ type RequestAfterAuthInterceptRequest struct {
 
 // RequestAfterAuthInterceptResponse returns selected-auth request modifications.
 type RequestAfterAuthInterceptResponse struct {
+	// Model replaces the execution model for the selected provider when non-empty.
+	Model string
 	// Headers replaces matching current request headers and preserves headers not mentioned here.
 	Headers http.Header
 	// Body replaces the current request body only when non-empty.

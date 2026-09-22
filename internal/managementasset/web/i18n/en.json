@@ -28,7 +28,6 @@
   "combo.delete": "Delete",
   "combo.description": "Ordered combo definitions stored by the Go backend.",
   "combo.empty": "No combo definitions are configured.",
-  "combo.executionPending": "Definitions are stored and validated. Runtime fallback execution is still being wired into the request pipeline.",
   "cli.reset": "Reset",
   "cli.resetDone": "Configuration reset.",
   "cli.saved": "Configuration saved.",

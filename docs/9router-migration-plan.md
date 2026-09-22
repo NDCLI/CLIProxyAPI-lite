@@ -124,6 +124,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Read-only Logs page added | `cce67e39` | Source-owned UI reads the existing authenticated logs endpoint and explicitly reports when file logging is unavailable |
 | 2026-09-22 | System settings page added | `da6ee593` | `GET/PATCH /system-settings` exposes only allow-listed non-secret settings; focused test proves secrets are not returned and changes persist |
 | 2026-09-22 | Combo definition persistence added | `36b6521c` | Combo CRUD stores validated ordered provider/model targets in `combos.json`; capability remains `partial` until runtime fallback execution is connected |
+| 2026-09-22 | Combo runtime fallback connected | Pending commit | AuthManager receives ordered combo providers and rewrites the selected provider's upstream model for non-stream, stream, and count execution paths; focused routing test passes |
 
 ## Update convention
 

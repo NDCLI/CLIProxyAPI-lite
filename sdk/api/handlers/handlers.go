@@ -364,6 +364,16 @@ type BaseAPIHandler struct {
 	// ModelRouterHost optionally routes matching requests to a plugin executor, the router's own
 	// executor, or a built-in provider before model-to-provider resolution and auth selection.
 	ModelRouterHost PluginModelRouterHost
+	ComboResolver   ComboResolver
+}
+
+type ComboTarget struct {
+	Provider string
+	Model    string
+}
+
+type ComboResolver interface {
+	ResolveCombo(string) ([]ComboTarget, bool)
 }
 
 // NewBaseAPIHandlers creates a new API handlers instance.
@@ -412,6 +422,46 @@ func (h *BaseAPIHandler) SetModelRouterHost(host PluginModelRouterHost) {
 		return
 	}
 	h.ModelRouterHost = host
+}
+
+func (h *BaseAPIHandler) SetComboResolver(resolver ComboResolver) { h.ComboResolver = resolver }
+
+func (h *BaseAPIHandler) comboTargets(model string) map[string]string {
+	if h == nil || h.ComboResolver == nil {
+		return nil
+	}
+	targets, ok := h.ComboResolver.ResolveCombo(model)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]string, len(targets))
+	for _, target := range targets {
+		provider, targetModel := strings.ToLower(strings.TrimSpace(target.Provider)), strings.TrimSpace(target.Model)
+		if provider != "" && targetModel != "" {
+			out[provider] = targetModel
+		}
+	}
+	return out
+}
+
+func (h *BaseAPIHandler) installComboInterceptor(opts *coreexecutor.Options, model string) {
+	targets := h.comboTargets(model)
+	if len(targets) == 0 {
+		return
+	}
+	base := opts.RequestAfterAuthInterceptor
+	opts.RequestAfterAuthInterceptor = func(ctx context.Context, request coreexecutor.RequestAfterAuthInterceptRequest) coreexecutor.RequestAfterAuthInterceptResponse {
+		var response coreexecutor.RequestAfterAuthInterceptResponse
+		if base != nil {
+			response = base(ctx, request)
+		}
+		if provider, ok := request.Metadata[coreexecutor.ComboProviderMetadataKey].(string); ok {
+			if targetModel := targets[strings.ToLower(strings.TrimSpace(provider))]; targetModel != "" {
+				response.Model = targetModel
+			}
+		}
+		return response
+	}
 }
 
 func isNilPluginInterceptorHost(host PluginInterceptorHost) bool {

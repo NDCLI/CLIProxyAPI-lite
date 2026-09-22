@@ -21,6 +21,7 @@ import (
 	managementHandlers "github.com/router-for-me/CLIProxyAPI/v7/internal/api/handlers/management"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/api/middleware"
 	codexlive "github.com/router-for-me/CLIProxyAPI/v7/internal/client/codex/live"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/combo"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
@@ -106,6 +107,20 @@ type Server struct {
 	exampleAPIKeySafeModeActive  atomic.Bool
 }
 
+type comboResolver struct{ store *combo.Store }
+
+func (r comboResolver) ResolveCombo(model string) ([]handlers.ComboTarget, bool) {
+	targets, ok := r.store.Resolve(model)
+	if !ok {
+		return nil, false
+	}
+	out := make([]handlers.ComboTarget, 0, len(targets))
+	for _, target := range targets {
+		out = append(out, handlers.ComboTarget{Provider: target.Provider, Model: target.Model})
+	}
+	return out, true
+}
+
 // NewServer creates and initializes a new API server instance.
 // It sets up the Gin engine, middleware, routes, and handlers.
 //
@@ -187,6 +202,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	s.wsAuthEnabled.Store(cfg.WebsocketAuth)
 	s.exampleAPIKeySafeModeActive.Store(s.exampleAPIKeySafeModeRequired(cfg))
 	s.handlers.SetPluginHost(optionState.pluginHost)
+	s.handlers.SetComboResolver(comboResolver{store: combo.New(configFilePath)})
 	if optionState.pluginHost != nil {
 		optionState.pluginHost.SetModelExecutor(s.handlers)
 		optionState.pluginHost.SetAuthManager(authManager)

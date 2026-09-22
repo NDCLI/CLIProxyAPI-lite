@@ -28,7 +28,6 @@
   "combo.delete": "Xóa",
   "combo.description": "Các định nghĩa combo theo thứ tự được backend Go lưu trữ.",
   "combo.empty": "Chưa cấu hình combo nào.",
-  "combo.executionPending": "Định nghĩa đã được lưu và kiểm tra. Runtime fallback vẫn đang được nối vào pipeline request.",
   "cli.reset": "Đặt lại",
   "cli.resetDone": "Đã đặt lại cấu hình.",
   "cli.saved": "Đã lưu cấu hình.",

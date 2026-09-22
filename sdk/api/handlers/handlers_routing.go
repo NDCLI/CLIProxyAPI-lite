@@ -153,6 +153,21 @@ func (h *BaseAPIHandler) providersForExecution(modelName, originalRequestedModel
 		}
 		return []string{routeDecision.Provider}, normalizedModel, nil
 	}
+	if h.ComboResolver != nil {
+		if targets, ok := h.ComboResolver.ResolveCombo(originalRequestedModel); ok && len(targets) > 0 {
+			providers := make([]string, 0, len(targets))
+			for _, target := range targets {
+				provider := strings.ToLower(strings.TrimSpace(target.Provider))
+				if provider == "" {
+					continue
+				}
+				providers = append(providers, provider)
+			}
+			if len(providers) > 0 {
+				return providers, strings.TrimSpace(targets[0].Model), nil
+			}
+		}
+	}
 	return h.getRequestDetailsWithOptions(modelName, allowImageModel)
 }
 

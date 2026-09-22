@@ -86,6 +86,7 @@ func (h *BaseAPIHandler) executeWithAuthManagerFormats(ctx context.Context, entr
 		WebSocketResponseObserver:   h.webSocketResponseObserver(lifecycle.requestID(), execOptions.SkipInterceptorPluginID),
 	}
 	opts.Metadata = reqMeta
+	h.installComboInterceptor(&opts, originalRequestedModel)
 	ctx = enrichContextWithSessionHierarchy(ctx, opts.Headers, req.Payload, opts.Metadata)
 	var interceptErr *interfaces.ErrorMessage
 	req, opts, interceptErr = h.applyRequestInterceptorsBeforeAuth(ctx, entryProtocol, originalRequestedModel, lifecycle.requestID(), req, opts, execOptions.SkipInterceptorPluginID)
@@ -154,6 +155,7 @@ func (h *BaseAPIHandler) executeCountWithAuthManager(ctx context.Context, handle
 		WebSocketResponseObserver:   h.webSocketResponseObserver(lifecycle.requestID(), execOptions.SkipInterceptorPluginID),
 	}
 	opts.Metadata = reqMeta
+	h.installComboInterceptor(&opts, originalRequestedModel)
 	ctx = enrichContextWithSessionHierarchy(ctx, opts.Headers, req.Payload, opts.Metadata)
 	var interceptErr *interfaces.ErrorMessage
 	req, opts, interceptErr = h.applyRequestInterceptorsBeforeAuth(ctx, handlerType, originalRequestedModel, lifecycle.requestID(), req, opts, execOptions.SkipInterceptorPluginID)

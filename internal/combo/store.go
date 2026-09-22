@@ -77,6 +77,37 @@ func (s *Store) List() []Definition {
 	return append([]Definition(nil), s.items...)
 }
 
+// Resolve returns enabled targets for a client-facing combo model.
+func (s *Store) Resolve(model string) ([]Target, bool) {
+	if s == nil {
+		return nil, false
+	}
+	model = strings.TrimSpace(model)
+	s.mu.Lock()
+	s.loadLocked()
+	defer s.mu.Unlock()
+	for _, item := range s.items {
+		if item.Enabled && item.Model == model {
+			return append([]Target(nil), item.Targets...), true
+		}
+	}
+	return nil, false
+}
+
+func (s *Store) loadLocked() {
+	if s == nil || s.path == "" {
+		return
+	}
+	body, errRead := os.ReadFile(s.path)
+	if errRead != nil {
+		return
+	}
+	var items []Definition
+	if json.Unmarshal(body, &items) == nil {
+		s.items = items
+	}
+}
+
 func (s *Store) Save(def Definition) (Definition, error) {
 	if s == nil {
 		return Definition{}, fmt.Errorf("combo store unavailable")
