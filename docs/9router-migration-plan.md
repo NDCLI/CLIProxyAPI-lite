@@ -67,9 +67,9 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 ### Phase 6 — Usage and Quota Tracker
 
-- Replace placeholder metrics with live usage history, request status, token accounting, latency, provider/model filters, and time ranges.
-- Add quota limits, reset windows, remaining capacity, and provider-level error states.
-- Ensure all totals use one normalized backend representation and remain correct after refresh.
+- ~~Replace placeholder metrics with live usage history, request status, token accounting, latency, provider/model filters, and time ranges.~~
+- ~~Add quota limits, reset windows, remaining capacity, and provider-level error states.~~
+- ~~Ensure all totals use one normalized backend representation and remain correct after refresh.~~
 
 ### Phase 7 — Token Saver
 
@@ -131,6 +131,8 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Source-owned UI became default entrypoint | `40e227b2` | `/management.html` and `/` serve the source-owned shell; safe-mode configuration and `/management-legacy.html` retain the legacy editor for compatibility |
 | 2026-09-22 | Combo management controls completed | `b681d53b` | Authenticated create, validate, edit, duplicate, enable/disable, and delete flows use persisted Go combo definitions; focused handler/store/asset tests and server build pass |
 | 2026-09-22 | Combo fallback observability completed | `8c87ff13` | Request logs retain the actual upstream request while Usage now shows requested model, selected provider, and upstream model; focused combo-routing and management asset tests pass |
+| 2026-09-22 | Usage time range and latency display completed | `951964c3` | The existing normalized records/summary API now has localized datetime filters and latency display; focused management asset and usage handler tests pass |
+| 2026-09-22 | Credential quota details completed | `d8aaf2ab` | Quota page lists only backend-supported credentials, renders normalized buckets/remaining capacity/reset time, and exposes reset only where the provider supports it |
 
 ## Update convention
 
