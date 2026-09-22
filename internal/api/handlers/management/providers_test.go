@@ -75,3 +75,25 @@ func TestProviderRoutesRequireManagementAuthentication(t *testing.T) {
 		t.Fatalf("unauthorized status = %d, want %d", unauthorized.Code, http.StatusUnauthorized)
 	}
 }
+
+func TestPatchProviderChangesEnabledState(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	manager := coreauth.NewManager(nil, nil, nil)
+	if _, errRegister := manager.Register(context.Background(), &coreauth.Auth{ID: "provider-1", Provider: "claude", Status: coreauth.StatusActive}); errRegister != nil {
+		t.Fatal(errRegister)
+	}
+	handler := NewHandlerWithoutConfigFilePath(&config.Config{}, manager)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Params = gin.Params{{Key: "id", Value: "provider-1"}}
+	ctx.Request = httptest.NewRequest(http.MethodPatch, "/v0/management/providers/provider-1", strings.NewReader(`{"enabled":false}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	handler.PatchProvider(ctx)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d: %s", recorder.Code, http.StatusOK, recorder.Body.String())
+	}
+	updated, ok := manager.GetByID("provider-1")
+	if !ok || !updated.Disabled || updated.Status != coreauth.StatusDisabled {
+		t.Fatalf("provider state = %#v, want disabled", updated)
+	}
+}

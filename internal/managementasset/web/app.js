@@ -225,7 +225,7 @@ async function renderProviders(page) {
     const response = await api("/providers");
     const providers = response.items || [];
     const container = document.getElementById("providers");
-    container.innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td><td><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${t("providers.models")}</button></td></tr>`).join("")}</tbody></table></div><div id="provider-models" class="provider-models"></div>` : `<div class="empty">${t("providers.empty")}</div>`;
+    container.innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${t("providers.models")}</button><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></td></tr>`).join("")}</tbody></table></div><div id="provider-models" class="provider-models"></div>` : `<div class="empty">${t("providers.empty")}</div>`;
     container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
       button.disabled = true;
       const modelsPanel = document.getElementById("provider-models");
@@ -237,6 +237,18 @@ async function renderProviders(page) {
         if (error.message === "invalid_key") return logout();
         modelsPanel.innerHTML = `<div class="error">${t("common.error")}</div>`;
       } finally {
+        button.disabled = false;
+      }
+    }));
+    container.querySelectorAll("[data-provider-enabled]").forEach(button => button.addEventListener("click", async () => {
+      const enabled = button.dataset.enabled !== "true";
+      if (!confirm(t(enabled ? "providers.confirmEnable" : "providers.confirmDisable"))) return;
+      button.disabled = true;
+      try {
+        await api(`/providers/${encodeURIComponent(button.dataset.providerEnabled)}`, {method: "PATCH", body: JSON.stringify({enabled})});
+        await renderProviders(page);
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
         button.disabled = false;
       }
     }));

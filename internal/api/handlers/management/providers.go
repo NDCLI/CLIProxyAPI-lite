@@ -1,6 +1,9 @@
 package management
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
 	"net/http"
 	"path/filepath"
 	"sort"
@@ -108,6 +111,33 @@ func (h *Handler) GetProvider(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"schema_version": 1, "item": providerItemFromAuth(auth)})
+}
+
+// PatchProvider changes the enabled state through the existing auth-file persistence path.
+func (h *Handler) PatchProvider(c *gin.Context) {
+	var body struct {
+		Enabled *bool `json:"enabled"`
+	}
+	if errBind := c.ShouldBindJSON(&body); errBind != nil || body.Enabled == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_body", "message": "enabled is required"}})
+		return
+	}
+	auth, ok := h.findProvider(strings.TrimSpace(c.Param("id")))
+	if !ok {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "provider_not_found", "message": "Provider not found"}})
+		return
+	}
+	legacyBody, errMarshal := json.Marshal(struct {
+		Name     string `json:"name"`
+		Disabled bool   `json:"disabled"`
+	}{Name: auth.ID, Disabled: !*body.Enabled})
+	if errMarshal != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "provider_update_failed", "message": "Failed to update provider"}})
+		return
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(legacyBody))
+	c.Request.ContentLength = int64(len(legacyBody))
+	h.PatchAuthFileStatus(c)
 }
 
 // GetProviderModels returns models currently registered for one provider credential.

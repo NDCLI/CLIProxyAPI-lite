@@ -206,6 +206,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.DELETE("/oauth-session", s.mgmt.CancelAuthSession)
 		mgmt.GET("/providers", s.mgmt.GetProviders)
 		mgmt.GET("/providers/:id", s.mgmt.GetProvider)
+		mgmt.PATCH("/providers/:id", s.mgmt.PatchProvider)
 		mgmt.GET("/providers/:id/models", s.mgmt.GetProviderModels)
 		mgmt.POST("/configure-tool", s.mgmt.ConfigureTool)
 		mgmt.POST("/import/9router", s.mgmt.Import9RouterAccounts)
