@@ -363,6 +363,7 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 	body, _ = managementasset.AddEndpointCard(body)
 	body, _ = managementasset.AddUsageHistoryTab(body)
 	body, _ = managementasset.AddUsageLivePolling(body)
+	body, _ = managementasset.AddRouterNavigation(body)
 	c.Header("Cache-Control", "no-cache")
 	c.Data(http.StatusOK, "text/html; charset=utf-8", body)
 }
