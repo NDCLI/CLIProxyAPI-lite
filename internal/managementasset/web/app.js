@@ -64,6 +64,11 @@ function capability(id) {
   return state.capabilities.get(id) || {id, state: "planned", reason_code: "backend_not_implemented"};
 }
 
+function providerStatusLabel(status) {
+  const value = String(status || "unknown").toLowerCase();
+  return state.messages[`providers.status.${value}`] || status || t("providers.status.unknown");
+}
+
 function renderLogin(error = "") {
   app.innerHTML = `<main class="login-shell"><section class="login-card">
     <div class="brand"><span class="brand-mark">CP</span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
@@ -219,7 +224,7 @@ async function renderProviders(page) {
   try {
     const response = await api("/providers");
     const providers = response.items || [];
-    document.getElementById("providers").innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(provider.status || t("providers.active"))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("providers.empty")}</div>`;
+    document.getElementById("providers").innerHTML = providers.length ? `<div class="table-wrap"><table><thead><tr><th>${t("providers.name")}</th><th>${t("providers.type")}</th><th>${t("providers.status")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th></tr></thead><tbody>${providers.map(provider => `<tr><td>${escapeHTML(provider.label || provider.id || "-")}</td><td>${escapeHTML(provider.provider || "-")}</td><td><span class="badge ${provider.enabled ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.status))}</span></td><td>${Number(provider.success || 0).toLocaleString()}</td><td>${Number(provider.failed || 0).toLocaleString()}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("providers.empty")}</div>`;
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     document.getElementById("providers").innerHTML = `<div class="error">${t("common.error")}</div>`;
