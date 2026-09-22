@@ -8,6 +8,7 @@ const state = {
 
 const routes = [
   ["overview", "nav.overview", "OV"],
+  ["quick-start", "nav.quickStart", "QS"],
   ["endpoint", "nav.endpoint", "EP", "endpoint_keys"],
   ["providers", "nav.providers", "PR", "providers"],
   ["auth-files", "nav.authFiles", "AF", "providers"],
@@ -153,6 +154,23 @@ function capabilityCard(item) {
 
 function renderOverview(page) {
   page.innerHTML = pageHeader("kicker.migration", "dashboard.title", "dashboard.description") + `<section class="grid">${[...state.capabilities.values()].filter(item => routes.some(route => route[3] === item.id)).map(capabilityCard).join("")}</section>`;
+}
+
+async function renderQuickStart(page) {
+  page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  try {
+    const [keys, authFiles] = await Promise.all([api("/endpoint-keys"), api("/auth-files")]);
+    const activeKeys = (keys.items || []).length;
+    const credentials = (authFiles.files || []).filter(file => !file.disabled).length;
+    page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${t("quickStart.manageKeys")}</button></div></section><section class="grid"><article class="card"><h3>${t("quickStart.keys")}</h3><div class="metric">${activeKeys}</div></article><article class="card"><h3>${t("quickStart.credentials")}</h3><div class="metric">${credentials}</div></article></section>`;
+    document.getElementById("quick-start-copy").addEventListener("click", () => copyText(document.getElementById("quick-start-url").value));
+    document.getElementById("quick-start-keys").addEventListener("click", () => { location.hash = "#/endpoint"; });
+    document.getElementById("refresh").addEventListener("click", () => renderQuickStart(page));
+  } catch (error) {
+    if (error.message === "invalid_key") return logout();
+    page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<div class="error">${t("common.error")}</div>`;
+    document.getElementById("refresh").addEventListener("click", () => renderQuickStart(page));
+  }
 }
 
 function renderStatusPage(page, capabilityID, titleKey) {
@@ -552,6 +570,7 @@ async function renderPlugins(page) {
 function renderPage(name) {
   const page = document.getElementById("page");
   switch (name) {
+    case "quick-start": renderQuickStart(page); break;
     case "endpoint": renderEndpoint(page); break;
     case "providers": renderProviders(page); break;
     case "auth-files": renderAuthFiles(page); break;

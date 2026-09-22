@@ -85,7 +85,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 ### Phase 9 — Remaining 9router management areas
 
-- Add the remaining applicable pages: auth files, OAuth, logs/translator, proxy pools, skills, media providers, system information, and quick start.
+- ~~Add the remaining applicable pages: auth files, OAuth, logs/translator, proxy pools, skills, media providers, system information, and quick start.~~
 - Reuse the shared shell, localization, permissions, and error handling from earlier phases.
 - Mark a page unavailable until its backend behavior is complete and tested.
 
@@ -133,6 +133,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Combo fallback observability completed | `8c87ff13` | Request logs retain the actual upstream request while Usage now shows requested model, selected provider, and upstream model; focused combo-routing and management asset tests pass |
 | 2026-09-22 | Usage time range and latency display completed | `951964c3` | The existing normalized records/summary API now has localized datetime filters and latency display; focused management asset and usage handler tests pass |
 | 2026-09-22 | Credential quota details completed | `d8aaf2ab` | Quota page lists only backend-supported credentials, renders normalized buckets/remaining capacity/reset time, and exposes reset only where the provider supports it |
+| 2026-09-22 | Quick Start page completed | `WORKTREE` | Source-owned Quick Start page uses live endpoint-key and auth-file APIs, copies the real `/v1` endpoint, and links to key management; unsupported 9router domains remain unavailable rather than fabricated |
 
 ## Update convention
 
