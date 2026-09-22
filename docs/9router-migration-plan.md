@@ -121,6 +121,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Provider enable/disable added | `e201e6ec` | Authenticated `PATCH /v0/management/providers/:id` delegates to the existing auth persistence workflow; focused test proves the credential state is changed |
 | 2026-09-22 | Filterable usage read model added | `7b46d604` | `GET /usage/records` and `/usage/summary` share provider/model/status/time filters over persisted usage history; UI shows totals and filtered request rows |
 | 2026-09-22 | CLI tool status contract added | `884ee43a` | `GET /cli-tools` reports secret-free configured state for supported clients; the UI now displays the actual status before apply/reset |
+| 2026-09-22 | Read-only Logs page added | `cce67e39` | Source-owned UI reads the existing authenticated logs endpoint and explicitly reports when file logging is unavailable |
 
 ## Update convention
 
