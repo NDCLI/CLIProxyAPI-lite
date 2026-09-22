@@ -66,7 +66,7 @@ function capability(id) {
 
 function renderLogin(error = "") {
   app.innerHTML = `<main class="login-shell"><section class="login-card">
-    <div class="brand"><span class="brand-mark">9</span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
+    <div class="brand"><span class="brand-mark">CP</span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
     <h1>${t("auth.title")}</h1><p>${t("auth.description")}</p>
     <form id="login-form"><div class="field"><label for="management-key">${t("auth.key")}</label><input id="management-key" type="password" autocomplete="current-password" placeholder="${t("auth.keyPlaceholder")}" value="${escapeHTML(state.key)}" required /></div>
     <span class="hint">${t("auth.sessionOnly")}</span><button class="primary" type="submit">${t("action.login")}</button><div class="form-error">${escapeHTML(error)}</div></form>
