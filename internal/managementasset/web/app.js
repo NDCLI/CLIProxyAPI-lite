@@ -337,15 +337,26 @@ async function renderCLITools(page) {
 }
 
 async function renderAuthFiles(page) {
-  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-actions"><button class="secondary" data-oauth="codex">${t("authFiles.loginCodex")}</button><button class="secondary" data-oauth="anthropic">${t("authFiles.loginClaude")}</button><button class="secondary" data-oauth="antigravity">${t("authFiles.loginAntigravity")}</button></div><div id="auth-files-content" class="loading">${t("common.loading")}</div>`;
+  page.querySelectorAll("[data-oauth]").forEach(button => button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      const response = await api(`/${button.dataset.oauth}-auth-url`);
+      if (response.url) window.open(response.url, "_blank", "noopener");
+      if (response.state) { const message = document.getElementById("auth-oauth-status") || document.createElement("div"); message.id = "auth-oauth-status"; message.className = "form-message"; message.textContent = t("authFiles.loginWaiting"); page.querySelector(".auth-actions").appendChild(message); }
+    } catch (error) { if (error.message === "invalid_key") return logout(); }
+    finally { button.disabled = false; }
+  }));
   const load = async () => {
     try {
       const response = await api("/auth-files");
       const files = response.files || [];
-      page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + (files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => `<tr><td>${escapeHTML(file.name || file.id || "-")}</td><td>${escapeHTML(file.provider || file.type || "-")}</td><td>${escapeHTML(file.disabled ? t("providers.disabled") : t("providers.active"))}</td><td><button class="secondary" data-auth-toggle="${escapeHTML(file.name || file.id)}" data-disabled="${Boolean(file.disabled)}">${file.disabled ? t("providers.enable") : t("providers.disable")}</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("authFiles.empty")}</div>`);
+      const content = document.getElementById("auth-files-content");
+      content.className = "";
+      content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => `<tr><td>${escapeHTML(file.name || file.id || "-")}</td><td>${escapeHTML(file.provider || file.type || "-")}</td><td>${escapeHTML(file.disabled ? t("providers.disabled") : t("providers.active"))}</td><td><button class="secondary" data-auth-toggle="${escapeHTML(file.name || file.id)}" data-disabled="${Boolean(file.disabled)}">${file.disabled ? t("providers.enable") : t("providers.disable")}</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("authFiles.empty")}</div>`;
       document.getElementById("refresh").addEventListener("click", load);
       page.querySelectorAll("[data-auth-toggle]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api("/auth-files/status", {method: "PATCH", body: JSON.stringify({name: button.dataset.authToggle, disabled: button.dataset.disabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
-    } catch (error) { if (error.message === "invalid_key") return logout(); page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
+    } catch (error) { if (error.message === "invalid_key") return logout(); document.getElementById("auth-files-content").innerHTML = `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
   };
   await load();
 }

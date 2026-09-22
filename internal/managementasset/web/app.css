@@ -102,6 +102,7 @@ button { color: inherit; }
 .error { color: var(--danger); }
 .log-output { max-height: 70vh; margin: 0; overflow: auto; padding: 16px; border: 1px solid var(--line); border-radius: 10px; background: #0d1114; color: #cbd5e1; font: 12px/1.55 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
 .settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.auth-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
 .settings-grid label { display: grid; gap: 7px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .settings-grid label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 8px; }
 .combo-note { margin-bottom: 18px; padding: 12px 14px; border: 1px solid rgba(245, 194, 107, .35); border-radius: 8px; color: var(--warning); background: rgba(245, 194, 107, .08); }
