@@ -34,7 +34,7 @@ func TestGetCapabilitiesContract(t *testing.T) {
 	wantStates := map[string]string{
 		"endpoint_keys":   "ready",
 		"providers":       "partial",
-		"combos":          "planned",
+		"combos":          "partial",
 		"usage":           "partial",
 		"quota":           "ready",
 		"token_saver":     "unavailable",

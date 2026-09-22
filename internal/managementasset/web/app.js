@@ -335,6 +335,20 @@ async function renderCLITools(page) {
   }
 }
 
+async function renderCombos(page) {
+  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  const load = async () => {
+    try {
+      const response = await api("/combos");
+      const items = response.items || [];
+      page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="combo-note">${t("combo.executionPending")}</div>` + (items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge partial">${item.enabled ? t("capability.partial") : t("capability.unavailable")}</span></div><p>${escapeHTML(item.model)} · ${item.targets.map(target => escapeHTML(`${target.provider}/${target.model}`)).join(" → ")}</p><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${t("combo.delete")}</button></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`);
+      document.getElementById("refresh").addEventListener("click", load);
+      page.querySelectorAll("[data-delete-combo]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("combo.confirmDelete"))) return; await api(`/combos/${encodeURIComponent(button.dataset.deleteCombo)}`, {method: "DELETE"}); await load(); }));
+    } catch (error) { if (error.message === "invalid_key") return logout(); page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
+  };
+  await load();
+}
+
 async function renderUsage(page, filter = {}) {
   const filters = `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><button class="secondary" id="usage-apply">${t("usage.applyFilters")}</button></section>`;
   const renderHeader = () => pageHeader("kicker.liveData", "usage.title", "usage.description", true) + filters;
@@ -426,7 +440,7 @@ function renderPage(name) {
   switch (name) {
     case "endpoint": renderEndpoint(page); break;
     case "providers": renderProviders(page); break;
-    case "combo": renderStatusPage(page, "combos", "page.combo"); break;
+    case "combo": renderCombos(page); break;
     case "usage": renderUsage(page); break;
     case "quota": renderQuota(page); break;
     case "logs": renderLogs(page); break;
