@@ -130,6 +130,8 @@ label { color: #cad8eb; font-size: 13px; }
 .form-message { min-height: 20px; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
 .form-message.is-success { color: var(--success); }
 .form-message.is-error { color: var(--danger); }
+.mitm-restart-warning { color: var(--warning); display: inline-flex; align-items: center; gap: 6px; }
+.mitm-restart-warning > .icon { width: 14px; height: 14px; flex: 0 0 auto; }
 .form-error { color: var(--danger); margin-top: 12px; }
 .settings-grid label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 8px; }
 .table-wrap { width: 100%; overflow: auto; border: 1px solid var(--line); border-radius: 13px; background: #172439; box-shadow: 0 14px 32px #050c191c; }

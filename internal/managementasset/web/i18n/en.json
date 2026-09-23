@@ -550,6 +550,7 @@
   "tools.lastObserved": "Last IDE model received",
   "tools.directUpstream": "Direct upstream",
   "tools.saveMappings": "Save mappings",
+  "tools.restartToApply": "Restart {name} to apply the model changes.",
   "tools.resetMappings": "Reset",
   "tools.confirmResetMappings": "Reset this IDE's configuration? Its mappings and custom model names will be cleared, and the default model list will be restored.",
   "tools.resettingMappings": "Resetting IDE configuration…",

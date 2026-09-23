@@ -235,6 +235,10 @@
         const input = button.closest("[data-mitm-row]")?.querySelector("[data-mitm-map]");
         if (input) { input.value = ""; input.focus(); }
       };
+      const showRestartNotice = result => {
+        result.innerHTML = `${icon("warning")}<span>${escapeHTML(t("tools.restartToApply").replace("{name}", selected.label))}</span>`;
+        result.className = "form-message mitm-restart-warning";
+      };
       page.querySelector("#add-mitm-source")?.addEventListener("click", () => {
         const field = page.querySelector("#new-mitm-source"); const source = field.value.trim();
         if (!source || /[\r\n\x00]/.test(source)) return;
@@ -250,7 +254,7 @@
       page.querySelector("#save-mitm-mappings")?.addEventListener("click", async event => {
         const button = event.currentTarget; button.disabled = true; const result = page.querySelector("#mapping-message");
         const mappings = Object.fromEntries([...page.querySelectorAll("[data-mitm-map]")].map(input => [input.dataset.mitmMap, input.value.trim()]));
-        try { await api("/mitm/mappings", {method: "PUT", body: JSON.stringify({tool: selected.id, mappings})}); result.textContent = t("tools.mappingsSaved"); result.className = "form-message ok"; flashAction(button, t("tools.mappingsSaved")); }
+        try { await api("/mitm/mappings", {method: "PUT", body: JSON.stringify({tool: selected.id, mappings})}); showRestartNotice(result); flashAction(button, t("tools.mappingsSaved")); }
         catch (error) { if (error.message === "invalid_key") return logout(); result.textContent = t("tools.mappingSaveFailed"); result.className = "form-message failed"; }
         finally { button.disabled = false; }
       });
@@ -261,6 +265,8 @@
         try {
           await api("/mitm/mappings", {method: "PUT", body: JSON.stringify({tool: selected.id, mappings: {}})});
           await renderMITM(page, selected.id);
+          const resetMessage = page.querySelector("#mapping-message");
+          if (resetMessage) showRestartNotice(resetMessage);
         } catch (error) {
           if (error.message === "invalid_key") return logout();
           result.textContent = t("tools.mappingResetFailed"); result.className = "form-message failed";

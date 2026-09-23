@@ -550,6 +550,7 @@
   "tools.lastObserved": "Model IDE vừa nhận",
   "tools.directUpstream": "Gửi thẳng upstream",
   "tools.saveMappings": "Lưu ánh xạ",
+  "tools.restartToApply": "Khởi động lại {name} để áp dụng thay đổi model.",
   "tools.resetMappings": "Đặt lại",
   "tools.confirmResetMappings": "Đặt lại cấu hình cho IDE này? Các ánh xạ và tên model tự thêm sẽ bị xóa; danh sách model mặc định sẽ được khôi phục.",
   "tools.resettingMappings": "Đang đặt lại cấu hình IDE…",
