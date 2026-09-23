@@ -2,7 +2,7 @@
 
 Mục tiêu: người dùng nhận ra tác vụ qua icon và nhãn, đọc trạng thái tài khoản ngay trên thẻ, và thấy phản hồi rõ sau mỗi thao tác. Giao diện giữ sự gọn gàng của một bảng điều khiển vận hành; hiệu ứng chỉ xuất hiện khi người dùng tương tác hoặc dữ liệu thay đổi.
 
-Đã làm trong đợt này: icon cho các nút chính, hiệu ứng hover/nhấn/focus có hỗ trợ giảm chuyển động, tự nhận callback OAuth cho giao diện WebUI, ô dán URL callback Codex khi cần, và trạng thái lỗi/đăng nhập lại trên thẻ quota GPT. Phần còn lại triển khai theo thứ tự bên dưới.
+Trạng thái 23/09/2026: các mục giao diện 1–3 đã triển khai. Nút và trạng thái dùng cùng một hệ màu/icon; quota tự tải, gộp theo nhóm với danh sách model có thể mở rộng, và chỉ báo rõ khi Codex cần đăng nhập lại. Tổng quan, sử dụng, endpoint, nhà cung cấp, file xác thực, combo, log, cài đặt, plugin và công cụ CLI đã có bộ lọc hoặc phản hồi tác vụ phù hợp. Tiết kiệm token nêu rõ giới hạn backend hiện tại. Kiểm tra mã nguồn, bản build và dữ liệu trực tiếp trên màn hình rộng đã hoàn tất; kiểm tra trực quan trên thiết bị di động thật vẫn cần thực hiện.
 
 ## 1. Nền tảng chung
 

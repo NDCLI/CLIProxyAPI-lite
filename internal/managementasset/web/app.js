@@ -1,5 +1,5 @@
 const state = {
-  locale: localStorage.getItem("cliproxy-next-locale") === "vi" ? "vi" : "en",
+  locale: localStorage.getItem("cliproxy-next-locale") === "en" ? "en" : "vi",
   messages: {},
   key: sessionStorage.getItem("cliproxy-next-management-key") || "",
   capabilities: new Map(),
@@ -179,7 +179,9 @@ function renderShell() {
     localStorage.setItem("cliproxy-next-sidebar", state.collapsed ? "collapsed" : "expanded");
     renderShell();
   });
+  if (matchMedia("(max-width: 680px)").matches) app.querySelector(".nav-link.active")?.scrollIntoView({block: "nearest", inline: "center", behavior: "auto"});
   renderPage(active);
+  window.scrollTo(0, 0);
 }
 
 async function changeLocale() {
@@ -208,40 +210,55 @@ function capabilityCard(item) {
 }
 
 async function renderOverview(page) {
-  page.innerHTML = pageHeader("kicker.migration", "dashboard.title", "dashboard.description", true) + `<div id="overview-metrics" class="loading">${t("common.loading")}</div><div class="section-head"><h2>${t("dashboard.workspace")}</h2><a class="text-link" href="#/quick-start">${t("nav.quickStart")}${icon("arrow")}</a></div><section class="grid">${[...state.capabilities.values()].filter(item => routes.some(route => route[3] === item.id)).map(capabilityCard).join("")}</section>`;
+  page.innerHTML = pageHeader("kicker.migration", "dashboard.title", "dashboard.description", true) + `<div id="overview-metrics" class="loading">${t("common.loading")}</div><div id="overview-recent"></div><div class="section-head"><h2>${t("dashboard.workspace")}</h2><a class="text-link" href="#/quick-start">${t("nav.quickStart")}${icon("arrow")}</a></div><section class="grid">${["endpoint_keys", "providers", "usage", "quota"].map(id => capabilityCard(capability(id))).join("")}</section>`;
   document.getElementById("refresh").addEventListener("click", () => renderOverview(page));
   const container = page.querySelector("#overview-metrics");
   try {
-    const [providers, usage] = await Promise.all([api("/providers"), api("/usage/summary")]);
+    const [providers, usage, recent] = await Promise.all([api("/providers"), api("/usage/summary"), api("/usage/records?limit=5")]);
+    if (!container.isConnected) return;
+    const active = (providers.items || []).filter(item => item.enabled && item.status === "active").length;
+    const total = (providers.items || []).length;
     container.className = "metrics-grid";
-    container.innerHTML = metricCard("providers.accounts", (providers.items || []).length, "user") + metricCard("providers.active", (providers.items || []).filter(item => item.enabled && item.status === "active").length, "shield") + metricCard("common.requests", usage.item?.requests, "chart") + metricCard("common.tokens", usage.item?.total_tokens, "zap");
+    container.innerHTML = metricCard("providers.active", active, "shield") + metricCard("providers.accounts", total, "user") + metricCard("common.requests", usage.item?.requests, "chart") + metricCard("usage.failed", usage.item?.failed, "terminal");
+    page.querySelector("#overview-recent").innerHTML = `<div class="section-head"><h2>${t("dashboard.recent")}</h2><a class="text-link" href="#/usage">${t("dashboard.viewUsage")}${icon("arrow")}</a></div>${usageTable(recent.items || [])}<p class="hint">${t("dashboard.recentLimit")}</p>`;
   } catch (error) {
     if (error.message === "invalid_key") return logout();
+    if (!container.isConnected) return;
     container.className = "error";
     container.textContent = t("common.error");
   }
 }
 
 async function renderQuickStart(page) {
-  page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<div class="loading">${t("common.loading")}</div>`;
-  try {
-    const [keys, authFiles] = await Promise.all([api("/endpoint-keys"), api("/auth-files")]);
-    const activeKeys = (keys.items || []).length;
-    const credentials = (authFiles.files || []).filter(file => !file.disabled).length;
-    page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><h2>${t("quickStart.stepOne")}</h2><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${icon("copy")}${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${icon("key")}${t("quickStart.manageKeys")}</button></div></section><section class="grid"><article class="card"><span class="feature-icon">${icon("key")}</span><h3>${t("quickStart.stepTwo")}</h3><p>${t("quickStart.keys")}</p><div class="metric">${activeKeys}</div></article><article class="card"><span class="feature-icon">${icon("shield")}</span><h3>${t("quickStart.credentials")}</h3><div class="metric">${credentials}</div></article><article class="card"><span class="feature-icon">${icon("terminal")}</span><h3>${t("quickStart.stepThree")}</h3><p>${t("cli.description")}</p><a class="text-link" href="#/cli-tools">${t("quickStart.connectTools")}${icon("arrow")}</a></article></section>`;
-    document.getElementById("quick-start-copy").addEventListener("click", () => copyText(document.getElementById("quick-start-url").value));
-    document.getElementById("quick-start-keys").addEventListener("click", () => { location.hash = "#/endpoint"; });
-    document.getElementById("refresh").addEventListener("click", () => renderQuickStart(page));
-  } catch (error) {
-    if (error.message === "invalid_key") return logout();
-    page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<div class="error">${t("common.error")}</div>`;
-    document.getElementById("refresh").addEventListener("click", () => renderQuickStart(page));
-  }
+  page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><h2>${t("quickStart.stepOne")}</h2><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${icon("copy")}${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${icon("key")}${t("quickStart.manageKeys")}</button><span class="form-message" id="quick-start-copy-status" role="status" aria-live="polite"></span></div></section><section class="grid"><article class="card"><span class="feature-icon">${icon("key")}</span><h3>${t("quickStart.stepTwo")}</h3><p>${t("quickStart.keys")}</p><div class="metric" id="quick-start-key-count" aria-live="polite">–</div></article><article class="card"><span class="feature-icon">${icon("shield")}</span><h3>${t("quickStart.credentials")}</h3><div class="metric" id="quick-start-credential-count" aria-live="polite">–</div><a class="text-link" href="#/auth-files">${t("quickStart.manageAccounts")}${icon("arrow")}</a></article><article class="card"><span class="feature-icon">${icon("terminal")}</span><h3>${t("quickStart.stepThree")}</h3><p>${t("cli.description")}</p><a class="text-link" href="#/cli-tools">${t("quickStart.connectTools")}${icon("arrow")}</a></article></section>`;
+  document.getElementById("quick-start-copy").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await copyText(document.getElementById("quick-start-url").value);
+      document.getElementById("quick-start-copy-status").textContent = t("quickStart.copied");
+    } catch {
+      document.getElementById("quick-start-copy-status").textContent = t("common.copyFailed");
+    } finally { button.disabled = false; }
+  });
+  document.getElementById("quick-start-keys").addEventListener("click", () => { location.hash = "#/endpoint"; });
+  document.getElementById("refresh").addEventListener("click", () => renderQuickStart(page));
+  const [keys, authFiles] = await Promise.allSettled([api("/endpoint-keys"), api("/auth-files")]);
+  if ([keys, authFiles].some(result => result.status === "rejected" && result.reason?.message === "invalid_key")) return logout();
+  if (!page.isConnected || page.dataset.page !== "quick-start") return;
+  const updateCount = (id, result, count) => {
+    const element = page.querySelector(id);
+    element.className = result.status === "fulfilled" ? "metric" : "form-message";
+    element.textContent = result.status === "fulfilled" ? Number(count(result.value)).toLocaleString(state.locale) : t("common.error");
+  };
+  updateCount("#quick-start-key-count", keys, value => (value.items || []).length);
+  updateCount("#quick-start-credential-count", authFiles, value => (value.files || []).filter(file => !file.disabled).length);
 }
 
 function renderStatusPage(page, capabilityID, titleKey) {
   const item = capability(capabilityID);
-  page.innerHTML = pageHeader("kicker.management", titleKey, "partial.description") + `<section class="status-panel unavailable-panel"><span class="unavailable-icon">${icon("zap")}</span><div class="card-title"><h2>${t(titleKey)}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><p>${escapeHTML(reasonLabel(item.reason_code) || t("partial.description"))}</p></section>`;
+  const nextSteps = capabilityID === "token_saver" ? `<div class="section-head"><h2>${t("tokenSaver.availableNow")}</h2></div><section class="grid"><a class="card capability-card" href="#/usage"><span class="feature-icon">${icon("chart")}</span><h2>${t("nav.usage")}</h2><p>${t("tokenSaver.stepUsage")}</p><span class="card-arrow">${icon("arrow")}</span></a><a class="card capability-card" href="#/combo"><span class="feature-icon">${icon("route")}</span><h2>${t("nav.combo")}</h2><p>${t("tokenSaver.stepCombo")}</p><span class="card-arrow">${icon("arrow")}</span></a></section>` : "";
+  page.innerHTML = pageHeader("kicker.management", titleKey, "partial.description") + `<section class="status-panel unavailable-panel"><span class="unavailable-icon">${icon("zap")}</span><div class="card-title"><h2>${t(titleKey)}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><p>${escapeHTML(reasonLabel(item.reason_code) || t("partial.description"))}</p></section>${nextSteps}`;
 }
 
 async function copyText(value) {
@@ -250,8 +267,10 @@ async function copyText(value) {
   input.value = value;
   document.body.appendChild(input);
   input.select();
-  document.execCommand("copy");
-  input.remove();
+  let copied;
+  try { copied = document.execCommand("copy"); }
+  finally { input.remove(); }
+  if (!copied) throw new Error(t("common.copyFailed"));
 }
 
 function endpointKeyTable(items) {
@@ -259,46 +278,61 @@ function endpointKeyTable(items) {
   return `<div class="table-wrap"><table><thead><tr><th>${t("endpoint.key")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${items.map(item => `<tr><td><strong>${escapeHTML(item.label)}</strong><br><code>${escapeHTML(item.mask)}</code></td><td>${Number(item.success || 0).toLocaleString()}</td><td>${Number(item.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-rotate-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("refresh")}${t("endpoint.rotate")}</button><button class="danger-button" data-delete-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("trash")}${t("endpoint.delete")}</button></div></td></tr>`).join("")}</tbody></table></div>`;
 }
 
-async function renderEndpoint(page, secret = "") {
+async function renderEndpoint(page, secret = "", feedback = "") {
   const item = capability("endpoint_keys");
-  page.innerHTML = pageHeader("kicker.openai", "endpoint.title", "endpoint.description", true) + `<section class="status-panel"><div class="card-title"><h2>${t("endpoint.baseUrl")}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><div class="endpoint-value">${escapeHTML(`${location.origin}/v1`)}</div></section>${secret ? `<section class="secret-notice"><strong>${t("endpoint.secretOnce")}</strong><div class="secret-row"><input class="text-input" id="created-secret" readonly value="${escapeHTML(secret)}"><button class="secondary" id="copy-secret">${icon("copy")}${t("endpoint.copy")}</button></div></section>` : ""}<div class="section-head"><h2>${t("endpoint.keys")}</h2><button class="primary compact" id="create-key">${icon("plus")}${t("endpoint.create")}</button></div><div id="endpoint-keys"><div class="loading">${t("common.loading")}</div></div>`;
-  document.getElementById("refresh").addEventListener("click", () => renderEndpoint(page));
+  page.innerHTML = pageHeader("kicker.openai", "endpoint.title", "endpoint.description", true) + `<section class="status-panel"><div class="card-title"><h2>${t("endpoint.baseUrl")}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><div class="endpoint-value">${escapeHTML(`${location.origin}/v1`)}</div></section>${secret ? `<section class="secret-notice"><strong>${t("endpoint.secretOnce")}</strong><div class="secret-row"><input class="text-input" id="created-secret" readonly value="${escapeHTML(secret)}"><button class="secondary" id="copy-secret">${icon("copy")}${t("endpoint.copy")}</button></div></section>` : ""}<div class="section-head"><h2>${t("endpoint.keys")}</h2><button class="primary compact" id="create-key">${icon("plus")}${t("endpoint.create")}</button></div><div class="form-message" id="endpoint-feedback" role="status" aria-live="polite">${escapeHTML(feedback)}</div><div id="endpoint-keys"><div class="loading">${t("common.loading")}</div></div>`;
+  const showFeedback = message => { document.getElementById("endpoint-feedback").textContent = message; };
+  const actionError = error => showFeedback(t(error.code === "stale_revision" ? "endpoint.stale" : "endpoint.actionFailed"));
+  document.getElementById("refresh").addEventListener("click", () => renderEndpoint(page, secret));
   document.getElementById("create-key").addEventListener("click", async event => {
+    if (secret && !confirm(t("endpoint.confirmReplaceSecret"))) return;
     event.currentTarget.disabled = true;
+    showFeedback(t("endpoint.creating"));
     try {
       const response = await api("/endpoint-keys", {method: "POST", body: "{}"});
-      await renderEndpoint(page, response.secret || "");
+      await renderEndpoint(page, response.secret || "", t("endpoint.created"));
     } catch (error) {
       if (error.message === "invalid_key") return logout();
       event.currentTarget.disabled = false;
-      document.getElementById("endpoint-keys").innerHTML = `<div class="error">${t("common.error")}</div>`;
+      actionError(error);
     }
   });
-  if (secret) document.getElementById("copy-secret").addEventListener("click", () => copyText(secret));
+  if (secret) document.getElementById("copy-secret").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try { await copyText(secret); showFeedback(t("endpoint.copied")); }
+    catch { showFeedback(t("common.copyFailed")); }
+    finally { button.disabled = false; }
+  });
   try {
     const response = await api("/endpoint-keys");
+    if (!page.isConnected || page.dataset.page !== "endpoint") return;
     const container = document.getElementById("endpoint-keys");
     container.innerHTML = endpointKeyTable(response.items || []);
     container.querySelectorAll("[data-rotate-key]").forEach(button => button.addEventListener("click", async () => {
-      if (!confirm(t("endpoint.confirmRotate"))) return;
+      if (!confirm(t(secret ? "endpoint.confirmRotateWithSecret" : "endpoint.confirmRotate"))) return;
       button.disabled = true;
+      showFeedback(t("endpoint.rotating"));
       try {
         const result = await api(`/endpoint-keys/${encodeURIComponent(button.dataset.rotateKey)}`, {method: "PATCH", body: JSON.stringify({revision: button.dataset.revision})});
-        await renderEndpoint(page, result.secret || "");
+        await renderEndpoint(page, result.secret || "", t("endpoint.rotated"));
       } catch (error) {
         if (error.message === "invalid_key") return logout();
         button.disabled = false;
+        actionError(error);
       }
     }));
     container.querySelectorAll("[data-delete-key]").forEach(button => button.addEventListener("click", async () => {
       if (!confirm(t("endpoint.confirmDelete"))) return;
       button.disabled = true;
+      showFeedback(t("endpoint.deleting"));
       try {
         await api(`/endpoint-keys/${encodeURIComponent(button.dataset.deleteKey)}?revision=${encodeURIComponent(button.dataset.revision)}`, {method: "DELETE"});
-        await renderEndpoint(page);
+        await renderEndpoint(page, secret, t("endpoint.deleted"));
       } catch (error) {
         if (error.message === "invalid_key") return logout();
         button.disabled = false;
+        actionError(error);
       }
     }));
   } catch (error) {
@@ -312,6 +346,7 @@ async function renderProviders(page) {
   document.getElementById("refresh").addEventListener("click", () => renderProviders(page));
   try {
     const response = await api("/providers");
+    if (!page.isConnected || page.dataset.page !== "providers") return;
     const providers = response.items || [];
     const container = document.getElementById("providers");
     const groups = new Map();
@@ -320,28 +355,35 @@ async function renderProviders(page) {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(provider);
     }
-    container.innerHTML = `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="provider-search" type="search" placeholder="${t("providers.search")}" aria-label="${t("providers.search")}"></label><a class="primary compact" href="#/auth-files">${icon("user")}${t("providers.manageAccounts")}</a></div><div class="provider-summary"><span><strong>${groups.size}</strong> ${t("providers.type")}</span><span><strong>${providers.length}</strong> ${t("providers.accounts")}</span><span class="ok"><strong>${providers.filter(item => item.enabled && item.status === "active").length}</strong> ${t("providers.active")}</span></div><div class="provider-groups">${[...groups].map(([name, accounts]) => `<section class="provider-group"><header class="provider-group-head">${providerIdentity(name)}<span class="badge">${accounts.length} ${t("providers.accounts")}</span></header><div class="account-list">${accounts.map(provider => `<article class="account-row" data-account><div class="account-main"><span class="account-avatar">${icon("user")}</span><div><strong class="account-name">${escapeHTML(provider.label || provider.id || "-")}</strong><div class="account-meta"><span class="badge ${provider.enabled && provider.status === "active" ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.enabled ? provider.status : "disabled"))}</span><span>${Number(provider.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(provider.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></div></div><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${icon("grid")}${t("providers.models")}</button><button class="secondary" data-provider-quota="${escapeHTML(provider.auth_index)}" data-provider-name="${escapeHTML(provider.provider)}">${icon("gauge")}${t("quota.refresh")}</button><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${icon(provider.enabled ? "zap" : "shield")}${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></article>`).join("")}</div></section>`).join("")}</div><div id="provider-empty" class="empty" ${providers.length ? "hidden" : ""}>${t("providers.empty")}</div><div id="provider-models" class="provider-models" aria-live="polite"></div>`;
-    document.getElementById("provider-search").addEventListener("input", event => {
-      const query = event.target.value.trim().toLocaleLowerCase();
+    const providerState = provider => !provider.enabled ? "disabled" : provider.status === "active" ? "active" : "attention";
+    container.innerHTML = `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="provider-search" type="search" placeholder="${t("providers.search")}" aria-label="${t("providers.search")}"></label><select class="text-input provider-filter" id="provider-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select><a class="primary compact" href="#/auth-files">${icon("user")}${t("providers.manageAccounts")}</a></div><div class="provider-summary"><span><strong>${groups.size}</strong> ${t("providers.type")}</span><span><strong>${providers.length}</strong> ${t("providers.accounts")}</span><span class="ok"><strong>${providers.filter(item => providerState(item) === "active").length}</strong> ${t("providers.active")}</span></div><div class="provider-groups">${[...groups].map(([name, accounts]) => `<section class="provider-group"><header class="provider-group-head">${providerIdentity(name)}<span class="badge">${accounts.length} ${t("providers.accounts")}</span></header><div class="account-list">${accounts.map(provider => `<article class="account-row" data-account data-provider-state="${providerState(provider)}"><div class="account-main"><span class="account-avatar">${icon("user")}</span><div><strong class="account-name" title="${escapeHTML(provider.label || provider.id || "-")}">${escapeHTML(provider.label || provider.id || "-")}</strong><div class="account-meta"><span class="badge ${providerState(provider) === "active" ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.enabled ? provider.status : "disabled"))}</span><span>${Number(provider.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(provider.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></div></div><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${icon("grid")}${t("providers.models")}</button><a class="secondary" href="#/quota">${icon("gauge")}${t("quota.title")}</a><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${icon(provider.enabled ? "zap" : "shield")}${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></article>`).join("")}</div></section>`).join("")}</div><div id="provider-empty" class="empty" ${providers.length ? "hidden" : ""}>${providers.length ? t("providers.noMatches") : t("providers.empty")}</div><div id="provider-models" class="provider-models" aria-live="polite"></div>`;
+    const applyFilter = () => {
+      const query = container.querySelector("#provider-search").value.trim().toLocaleLowerCase();
+      const status = container.querySelector("#provider-status").value;
       let visible = 0;
       container.querySelectorAll(".provider-group").forEach(group => {
         let matches = 0;
         group.querySelectorAll("[data-account]").forEach(row => {
-          row.hidden = !(group.querySelector(".provider-identity").textContent + " " + row.querySelector(".account-name").textContent).toLocaleLowerCase().includes(query);
+          const text = `${group.querySelector(".provider-identity").textContent} ${row.querySelector(".account-name").textContent}`.toLocaleLowerCase();
+          row.hidden = (status !== "all" && row.dataset.providerState !== status) || !text.includes(query);
           if (!row.hidden) matches++;
         });
         group.hidden = !matches;
         visible += matches;
       });
-      document.getElementById("provider-empty").hidden = visible > 0;
-    });
+      container.querySelector("#provider-empty").hidden = visible > 0;
+    };
+    container.querySelector("#provider-search").addEventListener("input", applyFilter);
+    container.querySelector("#provider-status").addEventListener("change", applyFilter);
     container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
       button.disabled = true;
       const modelsPanel = document.getElementById("provider-models");
       modelsPanel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
       try {
         const models = (await api(`/providers/${encodeURIComponent(button.dataset.providerModels)}/models`)).items || [];
-        modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("providers.availableModels")}</h2></div>${models.length ? `<div class="model-list">${models.map(model => `<code>${escapeHTML(model.display_name || model.id)}</code>`).join("")}</div>` : `<div class="empty">${t("providers.modelsEmpty")}</div>`}</section>`;
+        const account = button.closest(".account-row").querySelector(".account-name").textContent;
+        modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("providers.availableModels")}: ${escapeHTML(account)}</h2><span class="badge">${models.length}</span></div>${models.length ? `<div class="model-list">${models.map(model => `<code title="${escapeHTML(model.id)}">${escapeHTML(model.display_name || model.id)}</code>`).join("")}</div>` : `<div class="empty">${t("providers.modelsEmpty")}</div>`}</section>`;
+        modelsPanel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
       } catch (error) {
         if (error.message === "invalid_key") return logout();
         modelsPanel.innerHTML = `<div class="error">${t("common.error")}</div>`;
@@ -361,18 +403,6 @@ async function renderProviders(page) {
         button.disabled = false;
       }
     }));
-    container.querySelectorAll("[data-provider-quota]").forEach(button => button.addEventListener("click", async () => {
-      button.disabled = true;
-      const modelsPanel = document.getElementById("provider-models");
-      modelsPanel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
-      try {
-        const quota = await api("/quota/fetch", {method: "POST", body: JSON.stringify({auth_index: button.dataset.providerQuota, provider: button.dataset.providerName})});
-        modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("quota.result")}</h2></div><pre class="quota-output">${escapeHTML(JSON.stringify(quota, null, 2))}</pre></section>`;
-      } catch (error) {
-        if (error.message === "invalid_key") return logout();
-        modelsPanel.innerHTML = `<div class="error">${t("quota.unavailable")}</div>`;
-      } finally { button.disabled = false; }
-    }));
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     document.getElementById("providers").innerHTML = `<div class="error">${t("common.error")}</div>`;
@@ -391,7 +421,17 @@ const cliTools = [
 ];
 
 async function renderCLITools(page) {
-  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2 class="tool-title">${providerIdentity(({"claude-code":"claude", "codex-cli":"codex", "env-openai":"openai", "env-anthropic":"anthropic"})[id] || id, true)}<span>${escapeHTML(label)}</span></h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t("cli.model")}<input class="text-input" name="model" autocomplete="off"></label><div class="actions"><button class="primary compact" type="submit">${icon("check")}${t("cli.apply")}</button><button class="secondary" type="button" data-copy-config>${icon("copy")}${t("cli.copyConfig")}</button>${reset ? `<button class="secondary" type="button" data-reset>${icon("refresh")}${t("cli.reset")}</button>` : ""}</div><div class="form-message" aria-live="polite"></div></form>`).join("")}</div>`;
+  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2 class="tool-title">${providerIdentity(({"claude-code":"claude", "codex-cli":"codex", "env-openai":"openai", "env-anthropic":"anthropic"})[id] || id, true)}<span>${escapeHTML(label)}</span></h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t(id === "codex-cli" ? "cli.modelRequired" : "cli.model")}<input class="text-input" name="model" autocomplete="off" ${id === "codex-cli" ? "required" : ""}></label><div class="actions"><button class="primary compact" type="submit">${icon("check")}${t("cli.apply")}</button><button class="secondary" type="button" data-copy-config>${icon("copy")}${t("cli.copyConfig")}</button>${reset ? `<button class="secondary" type="button" data-reset>${icon("refresh")}${t("cli.reset")}</button>` : ""}</div><div class="form-message" role="status" aria-live="polite"></div></form>`).join("")}</div>`;
+  const setStatus = (form, item) => {
+    const badge = form.querySelector("[data-tool-status]");
+    const unknown = form.dataset.tool.startsWith("env-");
+    badge.className = `badge ${item?.configured && !unknown ? "ready" : "partial"}`;
+    badge.textContent = t(unknown ? "cli.statusUnknown" : item ? item.configured ? "cli.configured" : "cli.notConfigured" : "cli.statusUnavailable");
+  };
+  const refreshStatus = async form => {
+    try { setStatus(form, (await api(`/cli-tools/${encodeURIComponent(form.dataset.tool)}`)).item); }
+    catch (error) { if (error.message === "invalid_key") return logout(); setStatus(form, null); }
+  };
   page.querySelectorAll("[data-tool]").forEach(form => {
     const message = form.querySelector(".form-message");
     form.addEventListener("submit", async event => {
@@ -401,12 +441,15 @@ async function renderCLITools(page) {
       message.textContent = t("common.loading");
       try {
         const body = {tool: form.dataset.tool, api_key: form.elements.api_key.value, model: form.elements.model.value.trim()};
-        const response = await api("/configure-tool", {method: "POST", body: JSON.stringify(body)});
+        await api("/configure-tool", {method: "POST", body: JSON.stringify(body)});
         form.elements.api_key.value = "";
-        message.textContent = response.message || t("cli.saved");
+        message.textContent = t("cli.saved");
+        message.className = "form-message ok";
+        await refreshStatus(form);
       } catch (error) {
         if (error.message === "invalid_key") return logout();
         message.textContent = t("common.error");
+        message.className = "form-message failed";
       } finally {
         submit.disabled = false;
       }
@@ -416,19 +459,22 @@ async function renderCLITools(page) {
       const model = form.elements.model.value.trim() || "MODEL";
       const endpoint = `${location.origin}/v1`;
       const config = `Endpoint: ${endpoint}\nModel: ${model}\nAPI key: \$ENDPOINT_API_KEY`;
-      await copyText(config);
-      message.textContent = t("cli.configCopied");
+      try { await copyText(config); message.textContent = t("cli.configCopied"); message.className = "form-message ok"; }
+      catch (_) { message.textContent = t("common.error"); message.className = "form-message failed"; }
     });
     if (reset) reset.addEventListener("click", async () => {
       if (!confirm(t("cli.confirmReset"))) return;
       reset.disabled = true;
       message.textContent = t("common.loading");
       try {
-        const response = await api("/configure-tool", {method: "POST", body: JSON.stringify({tool: form.dataset.tool, action: "reset"})});
-        message.textContent = response.message || t("cli.resetDone");
+        await api("/configure-tool", {method: "POST", body: JSON.stringify({tool: form.dataset.tool, action: "reset"})});
+        message.textContent = t("cli.resetDone");
+        message.className = "form-message ok";
+        await refreshStatus(form);
       } catch (error) {
         if (error.message === "invalid_key") return logout();
         message.textContent = t("common.error");
+        message.className = "form-message failed";
       } finally {
         reset.disabled = false;
       }
@@ -437,15 +483,11 @@ async function renderCLITools(page) {
   try {
     const statusByID = new Map(((await api("/cli-tools")).items || []).map(item => [item.id, item]));
     page.querySelectorAll("[data-tool]").forEach(form => {
-      const item = statusByID.get(form.dataset.tool);
-      const badge = form.querySelector("[data-tool-status]");
-      if (!badge) return;
-      const configured = Boolean(item?.configured);
-      badge.className = `badge ${configured ? "ready" : "partial"}`;
-      badge.textContent = t(configured ? "cli.configured" : "cli.notConfigured");
+      setStatus(form, statusByID.get(form.dataset.tool));
     });
   } catch (error) {
-    if (error.message === "invalid_key") logout();
+    if (error.message === "invalid_key") return logout();
+    page.querySelectorAll("[data-tool]").forEach(form => setStatus(form, null));
   }
 }
 
@@ -504,7 +546,22 @@ async function startOAuthLogin(provider, message, onSuccess) {
 }
 
 async function renderAuthFiles(page) {
-  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-actions"><button class="secondary" data-oauth="codex">${providerIdentity("codex", true)}${t("authFiles.loginCodex")}</button><button class="secondary" data-oauth="anthropic">${providerIdentity("claude", true)}${t("authFiles.loginClaude")}</button><button class="secondary" data-oauth="antigravity">${providerIdentity("antigravity", true)}${t("authFiles.loginAntigravity")}</button></div><div id="auth-files-content" class="loading">${t("common.loading")}</div>`;
+  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-actions"><button class="secondary" data-oauth="codex">${providerIdentity("codex", true)}${t("authFiles.loginCodex")}</button><button class="secondary" data-oauth="anthropic">${providerIdentity("claude", true)}${t("authFiles.loginClaude")}</button><button class="secondary" data-oauth="antigravity">${providerIdentity("antigravity", true)}${t("authFiles.loginAntigravity")}</button></div><div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="auth-search" type="search" placeholder="${t("authFiles.search")}" aria-label="${t("authFiles.search")}"></label><select class="text-input provider-filter" id="auth-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select></div><div id="auth-files-content" class="loading">${t("common.loading")}</div><div id="auth-models" class="provider-models" aria-live="polite"></div>`;
+  const content = page.querySelector("#auth-files-content");
+  const fileState = file => file.disabled ? "disabled" : file.unavailable || file.status !== "active" ? "attention" : "active";
+  const applyFilter = () => {
+    const query = page.querySelector("#auth-search").value.trim().toLocaleLowerCase();
+    const status = page.querySelector("#auth-status").value;
+    let visible = 0;
+    content.querySelectorAll("[data-auth-row]").forEach(row => {
+      row.hidden = (status !== "all" && row.dataset.authState !== status) || !row.textContent.toLocaleLowerCase().includes(query);
+      if (!row.hidden) visible++;
+    });
+    const empty = content.querySelector(".auth-filter-empty");
+    if (empty) empty.hidden = visible > 0;
+  };
+  page.querySelector("#auth-search").addEventListener("input", applyFilter);
+  page.querySelector("#auth-status").addEventListener("change", applyFilter);
   page.querySelectorAll("[data-oauth]").forEach(button => button.addEventListener("click", async () => {
     button.disabled = true;
     try {
@@ -517,60 +574,174 @@ async function renderAuthFiles(page) {
   const load = async () => {
     try {
       const response = await api("/auth-files");
+      if (!page.isConnected || page.dataset.page !== "auth-files") return;
       const files = response.files || [];
-      const content = document.getElementById("auth-files-content");
       content.className = "";
-      content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => `<tr><td>${escapeHTML(file.name || file.id || "-")}</td><td>${providerIdentity(file.provider || file.type, true)}</td><td><span class="badge ${file.disabled ? "partial" : "ready"}">${escapeHTML(file.disabled ? t("providers.disabled") : t("providers.active"))}</span></td><td><button class="secondary" data-auth-toggle="${escapeHTML(file.name || file.id)}" data-disabled="${Boolean(file.disabled)}">${icon(file.disabled ? "check" : "pause")}${file.disabled ? t("providers.enable") : t("providers.disable")}</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("authFiles.empty")}</div>`;
-      document.getElementById("refresh").addEventListener("click", load);
-      page.querySelectorAll("[data-auth-toggle]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api("/auth-files/status", {method: "PATCH", body: JSON.stringify({name: button.dataset.authToggle, disabled: button.dataset.disabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
-    } catch (error) { if (error.message === "invalid_key") return logout(); document.getElementById("auth-files-content").innerHTML = `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
+      page.querySelector("#auth-models").innerHTML = "";
+      content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => { const name = file.label || file.email || file.name || file.id || "-"; const filename = file.name || file.id || "-"; const status = file.disabled ? t("providers.disabled") : file.unavailable ? t("providers.unavailable") : providerStatusLabel(file.status); return `<tr data-auth-row data-auth-state="${fileState(file)}"><td><div class="auth-credential"><strong title="${escapeHTML(name)}">${escapeHTML(name)}</strong>${filename !== name ? `<small title="${escapeHTML(filename)}">${escapeHTML(filename)}</small>` : ""}</div></td><td>${providerIdentity(file.provider || file.type, true)}</td><td><span class="badge ${fileState(file) === "active" ? "ready" : "partial"}">${escapeHTML(status)}</span><div class="account-meta"><span>${Number(file.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(file.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></td><td><div class="actions"><button class="secondary" data-auth-models="${escapeHTML(file.id || "")}" data-auth-name="${escapeHTML(filename)}">${icon("grid")}${t("providers.models")}</button>${file.supports_quota ? `<a class="secondary" href="#/quota">${icon("gauge")}${t("quota.title")}</a>` : ""}<button class="secondary" data-auth-toggle="${escapeHTML(filename)}" data-auth-index="${escapeHTML(file.auth_index || "")}" data-disabled="${Boolean(file.disabled)}">${icon(file.disabled ? "check" : "pause")}${file.disabled ? t("providers.enable") : t("providers.disable")}</button></div></td></tr>`; }).join("")}</tbody></table></div><div class="empty auth-filter-empty" hidden>${t("authFiles.noMatches")}</div>` : `<div class="empty">${t("authFiles.empty")}</div>`;
+      applyFilter();
+      content.querySelectorAll("[data-auth-models]").forEach(button => button.addEventListener("click", async () => {
+        button.disabled = true;
+        const modelsPanel = page.querySelector("#auth-models");
+        modelsPanel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
+        try {
+          const endpoint = button.dataset.authModels ? `/providers/${encodeURIComponent(button.dataset.authModels)}/models` : `/auth-files/models?name=${encodeURIComponent(button.dataset.authName)}`;
+          const result = await api(endpoint);
+          const models = result.items || result.models || [];
+          const account = button.closest("tr").querySelector(".auth-credential strong").textContent;
+          modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("providers.availableModels")}: ${escapeHTML(account)}</h2><span class="badge">${models.length}</span></div>${models.length ? `<div class="model-list">${models.map(model => `<code title="${escapeHTML(model.id)}">${escapeHTML(model.display_name || model.id)}</code>`).join("")}</div>` : `<div class="empty">${t("providers.modelsEmpty")}</div>`}</section>`;
+          modelsPanel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
+        } catch (error) {
+          if (error.message === "invalid_key") return logout();
+          modelsPanel.innerHTML = `<div class="error">${t("common.error")}</div>`;
+        } finally { button.disabled = false; }
+      }));
+      content.querySelectorAll("[data-auth-toggle]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api("/auth-files/status", {method: "PATCH", body: JSON.stringify({name: button.dataset.authToggle, auth_index: button.dataset.authIndex, disabled: button.dataset.disabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
+    } catch (error) { if (error.message === "invalid_key") return logout(); content.innerHTML = `<div class="error">${t("common.error")}</div>`; }
   };
+  document.getElementById("refresh").onclick = load;
   await load();
 }
 
-async function renderCombos(page) {
+async function renderCombos(page, feedback = "") {
   const formHTML = item => `<form id="combo-form" class="status-panel combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><div class="card-title"><h2>${t(item?.id ? "combo.edit" : "combo.create")}</h2></div><div class="settings-grid"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" required></label><label>${t("combo.model")}<input class="text-input" name="model" value="${escapeHTML(item?.model || "")}" required></label></div><label>${t("combo.targets")}<textarea class="text-input" name="targets" rows="4" required placeholder="codex:gpt-5&#10;claude:sonnet">${escapeHTML((item?.targets || []).map(target => `${target.provider}:${target.model}`).join("\n"))}</textarea><span class="hint">${t("combo.targetsHint")}</span></label><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("combo.save")}</button><button class="secondary" id="validate-combo" type="button">${icon("check")}${t("combo.validate")}</button>${item?.id ? `<button class="secondary" id="cancel-combo" type="button">${icon("close")}${t("action.cancel")}</button>` : ""}<span class="form-message" id="combo-message" aria-live="polite"></span></div></form>`;
-  const targetList = targets => targets.map(target => `${target.provider}/${target.model}`).join(" → ");
   const scrollToForm = () => document.getElementById("combo-form").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
-  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="combo-layout">${formHTML()}<section class="combo-collection"><div class="section-head"><h2>${t("combo.saved")}</h2></div><div id="combos-list" class="loading">${t("common.loading")}</div></section></div>`;
-  const values = form => ({id: form.elements.id.value.trim(), name: form.elements.name.value.trim(), model: form.elements.model.value.trim(), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: form.elements.targets.value.split("\n").filter(Boolean).map((line, index) => { const separator = line.indexOf(":"); return separator < 1 ? {provider: "", model: ""} : {provider: line.slice(0, separator).trim(), model: line.slice(separator + 1).trim()}; })});
+  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="combo-layout">${formHTML()}<section class="combo-collection"><div class="section-head"><h2>${t("combo.saved")}</h2><span class="form-message" id="combo-list-message" role="status" aria-live="polite">${escapeHTML(feedback)}</span></div><div id="combos-list" class="loading">${t("common.loading")}</div></section></div>`;
+  let items = [];
+  const values = (form, message) => {
+    const value = {id: form.elements.id.value.trim(), name: form.elements.name.value.trim(), model: form.elements.model.value.trim(), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: []};
+    if (!value.name || !value.model) {
+      message.textContent = t("combo.required");
+      form.elements[!value.name ? "name" : "model"].focus();
+      return null;
+    }
+    const lines = form.elements.targets.value.split(/\r?\n/).map((text, index) => ({text: text.trim(), number: index + 1})).filter(line => line.text);
+    if (!lines.length) {
+      message.textContent = t("combo.targetsRequired");
+      form.elements.targets.focus();
+      return null;
+    }
+    for (const line of lines) {
+      const separator = line.text.indexOf(":");
+      const provider = line.text.slice(0, separator).trim();
+      const model = line.text.slice(separator + 1).trim();
+      if (separator < 1 || !provider || !model) {
+        message.textContent = t("combo.invalidTarget").replace("{line}", line.number);
+        form.elements.targets.focus();
+        return null;
+      }
+      value.targets.push({provider, model});
+    }
+    const candidateID = value.id || value.name.toLowerCase().replaceAll(" ", "-");
+    if (items.some(item => item.id !== value.id && item.id === candidateID)) {
+      message.textContent = t("combo.nameExists");
+      form.elements.name.focus();
+      return null;
+    }
+    if (items.some(item => item.id !== value.id && item.model === value.model)) {
+      message.textContent = t("combo.modelExists");
+      form.elements.model.focus();
+      return null;
+    }
+    return value;
+  };
   const bindForm = item => {
     const form = document.getElementById("combo-form");
     const message = document.getElementById("combo-message");
-    const validate = async () => {
-      message.textContent = t("common.loading");
-      const result = await api("/combos/validate", {method: "POST", body: JSON.stringify(values(form))});
-      message.textContent = result.item ? t("combo.valid") : t("common.error");
+    const validate = async value => {
+      message.textContent = t("combo.checking");
+      const result = await api("/combos/validate", {method: "POST", body: JSON.stringify(value)});
+      message.textContent = result.item ? t("combo.valid") : t("combo.invalid");
+      return Boolean(result.item);
     };
-    document.getElementById("validate-combo").addEventListener("click", async () => { try { await validate(); } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = error.message; } });
+    const validateButton = document.getElementById("validate-combo");
+    validateButton.addEventListener("click", async () => {
+      const value = values(form, message);
+      if (!value) return;
+      validateButton.disabled = true;
+      try { await validate(value); }
+      catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t(error.code === "invalid_combo" ? "combo.invalid" : "combo.checkFailed"); }
+      finally { validateButton.disabled = false; }
+    });
     const cancel = document.getElementById("cancel-combo");
-    if (cancel) cancel.addEventListener("click", () => renderCombos(page));
+    if (cancel) cancel.addEventListener("click", () => {
+      if (form.dataset.dirty === "true" && !confirm(t("combo.confirmDiscard"))) return;
+      form.outerHTML = formHTML();
+      bindForm();
+    });
+    form.addEventListener("input", () => { form.dataset.dirty = "true"; message.textContent = ""; });
+    form.addEventListener("change", () => { form.dataset.dirty = "true"; message.textContent = ""; });
     form.addEventListener("submit", async event => {
       event.preventDefault();
+      const value = values(form, message);
+      if (!value) return;
       const submit = form.querySelector('[type="submit"]');
       submit.disabled = true;
       try {
-        const value = values(form);
-        await validate();
+        if (!await validate(value)) return;
         if (value.id) await api(`/combos/${encodeURIComponent(value.id)}`, {method: "PATCH", body: JSON.stringify(value)});
         else await api("/combos", {method: "POST", body: JSON.stringify(value)});
-        await renderCombos(page);
+        await renderCombos(page, t("combo.savedMessage"));
       } catch (error) {
         if (error.message === "invalid_key") return logout();
-        message.textContent = error.message;
+        message.textContent = t(error.code === "combo_not_found" ? "combo.notFound" : "combo.saveFailed");
       } finally { submit.disabled = false; }
     });
   };
+  const replaceForm = item => {
+    const current = document.getElementById("combo-form");
+    if (current.dataset.dirty === "true" && !confirm(t("combo.confirmDiscard"))) return;
+    current.outerHTML = formHTML(item);
+    bindForm();
+    scrollToForm();
+  };
+  const listMessage = message => { document.getElementById("combo-list-message").textContent = message; };
   const load = async () => {
     try {
       const response = await api("/combos");
-      const items = response.items || [];
+      items = response.items || [];
       document.getElementById("combos-list").className = "";
       document.getElementById("combos-list").innerHTML = items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ${item.enabled ? "ready" : "partial"}">${item.enabled ? t("capability.ready") : t("providers.disabled")}</span></div><p class="combo-model">${icon("route")}${escapeHTML(item.model)}</p><ol class="target-chain">${(item.targets || []).map(target => `<li>${providerIdentity(target.provider, true)}<code>${escapeHTML(target.model)}</code></li>`).join("")}</ol><div class="actions"><button class="secondary" data-edit-combo="${escapeHTML(item.id)}">${icon("edit")}${t("combo.edit")}</button><button class="secondary" data-duplicate-combo="${escapeHTML(item.id)}">${icon("copy")}${t("combo.duplicate")}</button><button class="secondary" data-toggle-combo="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${item.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${icon("trash")}${t("combo.delete")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`;
-      page.querySelectorAll("[data-edit-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.editCombo); if (item) { document.getElementById("combo-form").outerHTML = formHTML(item); bindForm(item); scrollToForm(); } }));
-      page.querySelectorAll("[data-duplicate-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.duplicateCombo); if (item) { document.getElementById("combo-form").outerHTML = formHTML({...item, id: "", name: `${item.name} copy`}); bindForm(); scrollToForm(); } }));
-      page.querySelectorAll("[data-toggle-combo]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api(`/combos/${encodeURIComponent(button.dataset.toggleCombo)}`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
-      page.querySelectorAll("[data-delete-combo]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("combo.confirmDelete"))) return; button.disabled = true; try { await api(`/combos/${encodeURIComponent(button.dataset.deleteCombo)}`, {method: "DELETE"}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
+      page.querySelectorAll("[data-edit-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.editCombo); if (item) replaceForm(item); }));
+      page.querySelectorAll("[data-duplicate-combo]").forEach(button => button.addEventListener("click", () => {
+        const item = items.find(entry => entry.id === button.dataset.duplicateCombo);
+        if (!item) return;
+        let suffix = 1;
+        let name, model;
+        do {
+          name = `${item.name} (${t("combo.copySuffix")}${suffix > 1 ? ` ${suffix}` : ""})`;
+          model = `${item.model}-copy${suffix > 1 ? `-${suffix}` : ""}`;
+          suffix++;
+        } while (items.some(entry => entry.name === name || entry.model === model));
+        replaceForm({...item, id: "", name, model});
+      }));
+      page.querySelectorAll("[data-toggle-combo]").forEach(button => button.addEventListener("click", async () => {
+        button.disabled = true;
+        listMessage(t("combo.updating"));
+        try {
+          await api(`/combos/${encodeURIComponent(button.dataset.toggleCombo)}`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})});
+          await load();
+          listMessage(t("combo.updated"));
+        } catch (error) {
+          if (error.message === "invalid_key") return logout();
+          button.disabled = false;
+          listMessage(t("combo.actionFailed"));
+        }
+      }));
+      page.querySelectorAll("[data-delete-combo]").forEach(button => button.addEventListener("click", async () => {
+        if (!confirm(t("combo.confirmDelete"))) return;
+        button.disabled = true;
+        listMessage(t("combo.deleting"));
+        try {
+          await api(`/combos/${encodeURIComponent(button.dataset.deleteCombo)}`, {method: "DELETE"});
+          await load();
+          listMessage(t("combo.deleted"));
+        } catch (error) {
+          if (error.message === "invalid_key") return logout();
+          button.disabled = false;
+          listMessage(t("combo.actionFailed"));
+        }
+      }));
     } catch (error) { if (error.message === "invalid_key") return logout(); document.getElementById("combos-list").className = "error"; document.getElementById("combos-list").textContent = t("common.error"); }
   };
   bindForm();
@@ -579,23 +750,31 @@ async function renderCombos(page) {
 }
 
 async function renderUsage(page, filter = {}) {
+  const run = page._usageRun = (page._usageRun || 0) + 1;
   const localDateTime = value => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? "" : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   };
-  const filters = `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterFrom")}<input id="usage-from" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.from))}"></label><label>${t("usage.filterTo")}<input id="usage-to" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.to))}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><button class="secondary" id="usage-apply">${icon("filter")}${t("usage.applyFilters")}</button></section>`;
+  const filters = `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterFrom")}<input id="usage-from" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.from))}"></label><label>${t("usage.filterTo")}<input id="usage-to" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.to))}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><div class="actions"><button class="secondary" id="usage-apply">${icon("filter")}${t("usage.applyFilters")}</button><button class="secondary" id="usage-clear">${icon("close")}${t("usage.clearFilters")}</button></div></section><p class="form-message" id="usage-filter-message" role="status"></p>`;
   const renderHeader = () => pageHeader("kicker.liveData", "usage.title", "usage.description", true) + filters;
   page.innerHTML = renderHeader() + `<div class="loading">${t("common.loading")}</div>`;
   const apply = () => {
     const timestamp = id => {
-      const value = document.getElementById(id).value;
+      const value = page.querySelector(`#${id}`).value;
       return value ? new Date(value).toISOString() : "";
     };
-    renderUsage(page, {provider: document.getElementById("usage-provider").value.trim(), model: document.getElementById("usage-model").value.trim(), from: timestamp("usage-from"), to: timestamp("usage-to"), status: document.getElementById("usage-status").value});
+    const from = timestamp("usage-from");
+    const to = timestamp("usage-to");
+    if (from && to && from > to) { page.querySelector("#usage-filter-message").textContent = t("usage.invalidRange"); return; }
+    renderUsage(page, {provider: page.querySelector("#usage-provider").value.trim(), model: page.querySelector("#usage-model").value.trim(), from, to, status: page.querySelector("#usage-status").value});
   };
-  document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
-  document.getElementById("usage-apply").addEventListener("click", apply);
-  const query = new URLSearchParams({limit: "200"});
+  const bind = () => {
+    page.querySelector("#refresh").addEventListener("click", () => renderUsage(page, filter));
+    page.querySelector("#usage-apply").addEventListener("click", apply);
+    page.querySelector("#usage-clear").addEventListener("click", () => renderUsage(page));
+  };
+  bind();
+  const query = new URLSearchParams({limit: "100"});
   if (filter.provider) query.set("provider", filter.provider);
   if (filter.model) query.set("model", filter.model);
   if (filter.from) query.set("from", filter.from);
@@ -605,15 +784,17 @@ async function renderUsage(page, filter = {}) {
     const [recordsResponse, summaryResponse] = await Promise.all([api(`/usage/records?${query}`), api(`/usage/summary?${query}`)]);
     const records = recordsResponse.items || [];
     const summary = summaryResponse.item || {};
-    const metrics = [["common.requests", summary.requests || 0], ["common.tokens", summary.total_tokens || 0], ["usage.input", summary.input_tokens || 0], ["usage.output", summary.output_tokens || 0], ["usage.cached", summary.cached_tokens || 0]];
-    page.innerHTML = renderHeader() + `<section class="metrics-grid usage-metrics">${metrics.map(([label, value], index) => metricCard(label, value, ["chart", "zap", "arrow", "arrow", "shield"][index])).join("")}</section><section style="margin-top:14px">${usageTable(records)}</section>`;
-    document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
-    document.getElementById("usage-apply").addEventListener("click", apply);
+    if (!page.isConnected || page.dataset.page !== "usage" || page._usageRun !== run) return;
+    const feedback = page.querySelector("#usage-filter-message").textContent;
+    const metrics = [["common.requests", summary.requests || 0], ["usage.failed", summary.failed || 0], ["common.tokens", summary.total_tokens || 0], ["usage.input", summary.input_tokens || 0], ["usage.output", summary.output_tokens || 0]];
+    page.innerHTML = renderHeader() + `<section class="metrics-grid usage-metrics">${metrics.map(([label, value], index) => metricCard(label, value, ["chart", "terminal", "zap", "arrow", "arrow"][index])).join("")}</section><div class="section-head"><h2>${t("usage.history")}</h2><span class="hint">${t("usage.cached")}: ${Number(summary.cached_tokens || 0).toLocaleString(state.locale)} · ${t("usage.resultLimit")}</span></div>${usageTable(records)}`;
+    page.querySelector("#usage-filter-message").textContent = feedback;
+    bind();
   } catch (error) {
     if (error.message === "invalid_key") return logout();
+    if (!page.isConnected || page.dataset.page !== "usage" || page._usageRun !== run) return;
     page.innerHTML = renderHeader() + `<div class="error">${t("common.error")}</div>`;
-    document.getElementById("refresh").addEventListener("click", () => renderUsage(page, filter));
-    document.getElementById("usage-apply").addEventListener("click", apply);
+    bind();
   }
 }
 
@@ -637,14 +818,20 @@ function quotaResetLabel(resetTime) {
   const timestamp = new Date(resetTime).getTime();
   if (!Number.isFinite(timestamp)) return "";
   const minutes = Math.max(0, Math.ceil((timestamp - Date.now()) / 60000));
-  if (minutes <= 0) return "Đã đặt lại";
-  if (minutes < 60) return `còn ${minutes} phút`;
+  if (minutes <= 0) return t("quota.resetNow");
+  if (minutes < 60) return `${t("quota.resetIn")} ${minutes} ${t(minutes === 1 ? "quota.minute" : "quota.minutes")}`;
+  if (minutes >= 24 * 60) {
+    const days = Math.floor(minutes / (24 * 60));
+    const hours = Math.floor((minutes % (24 * 60)) / 60);
+    return `${t("quota.resetIn")} ${days} ${t(days === 1 ? "quota.day" : "quota.days")}${hours ? ` ${hours} ${t(hours === 1 ? "quota.hour" : "quota.hours")}` : ""}`;
+  }
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
-  return `còn ${hours} giờ${rest ? ` ${rest} phút` : ""}`;
+  return `${t("quota.resetIn")} ${hours} ${t(hours === 1 ? "quota.hour" : "quota.hours")}${rest ? ` ${rest} ${t(rest === 1 ? "quota.minute" : "quota.minutes")}` : ""}`;
 }
 
 function renderQuotaCockpit(value, provider) {
+  provider = String(provider || "").toLowerCase();
   const families = new Map();
   for (const group of value.groups || []) {
     for (const bucket of group.buckets || []) {
@@ -652,12 +839,14 @@ function renderQuotaCockpit(value, provider) {
       const window = quotaWindow(bucket);
       const key = `${family}:${window}`;
       const remaining = Math.max(0, Math.min(1, Number(bucket.remainingFraction) || 0));
-      const current = families.get(key);
-      if (!current || remaining < current.remaining) families.set(key, {family, window, remaining, resetTime: bucket.resetTime || ""});
+      const row = families.get(key) || {family, window, remaining, resetTime: bucket.resetTime || "", models: []};
+      if (remaining < row.remaining) { row.remaining = remaining; row.resetTime = bucket.resetTime || ""; }
+      if (provider === "antigravity" && group.displayName) row.models.push({name: group.displayName, remaining});
+      families.set(key, row);
     }
   }
   if (!families.size) return "";
-  return `<div class="quota-cockpit-grid">${[...families.values()].sort((a, b) => `${a.family}${a.window}`.localeCompare(`${b.family}${b.window}`)).map(row => `<section class="quota-family-card"><div class="quota-family-heading"><strong>${escapeHTML(row.family)}</strong><span>${row.window === "5h" ? "5h" : row.window === "week" ? t("quota.week") : t("quota.modelLimit")}</span></div><div class="quota-family-value"><span>${Math.round(row.remaining * 100)}%</span><span>${t("quota.remaining")}</span></div><progress max="1" value="${row.remaining}" aria-label="${escapeHTML(`${row.family} ${row.window}`)}"></progress>${row.resetTime ? `<span class="quota-reset" title="${escapeHTML(new Date(row.resetTime).toLocaleString(state.locale))}">${escapeHTML(quotaResetLabel(row.resetTime))}</span>` : ""}</section>`).join("")}</div>`;
+  return `<div class="quota-cockpit-grid">${[...families.values()].sort((a, b) => `${a.family}${a.window}`.localeCompare(`${b.family}${b.window}`)).map(row => `<section class="quota-family-card"><div class="quota-family-heading"><strong>${escapeHTML(row.family)}</strong><span>${row.window === "5h" ? "5h" : row.window === "week" ? t("quota.week") : t("quota.modelLimit")}</span></div><div class="quota-family-value"><span>${Math.round(row.remaining * 100)}%</span><span>${t("quota.remaining")}</span></div><progress max="1" value="${row.remaining}" aria-label="${escapeHTML(`${row.family} ${row.window}`)}"></progress>${row.resetTime ? `<span class="quota-reset" title="${escapeHTML(new Date(row.resetTime).toLocaleString(state.locale))}">${escapeHTML(quotaResetLabel(row.resetTime))}</span>` : ""}${row.models.length ? `<details class="quota-shared-models"><summary>${t("quota.sharedModels")} (${row.models.length})</summary>${row.models.sort((a, b) => a.name.localeCompare(b.name)).map(model => `<span>${escapeHTML(model.name)} · ${Math.round(model.remaining * 100)}%</span>`).join("")}</details>` : ""}</section>`).join("")}</div>`;
 }
 
 function usageTable(records) {
@@ -669,38 +858,60 @@ function usageTable(records) {
 async function renderQuota(page) {
   page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="loading">${t("common.loading")}</div>`;
   try {
-    const [authResponse, providerResponse] = await Promise.all([api("/auth-files"), api("/quota/providers")]);
+    const [authResponse, providerResponse] = await Promise.all([api("/auth-files"), api("/quota/providers").catch(error => { if (error.message === "invalid_key") throw error; return {providers: []}; })]);
+    if (!page.isConnected || page.dataset.page !== "quota") return;
     const credentials = (authResponse.files || []).filter(file => file.supports_quota);
     const quotaProviders = providerResponse.providers || [];
     const canReset = credential => quotaProviders.some(provider => provider.supports_reset && (provider.supported_providers || []).some(name => String(name).toLowerCase() === String(credential.provider).toLowerCase()));
-    const cards = credentials.map(credential => `<article class="card quota-card"><div class="card-title"><h2>${escapeHTML(credential.label || credential.email || credential.name || credential.id)}</h2><span class="badge ${credential.unavailable ? "partial" : "ready"}">${escapeHTML(providerStatusLabel(credential.status))}</span></div><div class="quota-brand">${providerIdentity(credential.provider, true)}</div><p class="quota-observed" data-quota-checked>${t("quota.checking")}</p><div class="quota-card-result" data-quota-result="${escapeHTML(credential.auth_index)}"><div class="loading">${t("common.loading")}</div></div><div class="actions"><button class="secondary" data-quota-fetch="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.refresh")}</button>${canReset(credential) ? `<button class="secondary" data-quota-reset="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${t("quota.reset")}</button>` : ""}</div></article>`).join("");
-    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `<section class="grid quota-grid">${cards}</section>` : `<div class="empty">${t("quota.empty")}</div>`);
+    const cards = credentials.map(credential => `<article class="card quota-card" data-quota-card data-quota-provider="${escapeHTML(credential.provider || "")}"><div class="card-title"><h2 title="${escapeHTML(credential.label || credential.email || credential.name || credential.id)}">${escapeHTML(credential.label || credential.email || credential.name || credential.id)}</h2><span class="badge ${credential.unavailable || credential.status !== "active" ? "partial" : "ready"}">${escapeHTML(credential.unavailable ? t("providers.unavailable") : providerStatusLabel(credential.status))}</span></div><div class="quota-brand">${providerIdentity(credential.provider, true)}</div><p class="quota-observed" data-quota-checked>${t("quota.checking")}</p><div class="quota-card-result" data-quota-result="${escapeHTML(credential.auth_index)}"><div class="loading">${t("common.loading")}</div></div><div class="actions"><button class="secondary" data-quota-fetch="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.refresh")}</button>${canReset(credential) ? `<button class="secondary" data-quota-reset="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.reset")}</button>` : ""}</div></article>`).join("");
+    const providers = [...new Set(credentials.map(credential => credential.provider).filter(Boolean))].sort();
+    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="quota-search" type="search" placeholder="${t("quota.search")}" aria-label="${t("quota.search")}"></label><select class="text-input provider-filter" id="quota-provider" aria-label="${t("quota.filterProvider")}"><option value="">${t("quota.allProviders")}</option>${providers.map(name => `<option value="${escapeHTML(name)}">${escapeHTML(providerBrands[String(name).toLowerCase()]?.[0] || name)}</option>`).join("")}</select></div><section class="grid quota-grid">${cards}</section><div id="quota-filter-empty" class="empty" hidden>${t("quota.noMatches")}</div>` : `<div class="empty">${t("quota.empty")}</div>`);
     document.getElementById("refresh").addEventListener("click", () => renderQuota(page));
+    if (cards) {
+      const applyFilter = () => {
+        const query = page.querySelector("#quota-search").value.trim().toLocaleLowerCase();
+        const provider = page.querySelector("#quota-provider").value;
+        let visible = 0;
+        page.querySelectorAll("[data-quota-card]").forEach(card => {
+          card.hidden = (provider && card.dataset.quotaProvider !== provider) || !card.textContent.toLocaleLowerCase().includes(query);
+          if (!card.hidden) visible++;
+        });
+        page.querySelector("#quota-filter-empty").hidden = visible > 0;
+      };
+      page.querySelector("#quota-search").addEventListener("input", applyFilter);
+      page.querySelector("#quota-provider").addEventListener("change", applyFilter);
+    }
     const renderResult = (target, value) => {
-      const resetLabel = resetTime => { if (!resetTime) return ""; const timestamp = new Date(resetTime).getTime(); if (!Number.isFinite(timestamp)) return ""; const minutes = Math.max(0, Math.ceil((timestamp - Date.now()) / 60000)); if (minutes <= 0) return "Đã đặt lại"; if (minutes < 60) return `còn ${minutes} phút`; const hours = Math.floor(minutes / 60); const rest = minutes % 60; return `còn ${hours} giờ${rest ? ` ${rest} phút` : ""}`; };
-      const groups = (value.groups || []).flatMap(group => (group.buckets || []).map(bucket => { const remaining = Math.round(Number(bucket.remainingFraction || 0) * 100); const models = bucket.description ? `<details class="quota-shared-models"><summary>${t("quota.sharedModels")}</summary><span>${escapeHTML(bucket.description)}</span></details>` : ""; return `<li class="quota-row"><div class="quota-row-main"><strong>${escapeHTML(group.displayName || t("quota.provider"))}</strong><span class="quota-percent">${remaining}% ${t("quota.remaining")}</span></div><progress max="1" value="${Math.max(0, Math.min(1, Number(bucket.remainingFraction) || 0))}" aria-label="${escapeHTML(group.displayName || t("quota.remaining"))}"></progress>${bucket.resetTime ? `<span class="quota-reset" title="${escapeHTML(new Date(bucket.resetTime).toLocaleString(state.locale))}">${escapeHTML(resetLabel(bucket.resetTime))}</span>` : ""}${models}</li>`; }));
-      const summary = (value.summary || []).map(metric => { const labels = {credit_amount: "quota.creditAmount", minimum_credit_amount: "quota.minimumCredit", observed_signals: "quota.observedSignals"}; return `<li><strong>${t(labels[metric.key] || metric.label || metric.key)}</strong><span>${escapeHTML(`${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)}</span></li>`; });
+      const summary = (value.summary || []).map(metric => { const labels = {credit_amount: "quota.creditAmount", minimum_credit_amount: "quota.minimumCredit", observed_signals: "quota.observedSignals"}; return `<li><strong>${escapeHTML(t(labels[metric.key] || metric.label || metric.key))}</strong><span>${escapeHTML(`${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)}</span></li>`; });
       const signalRows = Object.entries(value.signals || {}).map(([key, signal]) => `<li><strong>${escapeHTML(key)}</strong><code>${escapeHTML(signal)}</code></li>`).join("");
       const cockpit = renderQuotaCockpit(value, target.closest(".quota-card")?.querySelector("[data-quota-fetch]")?.dataset.provider);
       const observed = value.observed_at ? `<p class="quota-observed">${t("quota.lastObserved")}: ${escapeHTML(new Date(value.observed_at).toLocaleString(state.locale))}</p>` : "";
       const availability = typeof value.credits_available === "boolean" ? `<span class="badge ${value.credits_available ? "ready" : "partial"}">${t(value.credits_available ? "quota.creditsAvailable" : "quota.creditsUnavailable")}</span>` : "";
-      const empty = summary.length || cockpit || groups.length || signalRows ? "" : `<div class="empty quota-empty-note">${t("quota.noObservation")}</div>`;
+      const empty = summary.length || cockpit || signalRows ? "" : `<div class="empty quota-empty-note">${t("quota.noObservation")}</div>`;
       target.innerHTML = `${observed}${value.subscription?.plan ? `<p>${escapeHTML(value.subscription.plan)}</p>` : ""}<div class="quota-result-heading"><strong>${t("quota.result")}</strong>${availability}</div>${summary.length ? `<ul class="quota-list">${summary.join("")}</ul>` : ""}${cockpit}${signalRows ? `<details class="quota-signals"><summary>${t("quota.signals")}</summary><ul class="quota-list">${signalRows}</ul></details>` : ""}${empty}`;
     };
     const fetchQuota = async button => {
       const target = page.querySelector(`[data-quota-result="${CSS.escape(button.dataset.quotaFetch)}"]`);
       if (!target) return;
-      const checked = button.closest(".quota-card")?.querySelector("[data-quota-checked]");
+      const card = button.closest(".quota-card");
+      const checked = card?.querySelector("[data-quota-checked]");
+      const badge = card?.querySelector(".card-title .badge");
+      if (badge && !badge.dataset.originalStatus) {
+        badge.dataset.originalStatus = badge.textContent;
+        badge.dataset.originalClass = badge.className;
+      }
       button.disabled = true;
       target.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
       if (checked) checked.textContent = t("quota.checking");
       try {
         renderResult(target, await api("/quota/fetch", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaFetch, provider: button.dataset.provider})}));
         if (checked) checked.textContent = `${t("quota.lastChecked")}: ${new Date().toLocaleString(state.locale)}`;
+        if (badge) { badge.className = badge.dataset.originalClass; badge.textContent = badge.dataset.originalStatus; }
       } catch (error) {
         if (error.message === "invalid_key") return logout();
         const needsCodexLogin = button.dataset.provider === "codex" && (error.code === "reauth_required" || /status 401|token_revoked/i.test(error.message));
         const message = needsCodexLogin ? t("quota.authRequired") : error.message === "server_error" ? t("quota.unavailable") : error.message;
+        if (needsCodexLogin && badge) { badge.className = "badge partial"; badge.textContent = t("quota.authRequiredShort"); }
         target.innerHTML = `<div class="error">${escapeHTML(message)}</div>${needsCodexLogin ? `<button class="secondary quota-login" type="button">${icon("key")}${t("quota.reconnectCodex")}</button>` : ""}`;
         if (checked) checked.textContent = t("quota.checkFailed");
         target.querySelector(".quota-login")?.addEventListener("click", async event => {
@@ -711,8 +922,8 @@ async function renderQuota(page) {
       } finally { button.disabled = false; }
     };
     page.querySelectorAll("[data-quota-fetch]").forEach(button => button.addEventListener("click", () => fetchQuota(button)));
-    await Promise.all([...page.querySelectorAll("[data-quota-fetch]")].map(fetchQuota));
     page.querySelectorAll("[data-quota-reset]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("quota.confirmReset"))) return; button.disabled = true; try { await api("/quota/reset", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaReset, provider: button.dataset.provider})}); await renderQuota(page); } catch (error) { if (error.message === "invalid_key") return logout(); const target = page.querySelector(`[data-quota-result="${CSS.escape(button.dataset.quotaReset)}"]`); if (target) target.innerHTML = `<div class="error">${escapeHTML(error.message)}</div>`; button.disabled = false; } }));
+    page.querySelectorAll("[data-quota-fetch]").forEach(fetchQuota);
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="error">${t("common.error")}</div>`;
@@ -720,18 +931,31 @@ async function renderQuota(page) {
   }
 }
 
-async function renderLogs(page) {
-  page.innerHTML = pageHeader("kicker.liveData", "logs.title", "logs.description", true) + `<div class="loading">${t("common.loading")}</div>`;
-  document.getElementById("refresh").addEventListener("click", () => renderLogs(page));
+async function renderLogs(page, query = "") {
+  const run = page._logsRun = (page._logsRun || 0) + 1;
+  const header = () => pageHeader("kicker.liveData", "logs.title", "logs.description", true) + `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="log-search" type="search" value="${escapeHTML(query)}" placeholder="${escapeHTML(t("logs.search"))}" aria-label="${escapeHTML(t("logs.search"))}"></label><span class="hint" id="log-count" role="status"></span></div><div id="log-results" class="loading">${t("common.loading")}</div>`;
+  page.innerHTML = header();
+  page.querySelector("#refresh").addEventListener("click", () => renderLogs(page, page.querySelector("#log-search").value));
   try {
     const response = await api("/logs?limit=200");
+    if (!page.isConnected || page.dataset.page !== "logs" || page._logsRun !== run) return;
     const lines = response.lines || [];
-    page.innerHTML = pageHeader("kicker.liveData", "logs.title", "logs.description", true) + (lines.length ? `<pre class="log-output">${escapeHTML(lines.join("\n"))}</pre>` : `<div class="empty">${t("logs.empty")}</div>`);
-    document.getElementById("refresh").addEventListener("click", () => renderLogs(page));
+    const update = () => {
+      const needle = page.querySelector("#log-search").value.trim().toLocaleLowerCase(state.locale);
+      const matching = needle ? lines.filter(line => line.toLocaleLowerCase(state.locale).includes(needle)) : lines;
+      page.querySelector("#log-count").textContent = `${matching.length}/${lines.length} ${t("logs.lines")}`;
+      const results = page.querySelector("#log-results");
+      results.className = matching.length ? "log-output" : "empty";
+      results.innerHTML = matching.length ? escapeHTML(matching.join("\n")) : t(lines.length ? "logs.noMatch" : "logs.empty");
+    };
+    page.querySelector("#log-search").addEventListener("input", update);
+    update();
   } catch (error) {
     if (error.message === "invalid_key") return logout();
-    page.innerHTML = pageHeader("kicker.liveData", "logs.title", "logs.description", true) + `<div class="error">${t("logs.unavailable")}</div>`;
-    document.getElementById("refresh").addEventListener("click", () => renderLogs(page));
+    if (!page.isConnected || page.dataset.page !== "logs" || page._logsRun !== run) return;
+    const results = page.querySelector("#log-results");
+    results.className = "error";
+    results.textContent = error.status === 400 ? t("logs.unavailable") : t("common.error");
   }
 }
 
@@ -739,17 +963,24 @@ async function renderSettings(page) {
   page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<div class="loading">${t("common.loading")}</div>`;
   try {
     const settings = (await api("/system-settings")).item || {};
-    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="status-panel"><h2 class="tool-title">${icon("server")}${t("settings.connection")}</h2><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label></div><h2 class="tool-title">${icon("settings")}${t("settings.behavior")}</h2><div class="settings-grid"><label><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> ${t("settings.logging")}</label><label><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> ${t("settings.usage")}</label><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" value="${Number(settings.request_retry || 0)}"></label></div><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="settings-message"></span></div></form>`;
+    if (!page.isConnected || page.dataset.page !== "settings") return;
+    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="status-panel"><h2 class="tool-title">${icon("server")}${t("settings.connection")}</h2><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label></div><h2 class="tool-title">${icon("settings")}${t("settings.behavior")}</h2><div class="settings-grid"><label><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> ${t("settings.logging")}</label><label><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> ${t("settings.usage")}</label><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" required value="${Number(settings.request_retry || 0)}"></label></div><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="settings-message" role="status" aria-live="polite"></span></div></form>`;
     const load = () => renderSettings(page);
     document.getElementById("refresh").addEventListener("click", load);
+    document.getElementById("settings-form").addEventListener("input", () => { document.getElementById("settings-message").textContent = ""; });
     document.getElementById("settings-form").addEventListener("submit", async event => {
       event.preventDefault();
       const form = event.currentTarget;
       const message = document.getElementById("settings-message");
+      const button = form.querySelector('[type="submit"]');
+      button.disabled = true;
+      message.textContent = t("settings.saving");
       try {
         await api("/system-settings", {method: "PATCH", body: JSON.stringify({logging_to_file: form.elements.logging_to_file.checked, usage_statistics_enabled: form.elements.usage_statistics_enabled.checked, request_retry: Number(form.elements.request_retry.value)})});
         message.textContent = t("settings.saved");
-      } catch (error) { message.textContent = t("common.error"); }
+        message.className = "form-message ok";
+      } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("common.error"); message.className = "form-message failed"; }
+      finally { button.disabled = false; }
     });
   } catch (error) {
     if (error.message === "invalid_key") return logout();
@@ -763,11 +994,25 @@ async function renderPlugins(page) {
   const load = async () => {
     try {
       const response = await api("/plugins");
+      if (!page.isConnected || page.dataset.page !== "plugins") return;
       const plugins = response.plugins || [];
-      page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + (plugins.length ? `<section class="grid">${plugins.map(plugin => `<article class="card"><div class="card-title"><h2 class="tool-title">${icon("puzzle")}${escapeHTML(plugin.metadata?.name || plugin.id)}</h2><span class="badge ${plugin.effective_enabled ? "ready" : "partial"}">${plugin.effective_enabled ? t("plugins.enabled") : t("plugins.disabled")}</span></div><p>${escapeHTML(plugin.metadata?.version || plugin.id)}</p><div class="actions"><button class="secondary" data-plugin-enabled="${escapeHTML(plugin.id)}" data-enabled="${Boolean(plugin.enabled)}">${icon(plugin.enabled ? "pause" : "check")}${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("plugins.empty")}</div>`);
+      page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + (!response.plugins_enabled && plugins.length ? `<section class="status-panel"><p>${t("plugins.globalDisabled")}</p></section>` : "") + (plugins.length ? `<section class="grid">${plugins.map(plugin => `<article class="card"><div class="card-title"><h2 class="tool-title">${icon("puzzle")}${escapeHTML(plugin.metadata?.name || plugin.id)}</h2><span class="badge ${plugin.effective_enabled ? "ready" : "partial"}">${t(plugin.effective_enabled ? "plugins.enabled" : plugin.enabled ? "plugins.inactive" : "plugins.disabled")}</span></div><p>${escapeHTML(plugin.metadata?.version || plugin.id)}</p><div class="actions"><button class="secondary" data-plugin-enabled="${escapeHTML(plugin.id)}" data-enabled="${Boolean(plugin.enabled)}">${icon(plugin.enabled ? "pause" : "check")}${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}</button></div><span class="form-message" role="status" aria-live="polite"></span></article>`).join("")}</section>` : `<div class="empty">${t("plugins.empty")}</div>`);
       document.getElementById("refresh").addEventListener("click", load);
-      page.querySelectorAll("[data-plugin-enabled]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api(`/plugins/${encodeURIComponent(button.dataset.pluginEnabled)}/enabled`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
-    } catch (error) { if (error.message === "invalid_key") return logout(); page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
+      page.querySelectorAll("[data-plugin-enabled]").forEach(button => button.addEventListener("click", async () => {
+        const message = button.closest(".card").querySelector(".form-message");
+        button.disabled = true;
+        message.textContent = t("plugins.updating");
+        try {
+          await api(`/plugins/${encodeURIComponent(button.dataset.pluginEnabled)}/enabled`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})});
+          await load();
+        } catch (error) {
+          if (error.message === "invalid_key") return logout();
+          message.textContent = t("plugins.updateFailed");
+          message.className = "form-message failed";
+          button.disabled = false;
+        }
+      }));
+    } catch (error) { if (error.message === "invalid_key") return logout(); if (!page.isConnected || page.dataset.page !== "plugins") return; page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
   };
   await load();
 }
