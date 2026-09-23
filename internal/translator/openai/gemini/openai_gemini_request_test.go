@@ -7,6 +7,22 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+func TestConvertGeminiRequestToOpenAI_NormalizesToolSchemaTypes(t *testing.T) {
+	input := []byte(`{"contents":[{"role":"user","parts":[{"text":"hello"}]}],"tools":[{"functionDeclarations":[{"name":"lookup","parameters":{"type":"OBJECT","properties":{"query":{"type":"STRING"},"options":{"type":"ARRAY","items":{"type":"INTEGER"}}}}},{"name":"other","parametersJsonSchema":{"type":"OBJECT","properties":{"enabled":{"type":"BOOLEAN"}}}}]}]}`)
+	out := ConvertGeminiRequestToOpenAI("test-model", input, true)
+	for path, want := range map[string]string{
+		"tools.0.function.parameters.type":                          "object",
+		"tools.0.function.parameters.properties.query.type":         "string",
+		"tools.0.function.parameters.properties.options.type":       "array",
+		"tools.0.function.parameters.properties.options.items.type": "integer",
+		"tools.1.function.parameters.properties.enabled.type":       "boolean",
+	} {
+		if got := gjson.GetBytes(out, path).String(); got != want {
+			t.Errorf("%s = %q, want %q", path, got, want)
+		}
+	}
+}
+
 func TestConvertGeminiRequestToOpenAI_FunctionResponsesConsumeToolCallIDsFIFO(t *testing.T) {
 	inputJSON := []byte(`{
 		"contents": [
