@@ -187,7 +187,7 @@ func (h *Handler) GetPluginConfig(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "plugin_config_encode_failed", "message": errBody.Error()})
 			return
 		}
-		c.JSON(http.StatusOK, body)
+		c.JSON(http.StatusOK, redactPluginConfigSecrets(body))
 		return
 	}
 
@@ -211,6 +211,33 @@ func (h *Handler) GetPluginConfig(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusNotFound, gin.H{"error": "plugin_not_found", "message": "plugin not found"})
+}
+
+func redactPluginConfigSecrets(value any) any {
+	switch current := value.(type) {
+	case map[string]any:
+		for key, item := range current {
+			name := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(key, "-", "_"), ".", "_"))
+			secret := strings.Contains(name, "key") || strings.Contains(name, "token") || strings.Contains(name, "secret") || strings.Contains(name, "password") || strings.Contains(name, "cookie") || strings.Contains(name, "credential") || strings.Contains(name, "authorization")
+			if secret {
+				if item == nil || item == "" || item == false {
+					current[key] = ""
+				} else {
+					current[key] = "[configured]"
+				}
+				continue
+			}
+			current[key] = redactPluginConfigSecrets(item)
+		}
+		return current
+	case []any:
+		for index := range current {
+			current[index] = redactPluginConfigSecrets(current[index])
+		}
+		return current
+	default:
+		return value
+	}
 }
 
 // PatchPluginEnabled updates plugins.configs.<id>.enabled without touching plugins.enabled.

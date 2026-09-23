@@ -10,18 +10,27 @@ import (
 type systemSettings struct {
 	Host                   string `json:"host"`
 	Port                   int    `json:"port"`
+	Debug                  bool   `json:"debug"`
 	LoggingToFile          bool   `json:"logging_to_file"`
+	RequestLog             bool   `json:"request_log"`
+	WebsocketAuth          bool   `json:"websocket_auth"`
 	UsageStatisticsEnabled bool   `json:"usage_statistics_enabled"`
+	ForceModelPrefix       bool   `json:"force_model_prefix"`
 	RoutingStrategy        string `json:"routing_strategy"`
 	RequestRetry           int    `json:"request_retry"`
 	MaxRetryCredentials    int    `json:"max_retry_credentials"`
 	MaxRetryInterval       int    `json:"max_retry_interval"`
+	LogsMaxTotalSizeMB     int    `json:"logs_max_total_size_mb"`
+	ErrorLogsMaxFiles      int    `json:"error_logs_max_files"`
+	ProxyURLConfigured     bool   `json:"proxy_url_configured"`
 }
 
 func (h *Handler) currentSystemSettingsLocked() systemSettings {
 	return systemSettings{
-		Host: h.cfg.Host, Port: h.cfg.Port, LoggingToFile: h.cfg.LoggingToFile, UsageStatisticsEnabled: h.cfg.UsageStatisticsEnabled,
+		Host: h.cfg.Host, Port: h.cfg.Port, Debug: h.cfg.Debug, LoggingToFile: h.cfg.LoggingToFile, RequestLog: h.cfg.RequestLog,
+		WebsocketAuth: h.cfg.WebsocketAuth, UsageStatisticsEnabled: h.cfg.UsageStatisticsEnabled, ForceModelPrefix: h.cfg.ForceModelPrefix,
 		RoutingStrategy: h.cfg.Routing.Strategy, RequestRetry: h.cfg.RequestRetry, MaxRetryCredentials: h.cfg.MaxRetryCredentials, MaxRetryInterval: h.cfg.MaxRetryInterval,
+		LogsMaxTotalSizeMB: h.cfg.LogsMaxTotalSizeMB, ErrorLogsMaxFiles: h.cfg.ErrorLogsMaxFiles, ProxyURLConfigured: strings.TrimSpace(h.cfg.ProxyURL) != "",
 	}
 }
 
@@ -37,12 +46,18 @@ func (h *Handler) GetSystemSettings(c *gin.Context) {
 
 func (h *Handler) PatchSystemSettings(c *gin.Context) {
 	var body struct {
+		Debug                  *bool   `json:"debug"`
 		LoggingToFile          *bool   `json:"logging_to_file"`
+		RequestLog             *bool   `json:"request_log"`
+		WebsocketAuth          *bool   `json:"websocket_auth"`
 		UsageStatisticsEnabled *bool   `json:"usage_statistics_enabled"`
+		ForceModelPrefix       *bool   `json:"force_model_prefix"`
 		RoutingStrategy        *string `json:"routing_strategy"`
 		RequestRetry           *int    `json:"request_retry"`
 		MaxRetryCredentials    *int    `json:"max_retry_credentials"`
 		MaxRetryInterval       *int    `json:"max_retry_interval"`
+		LogsMaxTotalSizeMB     *int    `json:"logs_max_total_size_mb"`
+		ErrorLogsMaxFiles      *int    `json:"error_logs_max_files"`
 	}
 	if errBind := c.ShouldBindJSON(&body); errBind != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_body", "message": "Invalid request body"}})
@@ -57,14 +72,26 @@ func (h *Handler) PatchSystemSettings(c *gin.Context) {
 	if body.LoggingToFile != nil {
 		h.cfg.LoggingToFile = *body.LoggingToFile
 	}
+	if body.Debug != nil {
+		h.cfg.Debug = *body.Debug
+	}
+	if body.RequestLog != nil {
+		h.cfg.RequestLog = *body.RequestLog
+	}
+	if body.WebsocketAuth != nil {
+		h.cfg.WebsocketAuth = *body.WebsocketAuth
+	}
 	if body.UsageStatisticsEnabled != nil {
 		h.cfg.UsageStatisticsEnabled = *body.UsageStatisticsEnabled
 	}
+	if body.ForceModelPrefix != nil {
+		h.cfg.ForceModelPrefix = *body.ForceModelPrefix
+	}
 	if body.RoutingStrategy != nil {
-		strategy := strings.TrimSpace(*body.RoutingStrategy)
-		if strategy == "" {
+		strategy, valid := normalizeRoutingStrategy(strings.TrimSpace(*body.RoutingStrategy))
+		if !valid {
 			h.mu.Unlock()
-			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_routing_strategy", "message": "Routing strategy is required"}})
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_routing_strategy", "message": "Unsupported routing strategy"}})
 			return
 		}
 		h.cfg.Routing.Strategy = strategy
@@ -92,6 +119,22 @@ func (h *Handler) PatchSystemSettings(c *gin.Context) {
 			return
 		}
 		h.cfg.MaxRetryInterval = *body.MaxRetryInterval
+	}
+	if body.LogsMaxTotalSizeMB != nil {
+		if *body.LogsMaxTotalSizeMB < 0 {
+			h.mu.Unlock()
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_log_retention", "message": "Log retention must not be negative"}})
+			return
+		}
+		h.cfg.LogsMaxTotalSizeMB = *body.LogsMaxTotalSizeMB
+	}
+	if body.ErrorLogsMaxFiles != nil {
+		if *body.ErrorLogsMaxFiles < 0 {
+			h.mu.Unlock()
+			c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_log_retention", "message": "Error log count must not be negative"}})
+			return
+		}
+		h.cfg.ErrorLogsMaxFiles = *body.ErrorLogsMaxFiles
 	}
 	snapshot, ok := h.saveConfigAndSnapshotLocked(c)
 	item := h.currentSystemSettingsLocked()

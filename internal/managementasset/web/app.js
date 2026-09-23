@@ -54,6 +54,7 @@ const iconPaths = {
   edit: '<path d="m15 5 4 4M4 20l4.5-.8L19 8.7a2.8 2.8 0 0 0-4-4L4.8 15 4 20Z"/>',
   filter: '<path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z"/>',
   pause: '<path d="M8 5v14M16 5v14"/>',
+  download: '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 20h16"/>',
   close: '<path d="M5 5 19 19M19 5 5 19"/>'
 };
 const icon = (name, className = "") => `<svg class="icon ${className}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name] || ""}</svg>`;
@@ -107,7 +108,7 @@ async function loadMessages() {
 async function api(path, options = {}) {
   const headers = new Headers(options.headers || {});
   headers.set("Authorization", `Bearer ${state.key}`);
-  if (options.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
+  if (options.body && !(typeof FormData !== "undefined" && options.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(`/v0/management${path}`, {...options, headers});
   if (response.status === 401 || response.status === 403) {
     const error = new Error("invalid_key");
@@ -300,9 +301,29 @@ function endpointKeyTable(items) {
 async function renderEndpoint(page, secret = "", feedback = "") {
   const item = capability("endpoint_keys");
   page.innerHTML = pageHeader("kicker.openai", "endpoint.title", "endpoint.description", true) + `<section class="status-panel"><div class="card-title"><h2>${t("endpoint.baseUrl")}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><div class="endpoint-value">${escapeHTML(`${location.origin}/v1`)}</div></section>${secret ? `<section class="secret-notice"><strong>${t("endpoint.secretOnce")}</strong><div class="secret-row"><input class="text-input" id="created-secret" readonly value="${escapeHTML(secret)}"><button class="secondary" id="copy-secret">${icon("copy")}${t("endpoint.copy")}</button></div></section>` : ""}<div class="section-head"><h2>${t("endpoint.keys")}</h2><button class="primary compact" id="create-key">${icon("plus")}${t("endpoint.create")}</button></div><div class="form-message" id="endpoint-feedback" role="status" aria-live="polite">${escapeHTML(feedback)}</div><div id="endpoint-keys"><div class="loading">${t("common.loading")}</div></div>`;
+  document.getElementById("create-key").insertAdjacentHTML("afterend", `<button class="secondary" type="button" id="show-add-key">${icon("key")}${t("endpoint.addExisting")}</button>`);
+  document.getElementById("endpoint-keys").insertAdjacentHTML("beforebegin", `<form id="add-endpoint-key" class="card endpoint-add-form" hidden><label>${t("endpoint.existingKey")}<input class="text-input" name="value" type="password" autocomplete="new-password" required></label><div class="actions"><button class="primary compact" type="submit">${icon("plus")}${t("endpoint.addExisting")}</button><button class="secondary" id="cancel-add-key" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>`);
   const showFeedback = message => { document.getElementById("endpoint-feedback").textContent = message; };
   const actionError = error => showFeedback(t(error.code === "stale_revision" ? "endpoint.stale" : "endpoint.actionFailed"));
   document.getElementById("refresh").addEventListener("click", () => renderEndpoint(page, secret));
+  const addKeyForm = page.querySelector("#add-endpoint-key");
+  page.querySelector("#show-add-key").addEventListener("click", () => { addKeyForm.hidden = !addKeyForm.hidden; if (!addKeyForm.hidden) addKeyForm.elements.value.focus(); });
+  page.querySelector("#cancel-add-key").addEventListener("click", () => { addKeyForm.reset(); addKeyForm.hidden = true; });
+  addKeyForm.addEventListener("submit", async event => {
+    event.preventDefault();
+    const submit = addKeyForm.querySelector('[type="submit"]');
+    const message = addKeyForm.querySelector(".form-message");
+    submit.disabled = true;
+    message.textContent = t("endpoint.creating");
+    try {
+      await api("/endpoint-keys", {method: "POST", body: JSON.stringify({value: addKeyForm.elements.value.value.trim()})});
+      await renderEndpoint(page, "", t("endpoint.addedExisting"));
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      message.textContent = t(error.code === "endpoint_key_exists" ? "endpoint.exists" : "endpoint.actionFailed");
+      submit.disabled = false;
+    }
+  });
   document.getElementById("create-key").addEventListener("click", async event => {
     if (secret && !confirm(t("endpoint.confirmReplaceSecret"))) return;
     event.currentTarget.disabled = true;
@@ -360,11 +381,80 @@ async function renderEndpoint(page, secret = "", feedback = "") {
   }
 }
 
+function compatibleProviderSection(items) {
+  const cards = items.map(item => `<article class="card compatible-provider-card"><div class="card-title"><h3>${escapeHTML(item.name)}</h3><span class="badge ${item.enabled ? "ready" : "partial"}">${t(item.enabled ? "providers.active" : "providers.disabled")}</span></div><code class="compatible-base-url">${escapeHTML(item.base_url)}</code><div class="account-meta"><span>${Number(item.models?.length || 0)} ${t("providers.models")}</span><span>${Number(item.api_key_masks?.length || 0)} ${t("providers.apiKeys")}</span></div>${item.models?.length ? `<details><summary>${t("providers.modelList")}</summary><div class="model-list">${item.models.map(model => `<code>${escapeHTML(model.alias || model.name)}</code>`).join("")}</div></details>` : ""}<div class="actions"><button class="secondary" type="button" data-custom-edit="${escapeHTML(item.id)}">${icon("edit")}${t("providers.edit")}</button><button class="secondary" type="button" data-custom-enabled="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${t(item.enabled ? "providers.disable" : "providers.enable")}</button><button class="danger-button" type="button" data-custom-delete="${escapeHTML(item.id)}">${icon("trash")}${t("endpoint.delete")}</button></div></article>`).join("");
+  return `<section class="compatible-provider-section"><div class="section-head"><div><h2>${t("providers.compatibleTitle")}</h2><p class="hint">${t("providers.compatibleDescription")}</p></div><button class="primary compact" type="button" id="show-custom-provider">${icon("plus")}${t("providers.addCompatible")}</button></div><form id="custom-provider-form" class="card compatible-provider-form" hidden><input type="hidden" name="id"><div class="settings-grid"><label>${t("providers.compatibleName")}<input class="text-input" name="name" required></label><label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.example.com/v1" required></label></div><div class="settings-grid"><label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("providers.apiKeyOptional")}"></label><label>${t("providers.prefix")}<input class="text-input" name="prefix"></label></div><label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="4" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button><button class="secondary" id="cancel-custom-provider" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>${items.length ? `<section class="grid compatible-provider-grid">${cards}</section>` : `<div class="empty compatible-empty">${t("providers.compatibleEmpty")}</div>`}</section>`;
+}
+
+function bindCompatibleProviderControls(container, items, reload) {
+  const section = container.querySelector(".compatible-provider-section");
+  const form = section.querySelector("#custom-provider-form");
+  const message = form.querySelector(".form-message");
+  section.querySelector("#show-custom-provider").addEventListener("click", () => {
+    form.reset();
+    form.elements.id.value = "";
+    form.elements.name.disabled = false;
+    delete form.dataset.initialBaseUrl;
+    form.hidden = !form.hidden;
+    if (!form.hidden) form.elements.name.focus();
+  });
+  section.querySelector("#cancel-custom-provider").addEventListener("click", () => { form.reset(); form.hidden = true; message.textContent = ""; });
+  section.querySelectorAll("[data-custom-edit]").forEach(button => button.addEventListener("click", () => {
+    const item = items.find(provider => provider.id === button.dataset.customEdit);
+    if (!item) return;
+    form.reset();
+    form.elements.id.value = item.id;
+    form.elements.name.value = item.name;
+    form.elements.name.disabled = true;
+    form.elements.base_url.value = item.base_url;
+    form.dataset.initialBaseUrl = item.base_url;
+    form.elements.prefix.value = item.prefix || "";
+    form.elements.api_key.value = "";
+    form.elements.models.value = (item.models || []).map(model => `${model.name} | ${model.alias}`).join("\n");
+    message.textContent = "";
+    form.hidden = false;
+    form.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
+  }));
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const lines = form.elements.models.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const models = lines.map(line => { const [name, alias] = line.split("|").map(value => value.trim()); return {name, alias: alias || name}; });
+    const id = form.elements.id.value;
+    const body = {name: form.elements.name.value.trim(), prefix: form.elements.prefix.value.trim(), api_key: form.elements.api_key.value.trim(), models};
+    if (!id || form.elements.base_url.value.trim() !== form.dataset.initialBaseUrl) body.base_url = form.elements.base_url.value.trim();
+    const submit = form.querySelector("[type=submit]");
+    submit.disabled = true;
+    message.textContent = t("providers.savingCompatible");
+    try {
+      await api(id ? `/provider-configs/${encodeURIComponent(id)}` : "/provider-configs", {method: id ? "PATCH" : "POST", body: JSON.stringify(body)});
+      await reload();
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      message.textContent = t(error.code === "provider_exists" ? "providers.compatibleExists" : "providers.compatibleSaveFailed");
+      message.className = "form-message failed";
+      submit.disabled = false;
+    }
+  });
+  section.querySelectorAll("[data-custom-enabled]").forEach(button => button.addEventListener("click", async () => {
+    const enabled = button.dataset.enabled !== "true";
+    if (!confirm(t(enabled ? "providers.confirmEnable" : "providers.confirmDisable"))) return;
+    button.disabled = true;
+    try { await api(`/provider-configs/${encodeURIComponent(button.dataset.customEnabled)}`, {method: "PATCH", body: JSON.stringify({disabled: !enabled})}); await reload(); }
+    catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; }
+  }));
+  section.querySelectorAll("[data-custom-delete]").forEach(button => button.addEventListener("click", async () => {
+    if (!confirm(t("providers.confirmDeleteCompatible"))) return;
+    button.disabled = true;
+    try { await api(`/provider-configs/${encodeURIComponent(button.dataset.customDelete)}`, {method: "DELETE"}); await reload(); }
+    catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; }
+  }));
+}
+
 async function renderProviders(page) {
   page.innerHTML = pageHeader("kicker.liveData", "page.providers", "providers.description", true) + `<div id="providers"><div class="loading">${t("common.loading")}</div></div>`;
   document.getElementById("refresh").addEventListener("click", () => renderProviders(page));
   try {
-    const response = await api("/providers");
+    const [response, customResponse] = await Promise.all([api("/providers"), api("/provider-configs")]);
     if (!page.isConnected || page.dataset.page !== "providers") return;
     const providers = response.items || [];
     const container = document.getElementById("providers");
@@ -377,6 +467,9 @@ async function renderProviders(page) {
     const providerState = provider => !provider.enabled ? "disabled" : provider.status === "active" ? "active" : "attention";
     container.innerHTML = `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="provider-search" type="search" placeholder="${t("providers.search")}" aria-label="${t("providers.search")}"></label><select class="text-input provider-filter" id="provider-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select><a class="primary compact" href="#/auth-files">${icon("user")}${t("providers.manageAccounts")}</a></div><div class="provider-summary"><span><strong>${groups.size}</strong> ${t("providers.type")}</span><span><strong>${providers.length}</strong> ${t("providers.accounts")}</span><span class="ok"><strong>${providers.filter(item => providerState(item) === "active").length}</strong> ${t("providers.active")}</span></div><div class="provider-groups">${[...groups].map(([name, accounts]) => `<section class="provider-group"><header class="provider-group-head">${providerIdentity(name)}<span class="badge">${accounts.length} ${t("providers.accounts")}</span></header><div class="account-list">${accounts.map(provider => `<article class="account-row" data-account data-provider-state="${providerState(provider)}"><div class="account-main"><span class="account-avatar">${icon("user")}</span><div><strong class="account-name" title="${escapeHTML(provider.label || provider.id || "-")}">${escapeHTML(provider.label || provider.id || "-")}</strong><div class="account-meta"><span class="badge ${providerState(provider) === "active" ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.enabled ? provider.status : "disabled"))}</span><span>${Number(provider.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(provider.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></div></div><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${icon("grid")}${t("providers.models")}</button><a class="secondary" href="#/quota">${icon("gauge")}${t("quota.title")}</a><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${icon(provider.enabled ? "zap" : "shield")}${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></article>`).join("")}</div></section>`).join("")}</div><div id="provider-empty" class="empty" ${providers.length ? "hidden" : ""}>${providers.length ? t("providers.noMatches") : t("providers.empty")}</div><div id="provider-models" class="provider-models" aria-live="polite"></div>`;
     container.querySelector(".search-field").outerHTML = providerFilterChips(providers.map(item => item.provider));
+    const customProviders = customResponse.items || [];
+    container.querySelector("#provider-empty").insertAdjacentHTML("beforebegin", compatibleProviderSection(customProviders));
+    if (!providers.length && customProviders.length) container.querySelector("#provider-empty").hidden = true;
     const groupNames = [...groups.keys()];
     container.querySelectorAll(".provider-group").forEach((group, index) => { group.dataset.provider = groupNames[index].toLowerCase(); });
     let selectedProvider = "";
@@ -392,7 +485,7 @@ async function renderProviders(page) {
         group.hidden = !matches;
         visible += matches;
       });
-      container.querySelector("#provider-empty").hidden = visible > 0;
+      container.querySelector("#provider-empty").hidden = visible > 0 || (!providers.length && customProviders.length > 0);
     };
     bindProviderFilterChips(container.querySelector(".provider-chips"), provider => { selectedProvider = provider; applyFilter(); });
     container.querySelector("#provider-status").addEventListener("change", applyFilter);
@@ -441,6 +534,7 @@ async function renderProviders(page) {
         button.disabled = false;
       }
     }));
+    bindCompatibleProviderControls(container, customProviders, () => renderProviders(page));
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     document.getElementById("providers").innerHTML = `<div class="error">${t("common.error")}</div>`;
@@ -584,7 +678,8 @@ async function startOAuthLogin(provider, message, onSuccess) {
 }
 
 async function renderAuthFiles(page) {
-  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-actions"><button class="secondary" data-oauth="codex">${providerIdentity("codex", true)}${t("authFiles.loginCodex")}</button><button class="secondary" data-oauth="anthropic">${providerIdentity("claude", true)}${t("authFiles.loginClaude")}</button><button class="secondary" data-oauth="antigravity">${providerIdentity("antigravity", true)}${t("authFiles.loginAntigravity")}</button></div><div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="auth-search" type="search" placeholder="${t("authFiles.search")}" aria-label="${t("authFiles.search")}"></label><select class="text-input provider-filter" id="auth-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select></div><div id="auth-files-content" class="loading">${t("common.loading")}</div><div id="auth-models" class="provider-models" aria-live="polite"></div>`;
+  const oauthButtons = [["codex", "codex", "authFiles.loginCodex"], ["anthropic", "claude", "authFiles.loginClaude"], ["antigravity", "antigravity", "authFiles.loginAntigravity"], ["kimi", "kimi", "authFiles.loginKimi"], ["kimi-ai", "kimi", "authFiles.loginKimiAI"], ["xai", "server", "authFiles.loginXAI"], ["devin", "server", "authFiles.loginDevin"], ["meta", "server", "authFiles.loginMeta"]];
+  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-toolbar"><div class="auth-actions">${oauthButtons.map(([id, brand, label]) => `<button class="secondary" data-oauth="${id}">${brand === "server" ? icon("key") : providerIdentity(brand, true)}${t(label)}</button>`).join("")}</div><div class="auth-import"><input id="auth-upload-input" type="file" accept=".json,application/json" multiple hidden><button class="primary compact" type="button" id="auth-upload">${icon("plus")}${t("authFiles.upload")}</button></div></div><div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="auth-search" type="search" placeholder="${t("authFiles.search")}" aria-label="${t("authFiles.search")}"></label><select class="text-input provider-filter" id="auth-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select></div><div id="auth-files-content" class="loading">${t("common.loading")}</div><div id="auth-models" class="provider-models" aria-live="polite"></div>`;
   page.querySelector(".search-field").outerHTML = `<div id="auth-provider-chips"></div>`;
   const content = page.querySelector("#auth-files-content");
   content.insertAdjacentHTML("beforebegin", `<div class="form-message" id="auth-action-status" role="status" aria-live="polite"></div>`);
@@ -664,6 +759,25 @@ async function renderAuthFiles(page) {
       content.querySelectorAll("[data-auth-toggle]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api("/auth-files/status", {method: "PATCH", body: JSON.stringify({name: button.dataset.authToggle, auth_index: button.dataset.authIndex, disabled: button.dataset.disabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
     } catch (error) { if (error.message === "invalid_key") return logout(); content.innerHTML = `<div class="error">${t("common.error")}</div>`; }
   };
+  const upload = page.querySelector("#auth-upload-input");
+  page.querySelector("#auth-upload").addEventListener("click", () => upload.click());
+  upload.addEventListener("change", async () => {
+    if (!upload.files?.length) return;
+    const message = page.querySelector("#auth-action-status");
+    const form = new FormData();
+    for (const file of upload.files) form.append("files", file, file.name);
+    page.querySelector("#auth-upload").disabled = true;
+    message.textContent = t("authFiles.uploading");
+    try {
+      const result = await api("/auth-files", {method: "POST", body: form});
+      message.textContent = t(result.status === "partial" ? "authFiles.uploadPartial" : "authFiles.uploaded");
+      upload.value = "";
+      await load();
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      message.textContent = t("authFiles.uploadFailed");
+    } finally { page.querySelector("#auth-upload").disabled = false; }
+  });
   document.getElementById("refresh").onclick = load;
   await load();
 }
@@ -1084,30 +1198,66 @@ async function renderQuota(page) {
 
 async function renderLogs(page, query = "") {
   const run = page._logsRun = (page._logsRun || 0) + 1;
-  const header = () => pageHeader("kicker.liveData", "logs.title", "logs.description", true) + `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="log-search" type="search" value="${escapeHTML(query)}" placeholder="${escapeHTML(t("logs.search"))}" aria-label="${escapeHTML(t("logs.search"))}"></label><span class="hint" id="log-count" role="status"></span></div><div id="log-results" class="loading">${t("common.loading")}</div>`;
-  page.innerHTML = header();
-  page.querySelector("#refresh").addEventListener("click", () => renderLogs(page, page.querySelector("#log-search").value));
-  try {
-    const response = await api("/logs?limit=200");
-    if (!page.isConnected || page.dataset.page !== "logs" || page._logsRun !== run) return;
-    const lines = response.lines || [];
-    const update = () => {
-      const needle = page.querySelector("#log-search").value.trim().toLocaleLowerCase(state.locale);
-      const matching = needle ? lines.filter(line => line.toLocaleLowerCase(state.locale).includes(needle)) : lines;
-      page.querySelector("#log-count").textContent = `${matching.length}/${lines.length} ${t("logs.lines")}`;
-      const results = page.querySelector("#log-results");
-      results.className = matching.length ? "log-output" : "empty";
-      results.innerHTML = matching.length ? escapeHTML(matching.join("\n")) : t(lines.length ? "logs.noMatch" : "logs.empty");
-    };
-    page.querySelector("#log-search").addEventListener("input", update);
-    update();
-  } catch (error) {
-    if (error.message === "invalid_key") return logout();
-    if (!page.isConnected || page.dataset.page !== "logs" || page._logsRun !== run) return;
-    const results = page.querySelector("#log-results");
-    results.className = "error";
-    results.textContent = error.status === 400 ? t("logs.unavailable") : t("common.error");
-  }
+  let tab = "server";
+  const shell = () => pageHeader("kicker.liveData", "logs.title", "logs.description", true) + `<div class="log-tabs"><button type="button" data-log-tab="server" aria-pressed="${tab === "server"}">${icon("terminal")}${t("logs.serverTab")}</button><button type="button" data-log-tab="request-errors" aria-pressed="${tab === "request-errors"}">${icon("shield")}${t("logs.requestErrorsTab")}</button></div><div id="log-content" class="loading">${t("common.loading")}</div>`;
+  page.innerHTML = shell();
+  const load = async () => {
+    const currentRun = ++page._logsRun;
+    page.innerHTML = shell();
+    page.querySelector("#refresh").addEventListener("click", load);
+    page.querySelectorAll("[data-log-tab]").forEach(button => button.addEventListener("click", () => { tab = button.dataset.logTab; load(); }));
+    const content = page.querySelector("#log-content");
+    try {
+      if (tab === "server") {
+        const response = await api("/logs?limit=400");
+        if (!page.isConnected || page.dataset.page !== "logs" || page._logsRun !== currentRun) return;
+        const lines = response.lines || [];
+        content.className = "log-panel";
+        content.innerHTML = `<div class="provider-toolbar log-toolbar"><label class="search-field">${icon("search")}<input id="log-search" type="search" value="${escapeHTML(query)}" placeholder="${escapeHTML(t("logs.search"))}" aria-label="${escapeHTML(t("logs.search"))}"></label><span class="hint" id="log-count" role="status"></span><button class="danger-button" type="button" id="clear-logs">${icon("trash")}${t("logs.clear")}</button></div><pre id="log-results" class="log-output"></pre>`;
+        const update = () => {
+          const needle = content.querySelector("#log-search").value.trim().toLocaleLowerCase(state.locale);
+          const matching = needle ? lines.filter(line => line.toLocaleLowerCase(state.locale).includes(needle)) : lines;
+          content.querySelector("#log-count").textContent = `${matching.length}/${lines.length} ${t("logs.lines")}`;
+          const results = content.querySelector("#log-results");
+          results.className = matching.length ? "log-output" : "empty";
+          results.textContent = matching.length ? matching.join("\n") : t(lines.length ? "logs.noMatch" : "logs.empty");
+        };
+        content.querySelector("#log-search").addEventListener("input", update);
+        content.querySelector("#clear-logs").addEventListener("click", async event => {
+          if (!confirm(t("logs.confirmClear"))) return;
+          event.currentTarget.disabled = true;
+          try { await api("/logs", {method: "DELETE"}); await load(); }
+          catch (error) { if (error.message === "invalid_key") return logout(); event.currentTarget.disabled = false; content.querySelector("#log-count").textContent = t("logs.clearFailed"); }
+        });
+        update();
+      } else {
+        const response = await api("/request-error-logs");
+        if (!page.isConnected || page.dataset.page !== "logs" || page._logsRun !== currentRun) return;
+        const files = response.files || [];
+        content.className = "log-panel";
+        content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("logs.file")}</th><th>${t("logs.size")}</th><th>${t("logs.modified")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${files.map(file => `<tr><td><code>${escapeHTML(file.name)}</code></td><td>${Number(file.size || 0).toLocaleString(state.locale)} B</td><td>${escapeHTML(file.modified ? new Date(Number(file.modified) * 1000).toLocaleString(state.locale) : "-")}</td><td><button class="secondary" type="button" data-download-error-log="${escapeHTML(file.name)}">${icon("download")}${t("logs.download")}</button></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">${t("logs.errorFilesEmpty")}</div>`;
+        content.querySelectorAll("[data-download-error-log]").forEach(button => button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            const response = await fetch(`/v0/management/request-error-logs/${encodeURIComponent(button.dataset.downloadErrorLog)}`, {headers: {Authorization: `Bearer ${state.key}`} });
+            if (response.status === 401 || response.status === 403) throw new Error("invalid_key");
+            if (!response.ok) throw new Error("download_failed");
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url; link.download = button.dataset.downloadErrorLog; link.click();
+            URL.revokeObjectURL(url);
+          } catch (error) { if (error.message === "invalid_key") return logout(); } finally { button.disabled = false; }
+        }));
+      }
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      if (!page.isConnected || page._logsRun !== currentRun) return;
+      content.className = "error";
+      content.textContent = error.status === 400 ? t("logs.unavailable") : t("common.error");
+    }
+  };
+  await load();
 }
 
 async function renderSettings(page) {
@@ -1115,7 +1265,7 @@ async function renderSettings(page) {
   try {
     const settings = (await api("/system-settings")).item || {};
     if (!page.isConnected || page.dataset.page !== "settings") return;
-    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="status-panel"><h2 class="tool-title">${icon("server")}${t("settings.connection")}</h2><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label></div><h2 class="tool-title">${icon("settings")}${t("settings.behavior")}</h2><div class="settings-grid"><label><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> ${t("settings.logging")}</label><label><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> ${t("settings.usage")}</label><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" required value="${Number(settings.request_retry || 0)}"></label></div><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="settings-message" role="status" aria-live="polite"></span></div></form>`;
+    page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="settings-layout"><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("server")}</span><div><h2>${t("settings.connection")}</h2><p>${t("settings.connectionDescription")}</p></div></div><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("route")}</span><div><h2>${t("settings.routing")}</h2><p>${t("settings.routingDescription")}</p></div></div><label>${t("settings.routingStrategy")}<select class="text-input" name="routing_strategy"><option value="round-robin" ${settings.routing_strategy === "round-robin" ? "selected" : ""}>${t("settings.roundRobin")}</option><option value="weighted-round-robin" ${settings.routing_strategy === "weighted-round-robin" ? "selected" : ""}>${t("settings.weightedRoundRobin")}</option><option value="fill-first" ${settings.routing_strategy === "fill-first" ? "selected" : ""}>${t("settings.fillFirst")}</option></select></label><div class="settings-grid"><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" required value="${Number(settings.request_retry || 0)}"></label><label>${t("settings.maxRetryCredentials")}<input class="text-input" type="number" name="max_retry_credentials" min="0" required value="${Number(settings.max_retry_credentials || 0)}"></label><label>${t("settings.maxRetryInterval")}<input class="text-input" type="number" name="max_retry_interval" min="0" required value="${Number(settings.max_retry_interval || 0)}"></label></div><label class="settings-toggle"><input type="checkbox" name="force_model_prefix" ${settings.force_model_prefix ? "checked" : ""}> <span><strong>${t("settings.forceModelPrefix")}</strong><small>${t("settings.forceModelPrefixDescription")}</small></span></label></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("settings")}</span><div><h2>${t("settings.behavior")}</h2><p>${t("settings.behaviorDescription")}</p></div></div><div class="settings-toggles"><label class="settings-toggle"><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> <span><strong>${t("settings.logging")}</strong><small>${t("settings.loggingDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="request_log" ${settings.request_log ? "checked" : ""}> <span><strong>${t("settings.requestLog")}</strong><small>${t("settings.requestLogDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> <span><strong>${t("settings.usage")}</strong><small>${t("settings.usageDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="websocket_auth" ${settings.websocket_auth ? "checked" : ""}> <span><strong>${t("settings.websocketAuth")}</strong><small>${t("settings.websocketAuthDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="debug" ${settings.debug ? "checked" : ""}> <span><strong>${t("settings.debug")}</strong><small>${t("settings.debugDescription")}</small></span></label></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("terminal")}</span><div><h2>${t("settings.logRetention")}</h2><p>${t("settings.logRetentionDescription")}</p></div></div><div class="settings-grid"><label>${t("settings.maxLogSize")}<input class="text-input" type="number" name="logs_max_total_size_mb" min="0" required value="${Number(settings.logs_max_total_size_mb || 0)}"></label><label>${t("settings.maxErrorLogs")}<input class="text-input" type="number" name="error_logs_max_files" min="0" required value="${Number(settings.error_logs_max_files || 0)}"></label></div></section><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="settings-message" role="status" aria-live="polite"></span></div></form><section class="card settings-section settings-proxy"><div class="tool-title"><span class="feature-icon">${icon("globe")}</span><div><h2>${t("settings.proxy")}</h2><p>${t("settings.proxyDescription")}</p></div><span class="badge ${settings.proxy_url_configured ? "ready" : "partial"}" id="proxy-status">${t(settings.proxy_url_configured ? "settings.proxyConfigured" : "settings.proxyNotConfigured")}</span></div><form id="proxy-form"><label>${t("settings.proxyUrl")}<input class="text-input" name="proxy_url" type="password" autocomplete="new-password" placeholder="${t(settings.proxy_url_configured ? "settings.proxyReplacePlaceholder" : "settings.proxyPlaceholder")}"></label><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.proxySave")}</button><button class="danger-button" type="button" id="proxy-clear" ${settings.proxy_url_configured ? "" : "disabled"}>${icon("trash")}${t("settings.proxyClear")}</button><span class="form-message" id="proxy-message" role="status" aria-live="polite"></span></div><span class="hint">${t("settings.proxySecretHint")}</span></form></section>`;
     const load = () => renderSettings(page);
     document.getElementById("refresh").addEventListener("click", load);
     document.getElementById("settings-form").addEventListener("input", () => { document.getElementById("settings-message").textContent = ""; });
@@ -1127,11 +1277,45 @@ async function renderSettings(page) {
       button.disabled = true;
       message.textContent = t("settings.saving");
       try {
-        await api("/system-settings", {method: "PATCH", body: JSON.stringify({logging_to_file: form.elements.logging_to_file.checked, usage_statistics_enabled: form.elements.usage_statistics_enabled.checked, request_retry: Number(form.elements.request_retry.value)})});
+        const body = {debug: form.elements.debug.checked, logging_to_file: form.elements.logging_to_file.checked, request_log: form.elements.request_log.checked, websocket_auth: form.elements.websocket_auth.checked, usage_statistics_enabled: form.elements.usage_statistics_enabled.checked, force_model_prefix: form.elements.force_model_prefix.checked, routing_strategy: form.elements.routing_strategy.value, request_retry: Number(form.elements.request_retry.value), max_retry_credentials: Number(form.elements.max_retry_credentials.value), max_retry_interval: Number(form.elements.max_retry_interval.value), logs_max_total_size_mb: Number(form.elements.logs_max_total_size_mb.value), error_logs_max_files: Number(form.elements.error_logs_max_files.value)};
+        await api("/system-settings", {method: "PATCH", body: JSON.stringify(body)});
         message.textContent = t("settings.saved");
         message.className = "form-message ok";
       } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("common.error"); message.className = "form-message failed"; }
       finally { button.disabled = false; }
+    });
+    const proxyForm = page.querySelector("#proxy-form");
+    const proxyMessage = page.querySelector("#proxy-message");
+    proxyForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const input = proxyForm.elements.proxy_url;
+      if (!input.value.trim()) { proxyMessage.textContent = t("settings.proxyRequired"); proxyMessage.className = "form-message failed"; return; }
+      const button = proxyForm.querySelector('[type="submit"]');
+      button.disabled = true;
+      proxyMessage.textContent = t("settings.saving");
+      try {
+        await api("/proxy-url", {method: "PUT", body: JSON.stringify({value: input.value.trim()})});
+        input.value = "";
+        page.querySelector("#proxy-status").className = "badge ready";
+        page.querySelector("#proxy-status").textContent = t("settings.proxyConfigured");
+        page.querySelector("#proxy-clear").disabled = false;
+        proxyMessage.textContent = t("settings.proxySaved");
+        proxyMessage.className = "form-message ok";
+      } catch (error) { if (error.message === "invalid_key") return logout(); proxyMessage.textContent = t("common.error"); proxyMessage.className = "form-message failed"; }
+      finally { button.disabled = false; }
+    });
+    page.querySelector("#proxy-clear").addEventListener("click", async event => {
+      if (!confirm(t("settings.proxyConfirmClear"))) return;
+      const button = event.currentTarget;
+      button.disabled = true;
+      proxyMessage.textContent = t("settings.saving");
+      try {
+        await api("/proxy-url", {method: "DELETE"});
+        page.querySelector("#proxy-status").className = "badge partial";
+        page.querySelector("#proxy-status").textContent = t("settings.proxyNotConfigured");
+        proxyMessage.textContent = t("settings.proxyCleared");
+        proxyMessage.className = "form-message ok";
+      } catch (error) { if (error.message === "invalid_key") return logout(); proxyMessage.textContent = t("common.error"); proxyMessage.className = "form-message failed"; button.disabled = false; }
     });
   } catch (error) {
     if (error.message === "invalid_key") return logout();
@@ -1141,29 +1325,104 @@ async function renderSettings(page) {
 }
 
 async function renderPlugins(page) {
-  page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="loading">${t("common.loading")}</div>`;
-  const load = async () => {
+  let tab = "installed";
+  let run = 0;
+  const header = () => pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="plugin-tabs"><button type="button" data-plugin-tab="installed" aria-pressed="${tab === "installed"}">${t("plugins.installedTab")}</button><button type="button" data-plugin-tab="store" aria-pressed="${tab === "store"}">${t("plugins.storeTab")}</button></div><div id="plugin-content" class="loading">${t("common.loading")}</div><div id="plugin-config-panel"></div>`;
+  const bindTabs = () => {
+    document.getElementById("refresh").addEventListener("click", load);
+    page.querySelectorAll("[data-plugin-tab]").forEach(button => button.addEventListener("click", () => { tab = button.dataset.pluginTab; load(); }));
+  };
+  const fieldHTML = (field, config) => {
+    const name = String(field.name || "");
+    const current = config?.[name];
+    const secret = ["key", "token", "secret", "password", "cookie"].some(part => name.toLowerCase().includes(part));
+    const label = escapeHTML(name);
+    const description = field.description ? `<small>${escapeHTML(field.description)}</small>` : "";
+    if (field.type === "boolean" || field.type === "bool") return `<label class="plugin-config-toggle"><input type="checkbox" data-plugin-field="${label}" data-plugin-type="boolean" ${current ? "checked" : ""}><span><strong>${label}</strong>${description}</span></label>`;
+    if ((field.enum_values || []).length) return `<label>${label}${description}<select class="text-input" data-plugin-field="${label}"><option value=""></option>${field.enum_values.map(value => `<option value="${escapeHTML(value)}" ${current === value ? "selected" : ""}>${escapeHTML(value)}</option>`).join("")}</select></label>`;
+    const type = field.type === "number" || field.type === "integer" ? "number" : secret ? "password" : "text";
+    const value = secret || current == null ? "" : String(current);
+    const placeholder = secret && current ? t("plugins.secretSaved") : "";
+    return `<label>${label}${description}<input class="text-input" data-plugin-field="${label}" data-plugin-type="${type}" type="${type}" value="${escapeHTML(value)}" placeholder="${placeholder}" autocomplete="off"></label>`;
+  };
+  const showConfig = async button => {
+    const id = button.dataset.pluginConfig;
+    const fields = JSON.parse(button.dataset.pluginFields || "[]");
+    const panel = page.querySelector("#plugin-config-panel");
+    button.disabled = true;
+    panel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
     try {
-      const response = await api("/plugins");
-      if (!page.isConnected || page.dataset.page !== "plugins") return;
-      const plugins = response.plugins || [];
-      page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + (!response.plugins_enabled && plugins.length ? `<section class="status-panel"><p>${t("plugins.globalDisabled")}</p></section>` : "") + (plugins.length ? `<section class="grid">${plugins.map(plugin => `<article class="card"><div class="card-title"><h2 class="tool-title">${icon("puzzle")}${escapeHTML(plugin.metadata?.name || plugin.id)}</h2><span class="badge ${plugin.effective_enabled ? "ready" : "partial"}">${t(plugin.effective_enabled ? "plugins.enabled" : plugin.enabled ? "plugins.inactive" : "plugins.disabled")}</span></div><p>${escapeHTML(plugin.metadata?.version || plugin.id)}</p><div class="actions"><button class="secondary" data-plugin-enabled="${escapeHTML(plugin.id)}" data-enabled="${Boolean(plugin.enabled)}">${icon(plugin.enabled ? "pause" : "check")}${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}</button></div><span class="form-message" role="status" aria-live="polite"></span></article>`).join("")}</section>` : `<div class="empty">${t("plugins.empty")}</div>`);
-      document.getElementById("refresh").addEventListener("click", load);
-      page.querySelectorAll("[data-plugin-enabled]").forEach(button => button.addEventListener("click", async () => {
-        const message = button.closest(".card").querySelector(".form-message");
-        button.disabled = true;
-        message.textContent = t("plugins.updating");
-        try {
-          await api(`/plugins/${encodeURIComponent(button.dataset.pluginEnabled)}/enabled`, {method: "PATCH", body: JSON.stringify({enabled: button.dataset.enabled !== "true"})});
-          await load();
-        } catch (error) {
-          if (error.message === "invalid_key") return logout();
-          message.textContent = t("plugins.updateFailed");
-          message.className = "form-message failed";
-          button.disabled = false;
-        }
-      }));
-    } catch (error) { if (error.message === "invalid_key") return logout(); if (!page.isConnected || page.dataset.page !== "plugins") return; page.innerHTML = pageHeader("kicker.management", "plugins.title", "plugins.description", true) + `<div class="error">${t("common.error")}</div>`; document.getElementById("refresh").addEventListener("click", load); }
+      const config = await api(`/plugins/${encodeURIComponent(id)}/config`);
+      if (!page.isConnected) return;
+      const form = `<form class="card plugin-config-form" data-plugin-config-form="${escapeHTML(id)}"><div class="section-head"><h2>${t("plugins.configuration")}: ${escapeHTML(id)}</h2><button class="secondary" type="button" data-plugin-close>${icon("close")}${t("action.close")}</button></div>${fields.length ? fields.map(field => fieldHTML(field, config)).join("") : `<p class="hint">${t("plugins.noConfigFields")}</p>`}<div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>`;
+      panel.innerHTML = form;
+      panel.querySelector("[data-plugin-close]").addEventListener("click", () => { panel.innerHTML = ""; });
+      panel.querySelector("form").addEventListener("submit", async event => {
+        event.preventDefault();
+        const currentForm = event.currentTarget;
+        const message = currentForm.querySelector(".form-message");
+        const changes = {};
+        currentForm.querySelectorAll("[data-plugin-field]").forEach(input => {
+          const name = input.dataset.pluginField;
+          const type = input.dataset.pluginType;
+          if (type === "boolean") { changes[name] = input.checked; return; }
+          if (type === "password" && !input.value) return;
+          if (type === "number" && input.value.trim()) changes[name] = Number(input.value);
+          else if (input.value !== "") changes[name] = input.value;
+        });
+        const submit = currentForm.querySelector("[type=submit]");
+        submit.disabled = true;
+        message.textContent = t("plugins.saving");
+        try { await api(`/plugins/${encodeURIComponent(id)}/config`, {method: "PATCH", body: JSON.stringify(changes)}); message.textContent = t("plugins.saved"); message.className = "form-message ok"; }
+        catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("plugins.saveFailed"); message.className = "form-message failed"; }
+        finally { submit.disabled = false; }
+      });
+      panel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
+    } catch (error) { if (error.message === "invalid_key") return logout(); panel.innerHTML = `<div class="error">${t("plugins.configFailed")}</div>`; }
+    finally { button.disabled = false; }
+  };
+  const load = async () => {
+    const currentRun = ++run;
+    page.innerHTML = header();
+    bindTabs();
+    const content = page.querySelector("#plugin-content");
+    try {
+      if (tab === "installed") {
+        const response = await api("/plugins");
+        if (!page.isConnected || page.dataset.page !== "plugins" || currentRun !== run) return;
+        const plugins = response.plugins || [];
+        content.className = "";
+        content.innerHTML = `${!response.plugins_enabled && plugins.length ? `<section class="status-panel"><p>${t("plugins.globalDisabled")}</p></section>` : ""}${plugins.length ? `<section class="grid">${plugins.map(plugin => { const label = escapeHTML(plugin.metadata?.name || plugin.id); const fields = JSON.stringify(plugin.config_fields || []); return `<article class="card plugin-card"><div class="card-title"><h2 class="tool-title">${icon("puzzle")}${label}</h2><span class="badge ${plugin.effective_enabled ? "ready" : "partial"}">${t(plugin.effective_enabled ? "plugins.enabled" : plugin.enabled ? "plugins.inactive" : "plugins.disabled")}</span></div><p>${escapeHTML(plugin.metadata?.version || plugin.id)}${plugin.registered ? "" : ` · ${t("plugins.restartRequired")}`}</p><div class="actions"><button class="secondary" data-plugin-enabled="${escapeHTML(plugin.id)}" data-enabled="${Boolean(plugin.enabled)}">${icon(plugin.enabled ? "pause" : "check")}${plugin.enabled ? t("plugins.disable") : t("plugins.enable")}</button><button class="secondary" data-plugin-config="${escapeHTML(plugin.id)}" data-plugin-fields="${escapeHTML(fields)}">${icon("settings")}${t("plugins.configuration")}</button><button class="danger-button" data-plugin-delete="${escapeHTML(plugin.id)}">${icon("trash")}${t("plugins.uninstall")}</button></div><span class="form-message" role="status" aria-live="polite"></span></article>`; }).join("")}</section>` : `<div class="empty">${t("plugins.empty")}</div>`}`;
+        content.querySelectorAll("[data-plugin-enabled]").forEach(button => button.addEventListener("click", async () => {
+          const enabled = button.dataset.enabled !== "true";
+          if (!confirm(t(enabled ? "plugins.confirmEnable" : "plugins.confirmDisable"))) return;
+          button.disabled = true;
+          try { await api(`/plugins/${encodeURIComponent(button.dataset.pluginEnabled)}/enabled`, {method: "PATCH", body: JSON.stringify({enabled})}); await load(); }
+          catch (error) { if (error.message === "invalid_key") return logout(); button.closest(".card").querySelector(".form-message").textContent = t("plugins.updateFailed"); button.disabled = false; }
+        }));
+        content.querySelectorAll("[data-plugin-config]").forEach(button => button.addEventListener("click", () => showConfig(button)));
+        content.querySelectorAll("[data-plugin-delete]").forEach(button => button.addEventListener("click", async () => {
+          if (!confirm(t("plugins.confirmUninstall").replace("{name}", button.dataset.pluginDelete))) return;
+          button.disabled = true;
+          try { await api(`/plugins/${encodeURIComponent(button.dataset.pluginDelete)}`, {method: "DELETE"}); await load(); }
+          catch (error) { if (error.message === "invalid_key") return logout(); button.closest(".card").querySelector(".form-message").textContent = t("plugins.updateFailed"); button.disabled = false; }
+        }));
+      } else {
+        const response = await api("/plugin-store");
+        if (!page.isConnected || page.dataset.page !== "plugins" || currentRun !== run) return;
+        const plugins = response.plugins || [];
+        content.className = "";
+        content.innerHTML = `${(response.source_errors || []).map(item => `<div class="form-message failed">${escapeHTML(item.source_name || item.source_id)}: ${escapeHTML(item.message || t("plugins.storeFailed"))}</div>`).join("")}${plugins.length ? `<section class="grid">${plugins.map(plugin => { const installable = !plugin.auth_required || plugin.auth_configured; const action = plugin.installed ? plugin.update_available ? t("plugins.update") : t("plugins.installed") : t("plugins.install"); return `<article class="card plugin-card"><div class="card-title"><h2>${escapeHTML(plugin.name || plugin.id)}</h2><span class="badge ${plugin.installed ? "ready" : "partial"}">${escapeHTML(plugin.version || "-")}</span></div><p>${escapeHTML(plugin.description || "")}</p><div class="plugin-store-meta"><span>${escapeHTML(plugin.author || plugin.source_name || "")}</span><span>${escapeHTML(plugin.license || "")}</span></div><div class="actions"><button class="primary compact" data-plugin-install="${escapeHTML(plugin.id)}" data-source="${escapeHTML(plugin.source_id)}" data-name="${escapeHTML(plugin.name || plugin.id)}" ${plugin.installed && !plugin.update_available || !installable ? "disabled" : ""}>${icon("plus")}${action}</button>${plugin.auth_required && !plugin.auth_configured ? `<span class="hint">${t("plugins.storeAuthRequired")}</span>` : ""}<span class="form-message" role="status" aria-live="polite"></span></div></article>`; }).join("")}</section>` : `<div class="empty">${t("plugins.storeEmpty")}</div>`}`;
+        content.querySelectorAll("[data-plugin-install]").forEach(button => button.addEventListener("click", async () => {
+          if (!confirm(t("plugins.confirmInstall").replace("{name}", button.dataset.name))) return;
+          button.disabled = true;
+          const message = button.closest(".card").querySelector(".form-message");
+          message.textContent = t("plugins.installing");
+          try { await api(`/plugin-store/${encodeURIComponent(button.dataset.pluginInstall)}/install?source=${encodeURIComponent(button.dataset.source)}`, {method: "POST", body: "{}"}); message.textContent = t("plugins.installedSuccess"); message.className = "form-message ok"; await load(); }
+          catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = error.status === 409 ? t("plugins.restartRequired") : t("plugins.installFailed"); message.className = "form-message failed"; button.disabled = false; }
+        }));
+      }
+    } catch (error) { if (error.message === "invalid_key") return logout(); if (!page.isConnected || currentRun !== run) return; content.className = "error"; content.textContent = tab === "store" ? t("plugins.storeFailed") : t("common.error"); }
   };
   await load();
 }
