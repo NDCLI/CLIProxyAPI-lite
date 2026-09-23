@@ -78,3 +78,4 @@ docker-compose.override.yml
 !static/
 !static/management.html
 usage-history.json
+combos.json

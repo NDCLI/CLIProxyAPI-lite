@@ -789,7 +789,11 @@ async function startOAuthLogin(provider, message, onSuccess) {
 
 
 async function renderCombos(page, feedback = "") {
-  const formHTML = item => `<form id="combo-form" class="combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><div class="settings-grid"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" required></label><label>${t("combo.model")}<input class="text-input" name="model" value="${escapeHTML(item?.model || "")}" required></label></div><div class="combo-target-heading"><strong>${t("combo.targets")}</strong><span class="hint">${t("combo.targetsHint")}</span></div><div id="combo-target-list" class="combo-target-list"></div><button class="secondary combo-add-target" id="add-combo-target" type="button">${icon("plus")}${t("combo.addTarget")}</button><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="combo-form-footer"><span class="form-message" id="combo-message" role="status" aria-live="polite"></span><div class="actions"><button class="secondary" id="validate-combo" type="button">${icon("check")}${t("combo.validate")}</button><button class="primary compact" type="submit">${icon("save")}${t("combo.save")}</button></div></div></form>`;
+  const comboModelID = name => String(name || "").trim().toLowerCase().replaceAll(" ", "-");
+  const formHTML = item => {
+    const model = item?.model || comboModelID(item?.name);
+    return `<form id="combo-form" class="combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><input name="model" type="hidden" value="${escapeHTML(item?.model || "")}"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" placeholder="my-combo" required><span class="hint" id="combo-model-preview">${t("combo.modelPreview").replace("{model}", escapeHTML(model || "my-combo"))}</span></label><div class="combo-target-heading"><strong>${t("combo.targets")}</strong><span class="hint">${t("combo.targetsHint")}</span></div><div id="combo-target-list" class="combo-target-list"></div><button class="secondary combo-add-target" id="add-combo-target" type="button">${icon("plus")}${t("combo.addTarget")}</button><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="combo-form-footer"><span class="form-message" id="combo-message" role="status" aria-live="polite"></span><div class="actions"><button class="secondary" id="validate-combo" type="button">${icon("check")}${t("combo.validate")}</button><button class="primary compact" type="submit">${icon("save")}${t("combo.save")}</button></div></div></form>`;
+  };
   page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<section class="status-panel combo-collection"><div class="section-head"><div><h2>${t("combo.saved")}</h2><span class="form-message" id="combo-list-message" role="status" aria-live="polite">${escapeHTML(feedback)}</span></div><button class="primary compact" id="create-combo" type="button">${icon("plus")}${t("combo.create")}</button></div><div id="combos-list" class="loading">${t("common.loading")}</div></section><dialog class="combo-dialog" id="combo-dialog" aria-labelledby="combo-dialog-title"><div class="combo-dialog-content"><header class="combo-dialog-head"><h2 id="combo-dialog-title"></h2><button class="secondary" type="button" id="close-combo-dialog" aria-label="${t("action.close")}">${icon("close")}</button></header><div id="combo-form-slot"></div></div></dialog>`;
   let items = [];
   let modelCatalog = null;
@@ -844,10 +848,11 @@ async function renderCombos(page, feedback = "") {
     return `<div class="combo-target-row"><select class="text-input" data-target-provider aria-label="${t("combo.selectProvider")}">${providerOptions(provider)}</select><span class="combo-target-arrow">${icon("arrow")}</span><select class="text-input" data-target-model aria-label="${t("combo.selectModel")}">${modelOptions(provider, model)}</select><button class="secondary combo-remove-target" type="button" data-remove-target aria-label="${t("combo.removeTarget")}" title="${t("combo.removeTarget")}">${icon("close")}</button></div>`;
   };
   const values = (form, message) => {
-    const value = {id: form.elements.id.value.trim(), name: form.elements.name.value.trim(), model: form.elements.model.value.trim(), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: []};
-    if (!value.name || !value.model) {
+    const name = form.elements.name.value.trim();
+    const value = {id: form.elements.id.value.trim(), name, model: form.elements.model.value.trim() || comboModelID(name), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: []};
+    if (!value.name) {
       message.textContent = t("combo.required");
-      form.elements[!value.name ? "name" : "model"].focus();
+      form.elements.name.focus();
       return null;
     }
     const rows = [...form.querySelectorAll(".combo-target-row")];
@@ -874,7 +879,7 @@ async function renderCombos(page, feedback = "") {
     }
     if (items.some(item => item.id !== value.id && item.model === value.model)) {
       message.textContent = t("combo.modelExists");
-      form.elements.model.focus();
+      form.elements.name.focus();
       return null;
     }
     return value;
@@ -925,6 +930,10 @@ async function renderCombos(page, feedback = "") {
       finally { validateButton.disabled = false; }
     });
     form.addEventListener("input", () => { form.dataset.dirty = "true"; message.textContent = ""; });
+    form.elements.name.addEventListener("input", () => {
+      const model = form.elements.model.value.trim() || comboModelID(form.elements.name.value) || "my-combo";
+      form.querySelector("#combo-model-preview").textContent = t("combo.modelPreview").replace("{model}", model);
+    });
     form.addEventListener("change", () => { form.dataset.dirty = "true"; message.textContent = ""; });
     form.addEventListener("submit", async event => {
       event.preventDefault();
