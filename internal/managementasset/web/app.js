@@ -598,10 +598,35 @@ function bindProviderAccountControls(container, reload) {
     const panel = container.querySelector("#provider-models");
     panel.innerHTML = '<div class="loading">' + t("common.loading") + '</div>';
     try {
-      const models = (await api("/providers/" + encodeURIComponent(button.dataset.providerModels) + "/models")).items || [];
+      const providerID = button.dataset.providerModels;
+      const models = (await api("/providers/" + encodeURIComponent(providerID) + "/models")).items || [];
       const label = button.closest(".account-row").querySelector(".account-name").textContent;
       panel.innerHTML = '<section class="status-panel"><div class="card-title"><h2>' + t("providers.availableModels") + ': ' + escapeHTML(label) + '</h2><span class="badge">' + models.length + '</span></div>' +
-        (models.length ? '<div class="model-list">' + models.map(model => '<code title="' + escapeHTML(model.id) + '">' + escapeHTML(model.display_name || model.id) + '</code>').join("") + '</div>' : '<div class="empty">' + t("providers.modelsEmpty") + '</div>') + '</section>';
+        (models.length ? '<div class="provider-model-test-list">' + models.map(model => '<div class="provider-model-test-row"><span><strong title="' + escapeHTML(model.id) + '">' + escapeHTML(model.display_name || model.id) + '</strong><small><code>' + escapeHTML(model.id) + '</code></small></span><button class="secondary" type="button" data-test-provider-model="' + escapeHTML(providerID) + '" data-model-id="' + escapeHTML(model.id) + '">' + icon("zap") + t("providers.testModel") + '</button><span class="form-message" data-model-test-result role="status" aria-live="polite"></span></div>').join("") + '</div>' : '<div class="empty">' + t("providers.modelsEmpty") + '</div>') + '</section>';
+      panel.querySelectorAll("[data-test-provider-model]").forEach(testButton => testButton.addEventListener("click", async () => {
+        const result = testButton.closest(".provider-model-test-row").querySelector("[data-model-test-result]");
+        const original = testButton.innerHTML;
+        testButton.disabled = true;
+        testButton.innerHTML = icon("refresh") + t("providers.testingModel");
+        result.textContent = "";
+        try {
+          const response = await api(`/providers/${encodeURIComponent(testButton.dataset.testProviderModel)}/test-model`, {method: "POST", body: JSON.stringify({model: testButton.dataset.modelId})});
+          if (response.ok) {
+            result.textContent = t("providers.modelTestPassed").replace("{latency}", Number(response.latency_ms || 0).toLocaleString(state.locale));
+            result.className = "form-message is-success";
+          } else {
+            result.textContent = response.error || t("providers.modelTestFailed");
+            result.className = "form-message is-error";
+          }
+        } catch (error) {
+          if (error.message === "invalid_key") return logout();
+          result.textContent = t("providers.modelTestFailed");
+          result.className = "form-message is-error";
+        } finally {
+          testButton.disabled = false;
+          testButton.innerHTML = original;
+        }
+      }));
       panel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
     } catch (error) { if (error.message === "invalid_key") return logout(); panel.innerHTML = '<div class="error">' + t("common.error") + '</div>'; }
     finally { button.disabled = false; }
@@ -764,10 +789,60 @@ async function startOAuthLogin(provider, message, onSuccess) {
 
 
 async function renderCombos(page, feedback = "") {
-  const formHTML = item => `<form id="combo-form" class="status-panel combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><div class="card-title"><h2>${t(item?.id ? "combo.edit" : "combo.create")}</h2></div><div class="settings-grid"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" required></label><label>${t("combo.model")}<input class="text-input" name="model" value="${escapeHTML(item?.model || "")}" required></label></div><label>${t("combo.targets")}<textarea class="text-input" name="targets" rows="4" required placeholder="codex:gpt-5&#10;claude:sonnet">${escapeHTML((item?.targets || []).map(target => `${target.provider}:${target.model}`).join("\n"))}</textarea><span class="hint">${t("combo.targetsHint")}</span></label><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("combo.save")}</button><button class="secondary" id="validate-combo" type="button">${icon("check")}${t("combo.validate")}</button>${item?.id ? `<button class="secondary" id="cancel-combo" type="button">${icon("close")}${t("action.cancel")}</button>` : ""}<span class="form-message" id="combo-message" aria-live="polite"></span></div></form>`;
-  const scrollToForm = () => document.getElementById("combo-form").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start"});
-  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<div class="combo-layout">${formHTML()}<section class="combo-collection"><div class="section-head"><h2>${t("combo.saved")}</h2><span class="form-message" id="combo-list-message" role="status" aria-live="polite">${escapeHTML(feedback)}</span></div><div id="combos-list" class="loading">${t("common.loading")}</div></section></div>`;
+  const formHTML = item => `<form id="combo-form" class="combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><div class="settings-grid"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" required></label><label>${t("combo.model")}<input class="text-input" name="model" value="${escapeHTML(item?.model || "")}" required></label></div><div class="combo-target-heading"><strong>${t("combo.targets")}</strong><span class="hint">${t("combo.targetsHint")}</span></div><div id="combo-target-list" class="combo-target-list"></div><button class="secondary combo-add-target" id="add-combo-target" type="button">${icon("plus")}${t("combo.addTarget")}</button><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="combo-form-footer"><span class="form-message" id="combo-message" role="status" aria-live="polite"></span><div class="actions"><button class="secondary" id="validate-combo" type="button">${icon("check")}${t("combo.validate")}</button><button class="primary compact" type="submit">${icon("save")}${t("combo.save")}</button></div></div></form>`;
+  page.innerHTML = pageHeader("kicker.management", "page.combo", "combo.description", true) + `<section class="status-panel combo-collection"><div class="section-head"><div><h2>${t("combo.saved")}</h2><span class="form-message" id="combo-list-message" role="status" aria-live="polite">${escapeHTML(feedback)}</span></div><button class="primary compact" id="create-combo" type="button">${icon("plus")}${t("combo.create")}</button></div><div id="combos-list" class="loading">${t("common.loading")}</div></section><dialog class="combo-dialog" id="combo-dialog" aria-labelledby="combo-dialog-title"><div class="combo-dialog-content"><header class="combo-dialog-head"><h2 id="combo-dialog-title"></h2><button class="secondary" type="button" id="close-combo-dialog" aria-label="${t("action.close")}">${icon("close")}</button></header><div id="combo-form-slot"></div></div></dialog>`;
   let items = [];
+  let modelCatalog = null;
+  let catalogError = "";
+  const loadModelCatalog = async () => {
+    const response = await api("/providers");
+    const providers = new Map();
+    const models = new Map();
+    const accounts = (response.items || []).filter(item => item.enabled && item.id && item.provider);
+    const result = await Promise.all(accounts.map(async account => {
+      try { return {account, items: (await api(`/providers/${encodeURIComponent(account.id)}/models`)).items || []}; }
+      catch (error) { if (error.message === "invalid_key") throw error; return {account, items: []}; }
+    }));
+    for (const {account, items: registeredModels} of result) {
+      const provider = String(account.provider).trim().toLowerCase();
+      if (!provider) continue;
+      if (!providers.has(provider)) providers.set(provider, String(account.provider).trim());
+      if (!models.has(provider)) models.set(provider, new Map());
+      for (const model of registeredModels) {
+        const id = String(model.id || "").trim();
+        if (id && !models.get(provider).has(id)) models.get(provider).set(id, String(model.display_name || id));
+      }
+    }
+    return {providers: [...providers].sort((a, b) => a[1].localeCompare(b[1])), models};
+  };
+  const ensureModelCatalog = async () => {
+    if (modelCatalog) return modelCatalog;
+    try { modelCatalog = await loadModelCatalog(); }
+    catch (error) {
+      if (error.message === "invalid_key") { await logout(); return null; }
+      catalogError = t("combo.modelsUnavailable");
+      modelCatalog = {providers: [], models: new Map()};
+    }
+    return modelCatalog;
+  };
+  const modelOptions = (provider, selected = "") => {
+    const available = modelCatalog?.models.get(provider) || new Map();
+    const options = [...available].map(([id, label]) => `<option value="${escapeHTML(id)}" ${id === selected ? "selected" : ""}>${escapeHTML(label)} · ${escapeHTML(id)}</option>`);
+    if (selected && !available.has(selected)) options.unshift(`<option value="${escapeHTML(selected)}" selected>${escapeHTML(selected)} (${t("combo.savedModel")})</option>`);
+    if (!selected) options.unshift(`<option value="" disabled selected>${t("combo.selectModel")}</option>`);
+    return options.join("");
+  };
+  const providerOptions = selected => {
+    const options = (modelCatalog?.providers || []).map(([key, label]) => `<option value="${escapeHTML(key)}" ${key === selected ? "selected" : ""}>${escapeHTML(label)}</option>`);
+    if (selected && !(modelCatalog?.providers || []).some(([key]) => key === selected)) options.unshift(`<option value="${escapeHTML(selected)}" selected>${escapeHTML(selected)} (${t("combo.savedModel")})</option>`);
+    options.unshift(`<option value="" ${selected ? "" : "selected"}>${t("combo.selectProvider")}</option>`);
+    return options.join("");
+  };
+  const targetRowHTML = target => {
+    const provider = String(target?.provider || "").trim().toLowerCase();
+    const model = String(target?.model || "").trim();
+    return `<div class="combo-target-row"><select class="text-input" data-target-provider aria-label="${t("combo.selectProvider")}">${providerOptions(provider)}</select><span class="combo-target-arrow">${icon("arrow")}</span><select class="text-input" data-target-model aria-label="${t("combo.selectModel")}">${modelOptions(provider, model)}</select><button class="secondary combo-remove-target" type="button" data-remove-target aria-label="${t("combo.removeTarget")}" title="${t("combo.removeTarget")}">${icon("close")}</button></div>`;
+  };
   const values = (form, message) => {
     const value = {id: form.elements.id.value.trim(), name: form.elements.name.value.trim(), model: form.elements.model.value.trim(), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: []};
     if (!value.name || !value.model) {
@@ -775,19 +850,18 @@ async function renderCombos(page, feedback = "") {
       form.elements[!value.name ? "name" : "model"].focus();
       return null;
     }
-    const lines = form.elements.targets.value.split(/\r?\n/).map((text, index) => ({text: text.trim(), number: index + 1})).filter(line => line.text);
-    if (!lines.length) {
+    const rows = [...form.querySelectorAll(".combo-target-row")];
+    if (!rows.length) {
       message.textContent = t("combo.targetsRequired");
-      form.elements.targets.focus();
+      form.querySelector("#add-combo-target").focus();
       return null;
     }
-    for (const line of lines) {
-      const separator = line.text.indexOf(":");
-      const provider = line.text.slice(0, separator).trim();
-      const model = line.text.slice(separator + 1).trim();
-      if (separator < 1 || !provider || !model) {
-        message.textContent = t("combo.invalidTarget").replace("{line}", line.number);
-        form.elements.targets.focus();
+    for (const row of rows) {
+      const provider = row.querySelector("[data-target-provider]").value;
+      const model = row.querySelector("[data-target-model]").value;
+      if (!provider || !model) {
+        message.textContent = t("combo.targetRequired");
+        row.querySelector(!provider ? "[data-target-provider]" : "[data-target-model]").focus();
         return null;
       }
       value.targets.push({provider, model});
@@ -805,16 +879,43 @@ async function renderCombos(page, feedback = "") {
     }
     return value;
   };
+  const dialog = page.querySelector("#combo-dialog");
   const bindForm = item => {
-    const form = document.getElementById("combo-form");
-    const message = document.getElementById("combo-message");
+    const form = page.querySelector("#combo-form");
+    const message = page.querySelector("#combo-message");
+    const targetList = page.querySelector("#combo-target-list");
+    targetList.innerHTML = (item?.targets?.length ? item.targets : [{}]).map(targetRowHTML).join("");
+    if (catalogError) message.textContent = catalogError;
+    targetList.addEventListener("change", event => {
+      if (!event.target.matches("[data-target-provider]")) return;
+      const row = event.target.closest(".combo-target-row");
+      const available = modelCatalog?.models.get(event.target.value) || new Map();
+      const firstModel = available.keys().next().value || "";
+      row.querySelector("[data-target-model]").innerHTML = modelOptions(event.target.value, firstModel);
+      form.dataset.dirty = "true";
+      message.textContent = "";
+    });
+    targetList.addEventListener("click", event => {
+      const remove = event.target.closest("[data-remove-target]");
+      if (!remove) return;
+      remove.closest(".combo-target-row").remove();
+      form.dataset.dirty = "true";
+      message.textContent = "";
+    });
+    form.querySelector("#add-combo-target").addEventListener("click", () => {
+      targetList.insertAdjacentHTML("beforeend", targetRowHTML({}));
+      const rows = targetList.querySelectorAll(".combo-target-row");
+      rows[rows.length - 1].querySelector("[data-target-provider]").focus();
+      form.dataset.dirty = "true";
+      message.textContent = "";
+    });
     const validate = async value => {
       message.textContent = t("combo.checking");
       const result = await api("/combos/validate", {method: "POST", body: JSON.stringify(value)});
       message.textContent = result.item ? t("combo.valid") : t("combo.invalid");
       return Boolean(result.item);
     };
-    const validateButton = document.getElementById("validate-combo");
+    const validateButton = page.querySelector("#validate-combo");
     validateButton.addEventListener("click", async () => {
       const value = values(form, message);
       if (!value) return;
@@ -822,12 +923,6 @@ async function renderCombos(page, feedback = "") {
       try { await validate(value); }
       catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t(error.code === "invalid_combo" ? "combo.invalid" : "combo.checkFailed"); }
       finally { validateButton.disabled = false; }
-    });
-    const cancel = document.getElementById("cancel-combo");
-    if (cancel) cancel.addEventListener("click", () => {
-      if (form.dataset.dirty === "true" && !confirm(t("combo.confirmDiscard"))) return;
-      form.outerHTML = formHTML();
-      bindForm();
     });
     form.addEventListener("input", () => { form.dataset.dirty = "true"; message.textContent = ""; });
     form.addEventListener("change", () => { form.dataset.dirty = "true"; message.textContent = ""; });
@@ -841,6 +936,7 @@ async function renderCombos(page, feedback = "") {
         if (!await validate(value)) return;
         if (value.id) await api(`/combos/${encodeURIComponent(value.id)}`, {method: "PATCH", body: JSON.stringify(value)});
         else await api("/combos", {method: "POST", body: JSON.stringify(value)});
+        dialog.close();
         await renderCombos(page, t("combo.savedMessage"));
       } catch (error) {
         if (error.message === "invalid_key") return logout();
@@ -848,13 +944,31 @@ async function renderCombos(page, feedback = "") {
       } finally { submit.disabled = false; }
     });
   };
-  const replaceForm = item => {
-    const current = document.getElementById("combo-form");
-    if (current.dataset.dirty === "true" && !confirm(t("combo.confirmDiscard"))) return;
-    current.outerHTML = formHTML(item);
-    bindForm();
-    scrollToForm();
+  const closeDialog = () => {
+    const form = page.querySelector("#combo-form");
+    if (form?.dataset.dirty === "true" && !confirm(t("combo.confirmDiscard"))) return;
+    dialog.close();
   };
+  const openForm = async item => {
+    if (dialog.open) {
+      const current = page.querySelector("#combo-form");
+      if (current?.dataset.dirty === "true" && !confirm(t("combo.confirmDiscard"))) return;
+      dialog.close();
+    }
+    const catalog = await ensureModelCatalog();
+    if (!catalog || !dialog.isConnected) return;
+    page.querySelector("#combo-dialog-title").textContent = t(item?.id ? "combo.edit" : "combo.create");
+    page.querySelector("#combo-form-slot").innerHTML = formHTML(item);
+    bindForm(item);
+    dialog.showModal();
+    document.body.classList.add("combo-dialog-open");
+    page.querySelector('#combo-form [name="name"]').focus();
+  };
+  page.querySelector("#create-combo").addEventListener("click", () => openForm());
+  page.querySelector("#close-combo-dialog").addEventListener("click", closeDialog);
+  dialog.addEventListener("click", event => { if (event.target === dialog) closeDialog(); });
+  dialog.addEventListener("cancel", event => { event.preventDefault(); closeDialog(); });
+  dialog.addEventListener("close", () => document.body.classList.remove("combo-dialog-open"));
   const listMessage = message => { document.getElementById("combo-list-message").textContent = message; };
   const load = async () => {
     try {
@@ -862,7 +976,7 @@ async function renderCombos(page, feedback = "") {
       items = response.items || [];
       document.getElementById("combos-list").className = "";
       document.getElementById("combos-list").innerHTML = items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ${item.enabled ? "ready" : "partial"}">${item.enabled ? t("capability.ready") : t("providers.disabled")}</span></div><p class="combo-model">${icon("route")}${escapeHTML(item.model)}</p><ol class="target-chain">${(item.targets || []).map(target => `<li>${providerIdentity(target.provider, true)}<code>${escapeHTML(target.model)}</code></li>`).join("")}</ol><div class="actions"><button class="secondary" data-edit-combo="${escapeHTML(item.id)}">${icon("edit")}${t("combo.edit")}</button><button class="secondary" data-duplicate-combo="${escapeHTML(item.id)}">${icon("copy")}${t("combo.duplicate")}</button><button class="secondary" data-toggle-combo="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${item.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${icon("trash")}${t("combo.delete")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`;
-      page.querySelectorAll("[data-edit-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.editCombo); if (item) replaceForm(item); }));
+      page.querySelectorAll("[data-edit-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.editCombo); if (item) openForm(item); }));
       page.querySelectorAll("[data-duplicate-combo]").forEach(button => button.addEventListener("click", () => {
         const item = items.find(entry => entry.id === button.dataset.duplicateCombo);
         if (!item) return;
@@ -873,7 +987,7 @@ async function renderCombos(page, feedback = "") {
           model = `${item.model}-copy${suffix > 1 ? `-${suffix}` : ""}`;
           suffix++;
         } while (items.some(entry => entry.name === name || entry.model === model));
-        replaceForm({...item, id: "", name, model});
+        openForm({...item, id: "", name, model});
       }));
       page.querySelectorAll("[data-toggle-combo]").forEach(button => button.addEventListener("click", async () => {
         button.disabled = true;

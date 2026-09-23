@@ -13,6 +13,8 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -44,6 +46,47 @@ func TestMITMStatusReportsLastObservedModel(t *testing.T) {
 	status := runtime.status("missing-cert.crt")
 	if status.LastTool != runtime.lastTool || status.LastModel != runtime.lastModel || status.LastMapped != runtime.lastMapped {
 		t.Fatalf("last observed route missing from status: %+v", status)
+	}
+}
+
+func TestCleanupMITMDNSHostsContentOnlyRemovesOwnedRedirects(t *testing.T) {
+	content := strings.Join([]string{
+		"127.0.0.1 daily-cloudcode-pa.googleapis.com cloudcode-pa.googleapis.com # CLIProxyAPI-lite MITM",
+		"127.0.0.1 example.local # user entry",
+		"127.0.0.1 api.individual.githubcopilot.com # another tool",
+		"",
+	}, "\r\n")
+	updated, changed, errCleanup := cleanupMITMDNSHostsContent(content)
+	if errCleanup != nil || !changed {
+		t.Fatalf("cleanup = changed %t, error %v; want removed managed entries", changed, errCleanup)
+	}
+	if strings.Contains(updated, "# CLIProxyAPI-lite MITM") || strings.Contains(updated, "daily-cloudcode-pa.googleapis.com") || strings.Contains(updated, "cloudcode-pa.googleapis.com") {
+		t.Fatalf("managed redirect remains after cleanup: %q", updated)
+	}
+	for _, entry := range []string{"127.0.0.1 example.local # user entry", "127.0.0.1 api.individual.githubcopilot.com # another tool"} {
+		if !strings.Contains(updated, entry) {
+			t.Fatalf("cleanup removed unrelated entry %q from %q", entry, updated)
+		}
+	}
+}
+
+func TestMITMDNSPreferencesPersistAcrossRuntimeInstances(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "config.yaml")
+	first := newMITMRuntime(configPath, 8317)
+	if errSet := first.setDNSPreference("antigravity", true); errSet != nil {
+		t.Fatal(errSet)
+	}
+
+	second := newMITMRuntime(configPath, 8317)
+	if !second.dnsDesired["antigravity"] {
+		t.Fatal("Antigravity DNS preference was not restored")
+	}
+	if errSet := second.setDNSPreference("antigravity", false); errSet != nil {
+		t.Fatal(errSet)
+	}
+	third := newMITMRuntime(configPath, 8317)
+	if third.dnsDesired["antigravity"] {
+		t.Fatal("disabled DNS preference was restored")
 	}
 }
 
@@ -123,6 +166,10 @@ func TestMITMHTTPClientPreservesHTTP2Redirect(t *testing.T) {
 }
 
 func TestResolveMITMUpstreamBypassesHosts(t *testing.T) {
+	mitmDNSCache.Delete("localhost")
+	mitmDNSCache.Delete("blocked.test")
+	defer mitmDNSCache.Delete("localhost")
+	defer mitmDNSCache.Delete("blocked.test")
 	packet, errListen := net.ListenPacket("udp4", "127.0.0.1:0")
 	if errListen != nil {
 		t.Fatal(errListen)
@@ -140,11 +187,11 @@ func TestResolveMITMUpstreamBypassesHosts(t *testing.T) {
 	go server.ActivateAndServe()
 	defer server.Shutdown()
 
-	got, errResolve := resolveMITMUpstream(context.Background(), "localhost", packet.LocalAddr().String())
+	got, errResolve := resolveMITMUpstreamWithServers(context.Background(), "localhost", []string{packet.LocalAddr().String()})
 	if errResolve != nil || got != "8.8.4.4" {
 		t.Fatalf("localhost resolved through hosts instead of DNS: ip=%q err=%v", got, errResolve)
 	}
-	if _, errResolve := resolveMITMUpstream(context.Background(), "blocked.test", packet.LocalAddr().String()); errResolve == nil {
+	if _, errResolve := resolveMITMUpstreamWithServers(context.Background(), "blocked.test", []string{packet.LocalAddr().String()}); errResolve == nil {
 		t.Fatal("loopback DNS answer must not route back into MITM")
 	}
 }

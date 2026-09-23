@@ -57,17 +57,14 @@ func (h *Handler) StartMITM(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errTrust.Error()})
 		return
 	}
+	_ = h.mitm.restoreDNSPreferences()
 	c.JSON(http.StatusOK, h.mitm.status(certPath))
 }
 
 func (h *Handler) StopMITM(c *gin.Context) {
-	for tool, enabled := range mitmDNSStatus() {
-		if enabled {
-			if errDNS := setMITMDNS(tool, false); errDNS != nil {
-				c.JSON(http.StatusForbidden, gin.H{"error": "stop aborted because DNS cleanup failed: " + errDNS.Error()})
-				return
-			}
-		}
+	if errDNS := h.mitm.disableDNSPreferences(); errDNS != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "stop aborted because DNS cleanup failed: " + errDNS.Error()})
+		return
 	}
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 	defer cancel()
@@ -105,7 +102,7 @@ func (h *Handler) ToggleMITMDNS(c *gin.Context) {
 			return
 		}
 	}
-	if errSet := setMITMDNS(body.Tool, *body.Enabled); errSet != nil {
+	if errSet := h.mitm.setDNS(body.Tool, *body.Enabled); errSet != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": errSet.Error()})
 		return
 	}

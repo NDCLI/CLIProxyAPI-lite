@@ -29,6 +29,7 @@ import (
 
 	"github.com/miekg/dns"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
+	log "github.com/sirupsen/logrus"
 )
 
 const mitmListenAddress = "127.0.0.1:443"
@@ -56,6 +57,8 @@ var mitmDNSCache sync.Map
 
 type mitmRuntime struct {
 	mu          sync.RWMutex
+	dnsMu       sync.RWMutex
+	dnsOpMu     sync.Mutex
 	server      *http.Server
 	listener    net.Listener
 	gatewayPort int
@@ -70,6 +73,8 @@ type mitmRuntime struct {
 	lastTool    string
 	lastModel   string
 	lastMapped  string
+	dnsDesired  map[string]bool
+	dnsWarning  string
 }
 
 type mitmStatus struct {
@@ -79,6 +84,8 @@ type mitmStatus struct {
 	CertTrusted      bool            `json:"cert_trusted"`
 	IsAdmin          bool            `json:"is_admin"`
 	DNS              map[string]bool `json:"dns"`
+	DNSPending       map[string]bool `json:"dns_pending"`
+	DNSWarning       string          `json:"dns_warning,omitempty"`
 	BaseURL          string          `json:"base_url"`
 	APIKeyID         string          `json:"api_key_id,omitempty"`
 	APIKeyConfigured bool            `json:"api_key_configured"`
@@ -98,8 +105,10 @@ func newMITMRuntime(configFilePath string, gatewayPort int) *mitmRuntime {
 		baseDir:     baseDir,
 		mappings:    make(map[string]map[string]string),
 		leafCerts:   make(map[string]*tls.Certificate),
+		dnsDesired:  make(map[string]bool),
 	}
 	runtime.loadMappings()
+	runtime.loadDNSState()
 	return runtime
 }
 
@@ -146,13 +155,16 @@ func (m *mitmRuntime) status(certPath string) mitmStatus {
 	baseURL, apiKeyID, hasKey := m.gatewayBaseURLLocked(), m.apiKeyID, m.apiKey != ""
 	lastTool, lastModel, lastMapped := m.lastTool, m.lastModel, m.lastMapped
 	m.mu.RUnlock()
+	dns, dnsPending, dnsWarning := m.dnsStateSnapshot()
 	return mitmStatus{
 		Running:          running,
 		Address:          mitmListenAddress,
 		CertExists:       fileExists(certPath),
 		CertTrusted:      certificateTrusted(certPath),
 		IsAdmin:          currentProcessIsAdmin(),
-		DNS:              mitmDNSStatus(),
+		DNS:              dns,
+		DNSPending:       dnsPending,
+		DNSWarning:       dnsWarning,
 		BaseURL:          baseURL,
 		APIKeyID:         apiKeyID,
 		APIKeyConfigured: hasKey,
@@ -203,6 +215,15 @@ func (m *mitmRuntime) start(certPath, keyPath, apiKey, baseURL, apiKeyID string)
 				m.listener = nil
 			}
 			m.mu.Unlock()
+			log.WithError(errServe).Error("MITM server stopped unexpectedly")
+			m.dnsOpMu.Lock()
+			if errCleanup := cleanupMITMDNSHosts(); errCleanup != nil {
+				m.setDNSWarning(errCleanup.Error())
+				log.WithError(errCleanup).Error("failed to remove DNS redirects after MITM server failure")
+			} else {
+				m.setDNSWarning("")
+			}
+			m.dnsOpMu.Unlock()
 		}
 	}()
 	return nil
@@ -459,6 +480,10 @@ func directMITMClient() *http.Client {
 }
 
 func resolveMITMUpstream(ctx context.Context, host string) (string, error) {
+	return resolveMITMUpstreamWithServers(ctx, host, []string{"1.1.1.1:53", "1.0.0.1:53", "8.8.8.8:53", "8.8.4.4:53"})
+}
+
+func resolveMITMUpstreamWithServers(ctx context.Context, host string, dnsServers []string) (string, error) {
 	if cached, ok := mitmDNSCache.Load(host); ok {
 		entry := cached.(mitmDNSCacheEntry)
 		if time.Now().Before(entry.expiresAt) {
@@ -470,7 +495,7 @@ func resolveMITMUpstream(ctx context.Context, host string) (string, error) {
 	query := new(dns.Msg)
 	query.SetQuestion(dns.Fqdn(host), dns.TypeA)
 	var lastErr error
-	for _, dnsServer := range []string{"1.1.1.1:53", "1.0.0.1:53", "8.8.8.8:53", "8.8.4.4:53"} {
+	for _, dnsServer := range dnsServers {
 		reply, _, errLookup := (&dns.Client{Net: "udp"}).ExchangeContext(ctx, query, dnsServer)
 		if errLookup == nil && reply.Truncated {
 			reply, _, errLookup = (&dns.Client{Net: "tcp"}).ExchangeContext(ctx, query, dnsServer)

@@ -294,6 +294,11 @@ func (s *Server) Start() error {
 	if s == nil || s.server == nil {
 		return fmt.Errorf("failed to start HTTP server: server not initialized")
 	}
+	if s.mgmt != nil {
+		if errRecover := s.mgmt.RecoverStaleMITMDNS(); errRecover != nil {
+			log.WithError(errRecover).Warn("stale MITM DNS redirects could not be removed")
+		}
+	}
 
 	addr := s.server.Addr
 	listener, errListen := net.Listen("tcp", addr)
@@ -399,6 +404,10 @@ func (s *Server) Start() error {
 //   - error: An error if the server fails to stop
 func (s *Server) Stop(ctx context.Context) error {
 	log.Debug("Stopping API server...")
+	var errMITM error
+	if s.mgmt != nil {
+		errMITM = s.mgmt.ShutdownMITM(ctx)
+	}
 
 	if s.keepAliveEnabled {
 		select {
@@ -423,6 +432,9 @@ func (s *Server) Stop(ctx context.Context) error {
 	}
 	if errShutdown != nil {
 		return fmt.Errorf("failed to shutdown HTTP server: %v", errShutdown)
+	}
+	if errMITM != nil {
+		return fmt.Errorf("failed to shutdown MITM runtime: %w", errMITM)
 	}
 
 	log.Debug("API server stopped")

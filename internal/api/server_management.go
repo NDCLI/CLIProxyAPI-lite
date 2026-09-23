@@ -216,6 +216,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/providers/:id", s.mgmt.GetProvider)
 		mgmt.PATCH("/providers/:id", s.mgmt.PatchProvider)
 		mgmt.GET("/providers/:id/models", s.mgmt.GetProviderModels)
+		mgmt.POST("/providers/:id/test-model", s.mgmt.TestProviderModel)
 		mgmt.GET("/combos", s.mgmt.GetCombos)
 		mgmt.POST("/combos", s.mgmt.PutCombo)
 		mgmt.POST("/combos/validate", s.mgmt.ValidateCombo)
