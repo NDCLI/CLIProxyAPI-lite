@@ -7,6 +7,8 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
+	"io"
 	"math/big"
 	"net"
 	"net/http"
@@ -48,6 +50,35 @@ func TestMITMOpenAIResponseTranslatesBackToGemini(t *testing.T) {
 	)
 	if !bytes.Contains(converted, []byte(`"candidates"`)) || !bytes.Contains(converted, []byte("xin chao")) {
 		t.Fatalf("unexpected Gemini response: %s", converted)
+	}
+}
+
+func TestMITMAntigravityResponseEnvelope(t *testing.T) {
+	response := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewBufferString(`{"id":"chatcmpl-1","choices":[{"index":0,"message":{"role":"assistant","content":"OK"},"finish_reason":"stop"}]}`))}
+	recorder := httptest.NewRecorder()
+	if errProxy := proxyAntigravityResponse(recorder, response, "test", []byte(`{"request":{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}}`), nil, false); errProxy != nil {
+		t.Fatal(errProxy)
+	}
+	var result struct {
+		Response struct {
+			Candidates []json.RawMessage `json:"candidates"`
+		} `json:"response"`
+	}
+	if errDecode := json.Unmarshal(recorder.Body.Bytes(), &result); errDecode != nil || len(result.Response.Candidates) == 0 {
+		t.Fatalf("missing Antigravity response envelope: %s, error=%v", recorder.Body.String(), errDecode)
+	}
+	stream := &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(bytes.NewBufferString("data: {\"id\":\"chatcmpl-1\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"OK\"},\"finish_reason\":\"stop\"}]}\n\n"))}
+	recorder = httptest.NewRecorder()
+	if errProxy := proxyAntigravityResponse(recorder, stream, "test", nil, nil, true); errProxy != nil {
+		t.Fatal(errProxy)
+	}
+	for _, line := range bytes.Split(recorder.Body.Bytes(), []byte("\n")) {
+		if !bytes.HasPrefix(line, []byte("data: ")) {
+			continue
+		}
+		if errDecode := json.Unmarshal(bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data: "))), &result); errDecode != nil || len(result.Response.Candidates) == 0 {
+			t.Fatalf("missing streaming Antigravity response envelope: %s, error=%v", line, errDecode)
+		}
 	}
 }
 

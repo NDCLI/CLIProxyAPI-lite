@@ -21,7 +21,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -352,6 +351,7 @@ func proxyAntigravityResponse(w http.ResponseWriter, response *http.Response, mo
 			return errRead
 		}
 		converted := sdktranslator.TranslateNonStream(context.Background(), sdktranslator.FormatOpenAI, sdktranslator.FormatGemini, model, original, translated, data, nil)
+		converted = wrapAntigravityResponse(converted)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(response.StatusCode)
 		_, _ = w.Write(converted)
@@ -374,13 +374,26 @@ func proxyAntigravityResponse(w http.ResponseWriter, response *http.Response, mo
 			continue
 		}
 		for _, chunk := range sdktranslator.TranslateStream(context.Background(), sdktranslator.FormatOpenAI, sdktranslator.FormatGemini, model, original, translated, []byte(data), &state) {
-			_, _ = fmt.Fprintf(w, "data: %s\r\n\r\n", chunk)
+			if len(chunk) == 0 {
+				continue
+			}
+			_, _ = fmt.Fprintf(w, "data: %s\r\n\r\n", wrapAntigravityResponse(chunk))
 		}
 		if flusher != nil {
 			flusher.Flush()
 		}
 	}
 	return scanner.Err()
+}
+
+func wrapAntigravityResponse(gemini []byte) []byte {
+	if len(gemini) == 0 {
+		return nil
+	}
+	wrapped := make([]byte, 0, len(gemini)+13)
+	wrapped = append(wrapped, `{"response":`...)
+	wrapped = append(wrapped, gemini...)
+	return append(wrapped, '}')
 }
 
 func (m *mitmRuntime) passthrough(w http.ResponseWriter, req *http.Request, host string, body []byte) {
@@ -610,7 +623,7 @@ func currentProcessIsAdmin() bool {
 	if runtime.GOOS != "windows" {
 		return false
 	}
-	return exec.Command("cmd", "/C", "net", "session").Run() == nil
+	return hiddenMITMCommand("cmd", "/C", "net", "session").Run() == nil
 }
 
 func certificateTrusted(certPath string) bool {
@@ -622,7 +635,7 @@ func certificateTrusted(certPath string) bool {
 		return false
 	}
 	fingerprint := sha1.Sum(cert.Raw)
-	return exec.Command("certutil", "-user", "-store", "Root", hex.EncodeToString(fingerprint[:])).Run() == nil
+	return hiddenMITMCommand("certutil", "-user", "-store", "Root", hex.EncodeToString(fingerprint[:])).Run() == nil
 }
 
 func mitmDNSStatus() map[string]bool {
@@ -689,7 +702,7 @@ func setMITMDNS(tool string, enabled bool) error {
 	if errWrite := os.WriteFile(path, []byte(content), 0o644); errWrite != nil {
 		return errWrite
 	}
-	_ = exec.Command("ipconfig", "/flushdns").Run()
+	_ = hiddenMITMCommand("ipconfig", "/flushdns").Run()
 	return nil
 }
 

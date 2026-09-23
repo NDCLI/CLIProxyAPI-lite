@@ -13,7 +13,6 @@ import (
 	"math/big"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -156,7 +155,7 @@ func installMITMCertificate(certPath string) error {
 	if runtime.GOOS != "windows" {
 		return errUnsupportedCertStore
 	}
-	output, errRun := exec.Command("certutil", "-addstore", "-user", "Root", certPath).CombinedOutput()
+	output, errRun := hiddenMITMCommand("certutil", "-addstore", "-user", "Root", certPath).CombinedOutput()
 	if errRun != nil {
 		return fmt.Errorf("install MITM CA: %s: %w", strings.TrimSpace(string(output)), errRun)
 	}
@@ -169,7 +168,7 @@ func uninstallMITMCertificate(cert *x509.Certificate) error {
 	}
 	fingerprint := sha1.Sum(cert.Raw)
 	thumbprint := strings.ToUpper(hex.EncodeToString(fingerprint[:]))
-	output, errRun := exec.Command("certutil", "-delstore", "-user", "Root", thumbprint).CombinedOutput()
+	output, errRun := hiddenMITMCommand("certutil", "-delstore", "-user", "Root", thumbprint).CombinedOutput()
 	if errRun != nil {
 		return fmt.Errorf("uninstall MITM CA: %s: %w", strings.TrimSpace(string(output)), errRun)
 	}

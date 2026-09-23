@@ -4,12 +4,20 @@ package management
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
+	"syscall"
 
 	"golang.org/x/sys/windows/registry"
 )
 
 const mitmNodeCAEnv = "NODE_EXTRA_CA_CERTS"
+
+func hiddenMITMCommand(name string, args ...string) *exec.Cmd {
+	command := exec.Command(name, args...)
+	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	return command
+}
 
 func setMITMNodeCA(certPath string) error {
 	key, errOpen := registry.OpenKey(registry.CURRENT_USER, `Environment`, registry.QUERY_VALUE|registry.SET_VALUE)
