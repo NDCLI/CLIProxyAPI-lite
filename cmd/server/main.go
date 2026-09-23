@@ -130,6 +130,7 @@ func main() {
 	var tuiMode bool
 	var standalone bool
 	var localModel bool
+	var trayMode bool
 
 	// Define command-line flags for different operation modes.
 	flag.BoolVar(&codexLogin, "codex-login", false, "Login to Codex using OAuth")
@@ -158,6 +159,7 @@ func main() {
 	flag.BoolVar(&tuiMode, "tui", false, "Start with terminal management UI")
 	flag.BoolVar(&standalone, "standalone", false, "In TUI mode, start an embedded local server")
 	flag.BoolVar(&localModel, "local-model", false, "Use embedded models.json and codex_client_models.json only, skip remote model catalog fetching")
+	flag.BoolVar(&trayMode, "tray", false, "Run the server with a Windows system tray icon")
 
 	flag.CommandLine.Usage = func() {
 		out := flag.CommandLine.Output()
@@ -196,6 +198,21 @@ func main() {
 
 	// Parse the command-line flags.
 	flag.Parse()
+	if trayMode && (tuiMode || standalone) {
+		log.Error("--tray cannot be combined with --tui or --standalone")
+		return
+	}
+	if trayMode {
+		releaseTrayMutex, acquired, errMutex := acquireTrayInstance()
+		if errMutex != nil {
+			log.Errorf("failed to acquire tray instance lock: %v", errMutex)
+			return
+		}
+		if !acquired {
+			return
+		}
+		defer releaseTrayMutex()
+	}
 
 	if discoverGateways || discoverJSON {
 		cfgInclude, cfgExclude := cmd.LoadDiscoveryScanFilters(configPath)
@@ -628,7 +645,13 @@ func main() {
 	coreauth.SetQuotaCooldownDisabled(cfg.DisableCooling)
 	coreauth.SetTransientErrorCooldownSeconds(cfg.TransientErrorCooldownSeconds)
 
-	if err = logging.ConfigureLogOutput(cfg); err != nil {
+	logConfig := cfg
+	if trayMode && !cfg.LoggingToFile {
+		trayLogConfig := *cfg
+		trayLogConfig.LoggingToFile = true
+		logConfig = &trayLogConfig
+	}
+	if err = logging.ConfigureLogOutput(logConfig); err != nil {
 		log.Errorf("failed to configure log output: %v", err)
 		return
 	}
@@ -822,7 +845,13 @@ func main() {
 			managementasset.StartAutoUpdater(context.Background(), configFilePath)
 			misc.StartAntigravityVersionUpdater(context.Background())
 			startModelCatalogUpdaters(localModel, cfg.Home.Enabled)
-			cmd.StartServiceWithPluginHost(cfg, configFilePath, password, pluginHost, serverOptions...)
+			if trayMode {
+				if errTray := runTrayMode(cfg, configFilePath, password, pluginHost, serverOptions...); errTray != nil {
+					log.Errorf("tray server stopped: %v", errTray)
+				}
+			} else {
+				cmd.StartServiceWithPluginHost(cfg, configFilePath, password, pluginHost, serverOptions...)
+			}
 		}
 	}
 }

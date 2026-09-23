@@ -179,6 +179,10 @@ jobs:
 
           cp LICENSE README.md README_CN.md config.example.yaml "$archive_dir/"
           if [[ "$ARCHIVE_FORMAT" == "zip" ]]; then
+            CGO_ENABLED=0 GOOS="$GOOS" GOARCH="$GOARCH" go build \
+              -ldflags="-s -w -H=windowsgui" \
+              -o "$archive_dir/cliproxy.exe" ./cmd/cliproxy/
+            cp install-cliproxy.ps1 "$archive_dir/"
             powershell -NoProfile -Command "Compress-Archive -Path '${archive_dir}/*' -DestinationPath 'dist/${archive_name}' -Force"
           else
             tar -C "$archive_dir" -czf "dist/$archive_name" "$binary_name" LICENSE README.md README_CN.md config.example.yaml

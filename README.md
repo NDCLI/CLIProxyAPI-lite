@@ -134,6 +134,10 @@ PackyCode provides special discounts for our software users: register using <a h
 
 CLIProxyAPI Guides: [https://help.router-for.me/](https://help.router-for.me/)
 
+### Windows tray launcher
+
+Download and extract a Windows release ZIP, then run `powershell -NoProfile -ExecutionPolicy Bypass -File .\install-cliproxy.ps1` from the extracted folder. It installs the server under `%LOCALAPPDATA%\CLIProxyAPI`, preserves an existing `config.yaml`, and adds the `cliproxy` command to your user PATH. Reopen CMD or PowerShell and run `cliproxy` to start the server in the system tray. Double-click the tray icon to open the management panel; choose **Thoát máy chủ** from its menu to shut down cleanly.
+
 ## Management API
 
 see [MANAGEMENT_API.md](https://help.router-for.me/management/api)
