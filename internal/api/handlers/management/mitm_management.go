@@ -141,7 +141,7 @@ func (h *Handler) PutMITMMappings(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "unsupported MITM tool"})
 		return
 	}
-	if !mitmDNSStatus()[body.Tool] {
+	if !mitmDNSStatus()[body.Tool] && len(body.Mappings) > 0 {
 		c.JSON(http.StatusForbidden, gin.H{"error": "enable DNS for this tool before editing its model mappings"})
 		return
 	}
