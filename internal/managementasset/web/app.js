@@ -272,6 +272,7 @@ async function renderQuickStart(page) {
     try {
       await copyText(document.getElementById("quick-start-url").value);
       document.getElementById("quick-start-copy-status").textContent = t("quickStart.copied");
+      flashAction(button, t("quickStart.copied"));
     } catch {
       document.getElementById("quick-start-copy-status").textContent = t("common.copyFailed");
     } finally { button.disabled = false; }
@@ -308,9 +309,23 @@ async function copyText(value) {
   if (!copied) throw new Error(t("common.copyFailed"));
 }
 
+function flashAction(button, label) {
+  const original = button._feedbackOriginal || button.innerHTML;
+  clearTimeout(button._feedbackTimer);
+  button._feedbackOriginal = original;
+  button.innerHTML = `${icon("check")}${label}`;
+  button.classList.add("action-success");
+  button._feedbackTimer = setTimeout(() => {
+    if (!button.isConnected) return;
+    button.innerHTML = original;
+    button.classList.remove("action-success");
+    delete button._feedbackOriginal;
+  }, 2200);
+}
+
 function endpointKeyTable(items) {
   if (!items.length) return `<div class="empty">${t("endpoint.empty")}</div>`;
-  return `<div class="table-wrap"><table><thead><tr><th>${t("endpoint.key")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${items.map(item => `<tr><td><strong>${escapeHTML(item.label)}</strong><br><code>${escapeHTML(item.mask)}</code></td><td>${Number(item.success || 0).toLocaleString()}</td><td>${Number(item.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-rotate-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("refresh")}${t("endpoint.rotate")}</button><button class="danger-button" data-delete-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("trash")}${t("endpoint.delete")}</button></div></td></tr>`).join("")}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>${t("endpoint.key")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${items.map(item => `<tr><td><strong>${escapeHTML(item.label)}</strong><br><code>${escapeHTML(item.mask)}</code></td><td>${Number(item.success || 0).toLocaleString()}</td><td>${Number(item.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-copy-key="${escapeHTML(item.id)}">${icon("copy")}${t("endpoint.copy")}</button><button class="secondary" data-rotate-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("refresh")}${t("endpoint.rotate")}</button><button class="danger-button" data-delete-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("trash")}${t("endpoint.delete")}</button></div></td></tr>`).join("")}</tbody></table></div>`;
 }
 
 async function renderEndpoint(page, secret = "", feedback = "") {
@@ -355,7 +370,7 @@ async function renderEndpoint(page, secret = "", feedback = "") {
   if (secret) document.getElementById("copy-secret").addEventListener("click", async event => {
     const button = event.currentTarget;
     button.disabled = true;
-    try { await copyText(secret); showFeedback(t("endpoint.copied")); }
+    try { await copyText(secret); showFeedback(t("endpoint.copied")); flashAction(button, t("endpoint.copied")); }
     catch { showFeedback(t("common.copyFailed")); }
     finally { button.disabled = false; }
   });
@@ -364,6 +379,18 @@ async function renderEndpoint(page, secret = "", feedback = "") {
     if (!page.isConnected || page.dataset.page !== "endpoint") return;
     const container = document.getElementById("endpoint-keys");
     container.innerHTML = endpointKeyTable(response.items || []);
+    container.querySelectorAll("[data-copy-key]").forEach(button => button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const result = await api(`/endpoint-keys/${encodeURIComponent(button.dataset.copyKey)}/secret`);
+        await copyText(result.secret);
+        showFeedback(t("endpoint.copied"));
+        flashAction(button, t("endpoint.copied"));
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        showFeedback(t("common.copyFailed"));
+      } finally { button.disabled = false; }
+    }));
     container.querySelectorAll("[data-rotate-key]").forEach(button => button.addEventListener("click", async () => {
       if (!confirm(t(secret ? "endpoint.confirmRotateWithSecret" : "endpoint.confirmRotate"))) return;
       button.disabled = true;

@@ -29,6 +29,7 @@ func (s *Server) registerManagementRoutes() {
 	{
 		mgmt.GET("/capabilities", s.mgmt.GetCapabilities)
 		mgmt.GET("/endpoint-keys", s.mgmt.GetEndpointKeys)
+		mgmt.GET("/endpoint-keys/:id/secret", s.mgmt.GetEndpointKeySecret)
 		mgmt.POST("/endpoint-keys", s.mgmt.PostEndpointKey)
 		mgmt.PATCH("/endpoint-keys/:id", s.mgmt.PatchEndpointKey)
 		mgmt.DELETE("/endpoint-keys/:id", s.mgmt.DeleteEndpointKey)

@@ -122,7 +122,7 @@
         form.querySelectorAll("input").forEach(input => input.addEventListener("input", updateGuide));
         form.querySelector('[name="api_key_id"]').addEventListener("change", event => { form.querySelector('[name="api_key"]').disabled = Boolean(event.target.value); updateGuide(); });
         updateGuide();
-        form.querySelector("#copy-guide").addEventListener("click", async () => { try { await copyText(form.querySelector("#guide-preview").textContent); form.querySelector("#tool-message").textContent = t("tools.copied"); form.querySelector("#tool-message").className = "form-message ok"; } catch (_) { form.querySelector("#tool-message").textContent = t("common.error"); } });
+        form.querySelector("#copy-guide").addEventListener("click", async event => { try { await copyText(form.querySelector("#guide-preview").textContent); form.querySelector("#tool-message").textContent = t("tools.copied"); form.querySelector("#tool-message").className = "form-message ok"; flashAction(event.currentTarget, t("tools.copied")); } catch (_) { form.querySelector("#tool-message").textContent = t("common.error"); } });
         page.querySelector("#refresh").addEventListener("click", () => renderToolDetail(page, id));
         return;
       }
@@ -155,7 +155,7 @@
         finally { button.disabled = false; }
       };
       form.querySelector("#preview-tool").addEventListener("click", preview);
-      form.querySelector("#copy-preview").addEventListener("click", async () => { try { await copyText(form.querySelector("#tool-preview").textContent); message.textContent = t("tools.copied"); message.className = "form-message ok"; } catch (_) { message.textContent = t("common.error"); } });
+      form.querySelector("#copy-preview").addEventListener("click", async event => { try { await copyText(form.querySelector("#tool-preview").textContent); message.textContent = t("tools.copied"); message.className = "form-message ok"; flashAction(event.currentTarget, t("tools.copied")); } catch (_) { message.textContent = t("common.error"); } });
       form.addEventListener("submit", async event => {
         event.preventDefault();
         if (!confirm(t("tools.confirmApply").replace("{name}", name))) return;
@@ -246,7 +246,7 @@
       page.querySelector("#save-mitm-mappings")?.addEventListener("click", async event => {
         const button = event.currentTarget; button.disabled = true; const result = page.querySelector("#mapping-message");
         const mappings = Object.fromEntries([...page.querySelectorAll("[data-mitm-map]")].map(input => [input.dataset.mitmMap, input.value.trim()]));
-        try { await api("/mitm/mappings", {method: "PUT", body: JSON.stringify({tool: selected.id, mappings})}); result.textContent = t("tools.mappingsSaved"); result.className = "form-message ok"; }
+        try { await api("/mitm/mappings", {method: "PUT", body: JSON.stringify({tool: selected.id, mappings})}); result.textContent = t("tools.mappingsSaved"); result.className = "form-message ok"; flashAction(button, t("tools.mappingsSaved")); }
         catch (error) { if (error.message === "invalid_key") return logout(); result.textContent = t("tools.mappingSaveFailed"); result.className = "form-message failed"; }
         finally { button.disabled = false; }
       });

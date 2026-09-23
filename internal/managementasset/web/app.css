@@ -78,6 +78,7 @@ h2, h3 { font-size: 15px; font-weight: 600; }
 .primary.compact { width: auto; margin-top: 0; }
 .primary:hover { background: var(--accent-hover); }
 .secondary:hover, .refresh:hover { background: #2e4463; border-color: #6b91bf; }
+.action-success { background: #173b31 !important; border-color: #41bf8f !important; color: #a5f3d0 !important; }
 .refresh { color: var(--muted); background: var(--panel); }
 .danger-button { background: transparent; color: var(--danger); }
 .danger-button:hover { background: #fb909d16; border-color: var(--danger); }

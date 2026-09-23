@@ -143,7 +143,7 @@
   "endpoint.rotate": "Đổi khóa",
   "endpoint.rotated": "Đã đổi khóa. Hãy sao chép khóa mới trước khi rời trang.",
   "endpoint.rotating": "Đang đổi khóa...",
-  "endpoint.secretOnce": "Hãy sao chép khóa ngay. Khóa sẽ không được hiển thị lại.",
+  "endpoint.secretOnce": "Hãy sao chép khóa để sử dụng. Sau này bạn vẫn có thể sao chép lại trong danh sách.",
   "endpoint.stale": "Khóa đã thay đổi. Hãy làm mới danh sách rồi thử lại.",
   "endpoint.title": "Endpoint & Khóa",
   "error.invalidKey": "Khóa quản lý bị thiếu hoặc không hợp lệ.",

@@ -57,6 +57,16 @@ func TestEndpointKeysNeverExposeStoredSecrets(t *testing.T) {
 	if response.SchemaVersion != 1 || len(response.Items) != 1 || response.Items[0].Mask != "••••alue" {
 		t.Fatalf("unexpected response: %#v", response)
 	}
+	secretResponse := endpointKeyRequest(t, handler.GetEndpointKeySecret, http.MethodGet, "/v0/management/endpoint-keys/"+response.Items[0].ID+"/secret", "", response.Items[0].ID)
+	if secretResponse.Code != http.StatusOK || secretResponse.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("secret response status=%d cache=%q", secretResponse.Code, secretResponse.Header().Get("Cache-Control"))
+	}
+	var revealed struct {
+		Secret string `json:"secret"`
+	}
+	if errDecode := json.Unmarshal(secretResponse.Body.Bytes(), &revealed); errDecode != nil || revealed.Secret != secret {
+		t.Fatal("explicit secret read did not return stored key")
+	}
 }
 
 func TestEndpointKeyCreateRotateDelete(t *testing.T) {

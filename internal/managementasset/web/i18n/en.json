@@ -143,7 +143,7 @@
   "endpoint.rotate": "Rotate",
   "endpoint.rotated": "Key rotated. Copy the new key before leaving this page.",
   "endpoint.rotating": "Rotating key...",
-  "endpoint.secretOnce": "Copy this key now. It will not be shown again.",
+  "endpoint.secretOnce": "Copy this key for use. You can copy it again from the list later.",
   "endpoint.stale": "This key changed. Refresh the list and try again.",
   "endpoint.title": "Endpoint & Key",
   "error.invalidKey": "The management key is missing or invalid.",

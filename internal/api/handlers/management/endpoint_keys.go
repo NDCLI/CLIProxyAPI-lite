@@ -78,6 +78,20 @@ func (h *Handler) GetEndpointKeys(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"schema_version": 1, "items": items, "next_cursor": nil})
 }
 
+func (h *Handler) GetEndpointKeySecret(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	c.Header("Cache-Control", "no-store")
+	for _, key := range h.cfg.APIKeys {
+		if endpointKeyID(key) == id {
+			c.JSON(http.StatusOK, gin.H{"secret": key})
+			return
+		}
+	}
+	c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "endpoint_key_not_found", "message": "Endpoint key not found"}})
+}
+
 func (h *Handler) PostEndpointKey(c *gin.Context) {
 	var body struct {
 		Value string `json:"value"`
