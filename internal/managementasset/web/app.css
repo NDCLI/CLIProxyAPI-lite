@@ -368,6 +368,20 @@ tbody tr:hover { background: #79b2ff0a; }
   .unavailable-panel { margin: 24px auto; }
 }
 
+/* Keep the combo page compact on narrow screens. */
+#page[data-page="combo"] .page-head h1 { font-size: 24px; letter-spacing: -.35px; }
+#page[data-page="combo"] .page-head p { font-size: 12px; }
+#page[data-page="combo"] .combo-collection { gap: 12px; padding: 16px; }
+#page[data-page="combo"] .combo-collection .section-head h2 { font-size: 15px; }
+#page[data-page="combo"] .combo-collection .card { padding: 14px; }
+#page[data-page="combo"] .combo-collection .card h2 { font-size: 13px; }
+#page[data-page="combo"] .combo-collection .card p { margin: 8px 0 12px; font-size: 11px; }
+#page[data-page="combo"] .combo-collection .target-chain { gap: 5px; font-size: 11px; }
+#page[data-page="combo"] .combo-collection .target-chain li { padding: 7px; }
+#page[data-page="combo"] .combo-collection .target-chain code { margin-top: 4px; font-size: 10px; }
+#page[data-page="combo"] .combo-collection .actions button { min-height: 31px; padding: 6px 8px; font-size: 11px; }
+#page[data-page="combo"] .combo-collection .badge { padding: 2px 6px; font-size: 10px; }
+
 /* 9Router-inspired management layout: compact cards on a quiet grid canvas. */
 :root {
   color: #ededed;
