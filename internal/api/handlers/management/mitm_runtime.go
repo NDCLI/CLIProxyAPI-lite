@@ -60,6 +60,9 @@ type mitmRuntime struct {
 	leafCerts   map[string]*tls.Certificate
 	rootCert    *x509.Certificate
 	rootKey     *rsa.PrivateKey
+	lastTool    string
+	lastModel   string
+	lastMapped  string
 }
 
 type mitmStatus struct {
@@ -73,6 +76,9 @@ type mitmStatus struct {
 	APIKeyID         string          `json:"api_key_id,omitempty"`
 	APIKeyConfigured bool            `json:"api_key_configured"`
 	Tools            []mitmToolInfo  `json:"tools"`
+	LastTool         string          `json:"last_tool,omitempty"`
+	LastModel        string          `json:"last_model,omitempty"`
+	LastMapped       string          `json:"last_mapped,omitempty"`
 }
 
 func newMITMRuntime(configFilePath string, gatewayPort int) *mitmRuntime {
@@ -131,6 +137,7 @@ func (m *mitmRuntime) status(certPath string) mitmStatus {
 	m.mu.RLock()
 	running := m.server != nil && m.listener != nil
 	baseURL, apiKeyID, hasKey := m.gatewayBaseURLLocked(), m.apiKeyID, m.apiKey != ""
+	lastTool, lastModel, lastMapped := m.lastTool, m.lastModel, m.lastMapped
 	m.mu.RUnlock()
 	return mitmStatus{
 		Running:          running,
@@ -143,6 +150,9 @@ func (m *mitmRuntime) status(certPath string) mitmStatus {
 		APIKeyID:         apiKeyID,
 		APIKeyConfigured: hasKey,
 		Tools:            mitmTools(),
+		LastTool:         lastTool,
+		LastModel:        lastModel,
+		LastMapped:       lastMapped,
 	}
 }
 
@@ -166,6 +176,7 @@ func (m *mitmRuntime) start(certPath, keyPath, apiKey, baseURL, apiKeyID string)
 	m.apiKey = apiKey
 	m.baseURL = baseURL
 	m.apiKeyID = apiKeyID
+	m.lastTool, m.lastModel, m.lastMapped = "", "", ""
 	m.leafCerts = make(map[string]*tls.Certificate)
 	tlsListener := tls.NewListener(listener, &tls.Config{
 		MinVersion:     tls.VersionTLS12,
@@ -245,6 +256,9 @@ func (m *mitmRuntime) serveHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	model := extractMITMModel(req.URL.Path, body)
 	mapped := m.mappedModel(tool, model)
+	m.mu.Lock()
+	m.lastTool, m.lastModel, m.lastMapped = tool, model, mapped
+	m.mu.Unlock()
 	if mapped == "" {
 		m.passthrough(w, req, host, body)
 		return

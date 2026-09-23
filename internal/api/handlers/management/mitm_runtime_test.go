@@ -36,6 +36,17 @@ func TestMITMMatchingAndModelExtraction(t *testing.T) {
 	}
 }
 
+func TestMITMStatusReportsLastObservedModel(t *testing.T) {
+	runtime := newMITMRuntime(t.TempDir(), 8317)
+	runtime.lastTool = "antigravity"
+	runtime.lastModel = "gemini-3.8-flash-tiered"
+	runtime.lastMapped = "xpiki/gpt-6-luna"
+	status := runtime.status("missing-cert.crt")
+	if status.LastTool != runtime.lastTool || status.LastModel != runtime.lastModel || status.LastMapped != runtime.lastMapped {
+		t.Fatalf("last observed route missing from status: %+v", status)
+	}
+}
+
 func TestMITMOpenAIResponseTranslatesBackToGemini(t *testing.T) {
 	response := []byte(`{"id":"chatcmpl-1","model":"test","choices":[{"index":0,"message":{"role":"assistant","content":"xin chao"},"finish_reason":"stop"}]}`)
 	converted := sdktranslator.TranslateNonStream(

@@ -547,6 +547,8 @@
   "tools.mappingDescription": "Yêu cầu có tên model IDE này sẽ dùng model gateway đã chọn.",
   "tools.mappingLockedHint": "Khởi động máy chủ, tin cậy CA và chạy quyền quản trị trước khi bật DNS.",
   "tools.mitmMappingDescription": "Ánh xạ tên model IDE sang model gateway. Để trống đích sẽ gửi thẳng đến upstream.",
+  "tools.lastObserved": "Model IDE vừa nhận",
+  "tools.directUpstream": "Gửi thẳng upstream",
   "tools.saveMappings": "Lưu ánh xạ",
   "tools.clearMapping": "Xóa ánh xạ",
   "tools.noModelMapping": "Công cụ này chưa có tên model mẫu. Thêm ánh xạ trong trình sửa bên dưới.",

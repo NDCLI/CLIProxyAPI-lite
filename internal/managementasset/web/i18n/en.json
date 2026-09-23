@@ -547,6 +547,8 @@
   "tools.mappingDescription": "Requests with these IDE model names will use the selected gateway model.",
   "tools.mappingLockedHint": "Start the server, trust its CA, and run as Administrator before enabling DNS for this tool.",
   "tools.mitmMappingDescription": "Map each IDE model name to a gateway model. Blank targets pass through upstream.",
+  "tools.lastObserved": "Last IDE model received",
+  "tools.directUpstream": "Direct upstream",
   "tools.saveMappings": "Save mappings",
   "tools.clearMapping": "Clear mapping",
   "tools.noModelMapping": "This tool has no predefined model names. Add mappings in the editor below.",
