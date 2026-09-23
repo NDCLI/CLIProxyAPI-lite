@@ -329,3 +329,98 @@ tbody tr:hover { background: #79b2ff0a; }
   .usage-filters { grid-template-columns: 1fr; padding: 16px; }
   .unavailable-panel { margin: 24px auto; }
 }
+
+/* 9Router-inspired management layout: compact cards on a quiet grid canvas. */
+:root {
+  color: #ededed;
+  background: #1a1a1a;
+  --bg: #1a1a1a;
+  --panel: #262626;
+  --panel-strong: #303030;
+  --sidebar: #1f1f1f;
+  --line: #383838;
+  --line-subtle: #2d2d2d;
+  --muted: #9ca3af;
+  --accent: #e56a4a;
+  --accent-hover: #ee8d6a;
+  --accent-soft: #e56a4a20;
+  --success: #22c55e;
+  --warning: #fbbf24;
+  --danger: #ef4444;
+}
+body { background-color: #1a1a1a; background-image: linear-gradient(#ffffff08 1px, transparent 1px), linear-gradient(90deg, #ffffff08 1px, transparent 1px); background-size: 36px 36px; background-attachment: fixed; }
+.app-shell { grid-template-columns: 252px minmax(0, 1fr); background: transparent; }
+.sidebar { border-right-color: #303030; background: #1f1f1f; }
+.brand-mark { background: linear-gradient(145deg, #ee8d6a, #d64f31); box-shadow: 0 5px 16px #e56a4a30; }
+.nav-group { color: #858585; }
+.nav-link, .sidebar-action { color: #a1a1aa; }
+.nav-link:hover, .sidebar-action:hover { background: #292929; color: #f4f4f5; }
+.nav-link.active { color: #ff9a7e; background: #e56a4a1c; box-shadow: inset 2px 0 var(--accent); }
+.topbar { background: #1a1a1aeF; border-bottom-color: #303030; }
+.topbar-context strong { color: #ededed; }
+.top-button { color: #a1a1aa; }
+.top-button:hover { background: #262626; border-color: #383838; color: #ededed; }
+.content { width: min(1320px, 100%); padding: 30px 34px 56px; }
+.page-head { margin-bottom: 24px; }
+.page-symbol { color: #ff9a7e; background: #e56a4a18; border-color: #e56a4a42; }
+.page-head h1 { font-size: 27px; letter-spacing: -.55px; }
+.page-head p { color: #a1a1aa; }
+.primary { color: #fff; background: #e56a4a; border-color: #ee8d6a; }
+.primary:hover { background: #cc5236; }
+.secondary, .refresh { background: #292929; border-color: #3b3b3b; }
+.secondary:hover, .refresh:hover { background: #333; border-color: #555; }
+.danger-button { border-color: #503333; }
+.text-link, .provider-chip.active, .quota-shared-models summary { color: #ff9a7e; }
+.text-input, .field input, .search-field, .endpoint-value { background: #1d1d1d; border-color: #3a3a3a; }
+.text-input:focus, .field input:focus { border-color: var(--accent); }
+.card, .status-panel, .table-wrap, .provider-group { background: #242424; border-color: #353535; box-shadow: 0 8px 22px #00000018; }
+.card { padding: 18px; border-radius: 10px; }
+.status-panel { gap: 16px; padding: 20px; border-radius: 10px; }
+.grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.tool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.settings-grid { gap: 12px; }
+.settings-grid label:has(input[type="checkbox"]) { padding: 12px; border-color: #383838; background: #202020; }
+#settings-form { width: min(820px, 100%); margin-inline: auto; }
+.metrics-grid { gap: 12px; }
+.metric { font-size: 27px; }
+.provider-toolbar { margin-bottom: 14px; }
+.provider-summary { gap: 20px; margin-bottom: 16px; }
+.provider-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 12px; }
+.provider-group { border-radius: 10px; }
+.provider-group-head { padding: 12px 14px; background: #292929; border-bottom-color: #383838; }
+.provider-group-head .provider-logo { width: 34px; height: 34px; }
+.provider-identity { gap: 9px; font-size: 14px; }
+.account-row { align-items: flex-start; gap: 10px; padding: 12px 14px; }
+.account-main { gap: 9px; }
+.account-avatar { display: none; }
+.account-meta { gap: 8px; margin-top: 5px; }
+.account-row .actions { gap: 6px; }
+.account-row .secondary, .account-row .danger-button { min-height: 32px; padding: 6px 8px; font-size: 11px; }
+.table-wrap { border-radius: 10px; }
+th { background: #292929; }
+th, td { padding: 10px 13px; }
+.quota-grid { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
+.quota-card-result { background: #1f1f1f; border-color: #333; }
+.quota-family-card { background: #292929; border-color: #3a3a3a; }
+.provider-chip { background: #252525; border-color: #383838; }
+.provider-chip:hover, .provider-chip.active { background: #3a2723; border-color: #a9543d; }
+.provider-chip .chip-count { background: #ffffff12; color: #d4d4d8; }
+@media (max-width: 1200px) {
+  .app-shell { grid-template-columns: 220px minmax(0, 1fr); }
+  .content { padding: 26px 24px 48px; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .provider-groups { grid-template-columns: 1fr; }
+  .account-row { flex-wrap: nowrap; }
+  .account-row .actions { padding-left: 0; }
+}
+@media (max-width: 900px) {
+  .app-shell { grid-template-columns: 200px minmax(0, 1fr); }
+  .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .app-shell, .app-shell.collapsed { grid-template-columns: 1fr; }
+  .content { padding: 22px 16px 100px; }
+  .grid, .tool-grid, .settings-grid { grid-template-columns: 1fr; }
+  .account-row { flex-wrap: wrap; }
+  .account-row .actions { padding-left: 0; }
+}
