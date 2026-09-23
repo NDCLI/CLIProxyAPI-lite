@@ -814,47 +814,129 @@ async function renderCombos(page, feedback = "") {
   await load();
 }
 
+function usagePeriodBounds(period, now = new Date()) {
+  const from = new Date(now);
+  if (period === "today") from.setHours(0, 0, 0, 0);
+  else if (period === "24h") from.setTime(now.getTime() - 24 * 60 * 60 * 1000);
+  else if (period === "7d") from.setDate(from.getDate() - 7);
+  else if (period === "30d") from.setDate(from.getDate() - 30);
+  else if (period === "60d") from.setDate(from.getDate() - 60);
+  else return {};
+  return {from: from.toISOString(), to: now.toISOString()};
+}
+
+function usagePeriodControls(period, tab) {
+  const periods = ["today", "24h", "7d", "30d", "60d", "all"];
+  return `<div class="usage-controls"><div class="usage-tabs" role="tablist"><button type="button" role="tab" data-usage-tab="overview" aria-selected="${tab === "overview"}">${t("usage.overview")}</button><button type="button" role="tab" data-usage-tab="details" aria-selected="${tab === "details"}">${t("usage.details")}</button></div><div class="usage-periods" role="group" aria-label="${t("usage.period")}">${periods.map(value => `<button type="button" data-usage-period="${value}" aria-pressed="${period === value}">${t(`usage.period.${value}`)}</button>`).join("")}</div></div>`;
+}
+
+function usageRoutePanel(records, providers) {
+  const activity = new Map();
+  for (const row of records) {
+    const name = String(row.provider || "unknown");
+    const item = activity.get(name) || {requests: 0, failed: 0, tokens: 0};
+    item.requests++;
+    if (row.failed) item.failed++;
+    item.tokens += Number(row.total_tokens || 0);
+    activity.set(name, item);
+  }
+  const names = new Set([...providers.map(item => item.provider), ...activity.keys()].filter(Boolean));
+  const rows = [...names].sort((a, b) => (activity.get(b)?.requests || 0) - (activity.get(a)?.requests || 0) || a.localeCompare(b));
+  return `<section class="card usage-topology"><div class="section-head"><h2>${t("usage.routing")}</h2><span class="hint">${names.size} ${t("usage.connectedProviders")}</span></div>${rows.length ? `<div class="usage-route-list"><div class="usage-gateway-node"><span class="feature-icon">${icon("route")}</span><div><strong>CLIProxyAPI</strong><small>${t("usage.gateway")}</small></div><span class="badge">${records.length.toLocaleString(state.locale)} ${t("common.requests")}</span></div><div class="usage-provider-list">${rows.map(name => { const item = activity.get(name) || {requests: 0, failed: 0, tokens: 0}; return `<button type="button" class="usage-provider-node" data-usage-provider="${escapeHTML(name)}"><span class="usage-route-line" aria-hidden="true"></span>${providerIdentity(name, true)}<span class="usage-provider-stats"><strong>${item.requests.toLocaleString(state.locale)}</strong><small>${t("common.requests")}</small></span><span class="usage-provider-tokens">${item.tokens.toLocaleString(state.locale)} ${t("common.tokens")}</span>${item.failed ? `<span class="badge failed">${item.failed} ${t("usage.failed")}</span>` : ""}</button>`; }).join("")}</div></div>` : `<div class="empty usage-route-empty">${t("usage.noProviderActivity")}</div>`}</section>`;
+}
+
+function usageRecentPanel(records) {
+  if (!records.length) return `<section class="card usage-recent"><div class="section-head"><h2>${t("usage.recent")}</h2></div><div class="empty">${t("usage.noRecent")}</div></section>`;
+  const rows = records.slice(0, 10).map(row => `<tr><td><span class="usage-status-dot ${row.failed ? "is-failed" : "is-ok"}" aria-label="${t(row.failed ? "usage.failed" : "usage.ok")}"></span></td><td><strong title="${escapeHTML(row.model || "-")}">${escapeHTML(row.model || "-")}</strong><small>${escapeHTML(row.provider || "-")}</small></td><td>${Number(row.input_tokens || 0).toLocaleString(state.locale)} ↑<br>${Number(row.output_tokens || 0).toLocaleString(state.locale)} ↓</td><td title="${escapeHTML(new Date(row.timestamp).toLocaleString(state.locale))}">${escapeHTML(new Date(row.timestamp).toLocaleTimeString(state.locale, {hour: "2-digit", minute: "2-digit"}))}</td></tr>`).join("");
+  return `<section class="card usage-recent"><div class="section-head"><h2>${t("usage.recent")}</h2><span class="hint">${Math.min(records.length, 10)} / ${records.length}</span></div><div class="usage-recent-scroll"><table><thead><tr><th></th><th>${t("usage.model")}</th><th>${t("usage.input")} / ${t("usage.output")}</th><th>${t("usage.time")}</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+}
+
+function usageTrendChart(records, period) {
+  if (!records.length) return `<div class="empty">${t("common.empty")}</div>`;
+  const end = new Date();
+  const range = usagePeriodBounds(period, end);
+  const start = range.from ? new Date(range.from) : new Date(Math.min(...records.map(row => new Date(row.timestamp).getTime())));
+  const duration = Math.max(1, end.getTime() - start.getTime());
+  const count = period === "today" || period === "24h" ? 12 : period === "7d" ? 7 : 12;
+  const buckets = Array.from({length: count}, () => ({input: 0, output: 0, label: ""}));
+  for (const row of records) {
+    const index = Math.max(0, Math.min(count - 1, Math.floor((new Date(row.timestamp).getTime() - start.getTime()) / duration * count)));
+    buckets[index].input += Number(row.input_tokens || 0);
+    buckets[index].output += Number(row.output_tokens || 0);
+    buckets[index].label = new Date(row.timestamp).toLocaleDateString(state.locale, {month: "short", day: "numeric"});
+  }
+  const max = Math.max(1, ...buckets.map(bucket => bucket.input + bucket.output));
+  const step = 720 / count;
+  const bars = buckets.map((bucket, index) => {
+    const inputHeight = bucket.input / max * 120;
+    const outputHeight = bucket.output / max * 120;
+    const x = index * step + step * 0.2;
+    const width = step * 0.6;
+    return `<g><title>${escapeHTML(bucket.label || "-")}: ${bucket.input.toLocaleString(state.locale)} ${t("usage.input")}, ${bucket.output.toLocaleString(state.locale)} ${t("usage.output")}</title><rect x="${x}" y="${148 - inputHeight}" width="${width}" height="${inputHeight}" rx="3" fill="#e56a4a"/><rect x="${x}" y="${148 - inputHeight - outputHeight}" width="${width}" height="${outputHeight}" rx="3" fill="#55a8ff"/></g>`;
+  }).join("");
+  return `<svg class="usage-trend-svg" viewBox="0 0 720 172" role="img" aria-label="${t("usage.tokenTrend")}" preserveAspectRatio="none"><line x1="0" y1="148" x2="720" y2="148"/><line x1="0" y1="88" x2="720" y2="88"/>${bars}</svg><div class="usage-chart-legend"><span><i class="legend-input"></i>${t("usage.input")}</span><span><i class="legend-output"></i>${t("usage.output")}</span><span class="hint">${t("usage.tokensOnly")}</span></div>`;
+}
+
+function usageBreakdown(records, field, title) {
+  const totals = new Map();
+  for (const row of records) {
+    const name = String(row[field] || "-");
+    const item = totals.get(name) || {requests: 0, tokens: 0};
+    item.requests++;
+    item.tokens += Number(row.total_tokens || 0);
+    totals.set(name, item);
+  }
+  const sorted = [...totals].sort((a, b) => b[1].requests - a[1].requests).slice(0, 6);
+  const max = Math.max(1, ...sorted.map(([, item]) => item.requests));
+  return `<section class="card usage-breakdown"><div class="section-head"><h2>${title}</h2></div>${sorted.length ? sorted.map(([name, item]) => `<div class="usage-breakdown-row"><div><strong title="${escapeHTML(name)}">${escapeHTML(name)}</strong><span>${item.requests.toLocaleString(state.locale)} ${t("common.requests")} · ${item.tokens.toLocaleString(state.locale)} ${t("common.tokens")}</span></div><progress max="${max}" value="${item.requests}"></progress></div>`).join("") : `<div class="empty">${t("common.empty")}</div>`}</section>`;
+}
+
 async function renderUsage(page, filter = {}) {
   const run = page._usageRun = (page._usageRun || 0) + 1;
+  const period = filter.period || "today";
+  const tab = filter.tab === "details" ? "details" : "overview";
   const localDateTime = value => {
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? "" : new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
   };
-  const filters = `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterFrom")}<input id="usage-from" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.from))}"></label><label>${t("usage.filterTo")}<input id="usage-to" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.to))}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><div class="actions"><button class="secondary" id="usage-apply">${icon("filter")}${t("usage.applyFilters")}</button><button class="secondary" id="usage-clear">${icon("close")}${t("usage.clearFilters")}</button></div></section><p class="form-message" id="usage-filter-message" role="status"></p>`;
-  const renderHeader = () => pageHeader("kicker.liveData", "usage.title", "usage.description", true) + filters;
+  const range = period === "custom" ? {from: filter.from || "", to: filter.to || ""} : usagePeriodBounds(period);
+  const filters = tab === "details" ? `<section class="usage-filters"><label>${t("usage.filterProvider")}<input id="usage-provider" class="text-input" value="${escapeHTML(filter.provider || "")}"></label><label>${t("usage.filterModel")}<input id="usage-model" class="text-input" value="${escapeHTML(filter.model || "")}"></label><label>${t("usage.filterFrom")}<input id="usage-from" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.from || ""))}"></label><label>${t("usage.filterTo")}<input id="usage-to" class="text-input" type="datetime-local" value="${escapeHTML(localDateTime(filter.to || ""))}"></label><label>${t("usage.filterStatus")}<select id="usage-status" class="text-input"><option value="">${t("usage.all")}</option><option value="ok" ${filter.status === "ok" ? "selected" : ""}>${t("usage.ok")}</option><option value="failed" ${filter.status === "failed" ? "selected" : ""}>${t("usage.failed")}</option></select></label><div class="actions"><button class="secondary" id="usage-apply">${icon("filter")}${t("usage.applyFilters")}</button><button class="secondary" id="usage-clear">${icon("close")}${t("usage.clearFilters")}</button></div></section><p class="form-message" id="usage-filter-message" role="status"></p>` : "";
+  const renderHeader = () => pageHeader("kicker.liveData", "usage.title", "usage.description", true) + usagePeriodControls(period, tab) + filters;
   page.innerHTML = renderHeader() + `<div class="loading">${t("common.loading")}</div>`;
   const apply = () => {
-    const timestamp = id => {
-      const value = page.querySelector(`#${id}`).value;
-      return value ? new Date(value).toISOString() : "";
-    };
+    const timestamp = id => { const value = page.querySelector(`#${id}`).value; return value ? new Date(value).toISOString() : ""; };
     const from = timestamp("usage-from");
     const to = timestamp("usage-to");
     if (from && to && from > to) { page.querySelector("#usage-filter-message").textContent = t("usage.invalidRange"); return; }
-    renderUsage(page, {provider: page.querySelector("#usage-provider").value.trim(), model: page.querySelector("#usage-model").value.trim(), from, to, status: page.querySelector("#usage-status").value});
+    renderUsage(page, {...filter, period: "custom", from, to, provider: page.querySelector("#usage-provider").value.trim(), model: page.querySelector("#usage-model").value.trim(), status: page.querySelector("#usage-status").value, tab: "details"});
   };
   const bind = () => {
-    page.querySelector("#refresh").addEventListener("click", () => renderUsage(page, filter));
-    page.querySelector("#usage-apply").addEventListener("click", apply);
-    page.querySelector("#usage-clear").addEventListener("click", () => renderUsage(page));
+    page.querySelector("#refresh")?.addEventListener("click", () => renderUsage(page, filter));
+    page.querySelectorAll("[data-usage-tab]").forEach(button => button.addEventListener("click", () => renderUsage(page, {...filter, tab: button.dataset.usageTab})));
+    page.querySelectorAll("[data-usage-period]").forEach(button => button.addEventListener("click", () => renderUsage(page, {...filter, period: button.dataset.usagePeriod, from: "", to: ""})));
+    page.querySelector("#usage-apply")?.addEventListener("click", apply);
+    page.querySelector("#usage-clear")?.addEventListener("click", () => renderUsage(page, {period, tab: "details"}));
   };
   bind();
-  const query = new URLSearchParams({limit: "100"});
+  const query = new URLSearchParams({limit: "1000"});
   if (filter.provider) query.set("provider", filter.provider);
   if (filter.model) query.set("model", filter.model);
-  if (filter.from) query.set("from", filter.from);
-  if (filter.to) query.set("to", filter.to);
+  if (range.from) query.set("from", range.from);
+  if (range.to) query.set("to", range.to);
   if (filter.status) query.set("status", filter.status);
   try {
-    const [recordsResponse, summaryResponse] = await Promise.all([api(`/usage/records?${query}`), api(`/usage/summary?${query}`)]);
+    const [recordsResponse, summaryResponse, providersResponse] = await Promise.all([api(`/usage/records?${query}`), api(`/usage/summary?${query}`), api("/providers").catch(error => { if (error.message === "invalid_key") throw error; return {items: []}; })]);
     const records = recordsResponse.items || [];
     const summary = summaryResponse.item || {};
     if (!page.isConnected || page.dataset.page !== "usage" || page._usageRun !== run) return;
-    const feedback = page.querySelector("#usage-filter-message").textContent;
-    const metrics = [["common.requests", summary.requests || 0], ["usage.failed", summary.failed || 0], ["common.tokens", summary.total_tokens || 0], ["usage.input", summary.input_tokens || 0], ["usage.output", summary.output_tokens || 0]];
-    page.innerHTML = renderHeader() + `<section class="metrics-grid usage-metrics">${metrics.map(([label, value], index) => metricCard(label, value, ["chart", "terminal", "zap", "arrow", "arrow"][index])).join("")}</section><div class="section-head"><h2>${t("usage.history")}</h2><span class="hint">${t("usage.cached")}: ${Number(summary.cached_tokens || 0).toLocaleString(state.locale)} · ${t("usage.resultLimit")}</span></div>${usageTable(records)}`;
-    page.querySelector("#usage-filter-message").textContent = feedback;
+    if (tab === "overview") {
+      const metrics = [["common.requests", summary.requests || 0], ["usage.failed", summary.failed || 0], ["common.tokens", summary.total_tokens || 0], ["usage.input", summary.input_tokens || 0], ["usage.output", summary.output_tokens || 0]];
+      page.innerHTML = renderHeader() + `<section class="metrics-grid usage-metrics">${metrics.map(([label, value], index) => metricCard(label, value, ["chart", "terminal", "zap", "arrow", "arrow"][index])).join("")}</section><section class="usage-overview-grid">${usageRoutePanel(records, providersResponse.items || [])}${usageRecentPanel(records)}</section><section class="usage-analysis-grid"><article class="card usage-trend"><div class="section-head"><h2>${t("usage.tokenTrend")}</h2><span class="hint">${t("usage.cached")}: ${Number(summary.cached_tokens || 0).toLocaleString(state.locale)}</span></div>${usageTrendChart(records, period)}</article>${usageBreakdown(records, "provider", t("usage.byProvider"))}${usageBreakdown(records, "model", t("usage.byModel"))}</section><div class="section-head"><h2>${t("usage.history")}</h2><button class="text-link" type="button" data-usage-tab="details">${t("usage.details")}${icon("arrow")}</button></div>${usageTable(records.slice(0, 12))}<p class="hint">${t("usage.resultLimit")}</p>`;
+    } else {
+      page.innerHTML = renderHeader() + `<div class="section-head"><h2>${t("usage.history")}</h2><span class="hint">${t("usage.cached")}: ${Number(summary.cached_tokens || 0).toLocaleString(state.locale)} · ${t("usage.resultLimit")}</span></div>${usageTable(records)}`;
+    }
     bind();
+    page.querySelectorAll("[data-usage-provider]").forEach(button => button.addEventListener("click", () => renderUsage(page, {...filter, provider: button.dataset.usageProvider, tab: "details"})));
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     if (!page.isConnected || page.dataset.page !== "usage" || page._usageRun !== run) return;
