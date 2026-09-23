@@ -927,23 +927,136 @@ function usagePeriodControls(period, tab) {
 
 function usageRoutePanel(records, providers) {
   const activity = new Map();
+  const latestByProvider = new Map();
+  const providerNames = new Map();
+  const timestamp = row => { const value = Date.parse(row.timestamp); return Number.isFinite(value) ? value : 0; };
+  let latest = null;
   for (const row of records) {
-    const name = String(row.provider || "unknown");
-    const item = activity.get(name) || {requests: 0, failed: 0, tokens: 0};
+    const name = String(row.provider || "").trim() || "unknown";
+    const key = name.toLowerCase();
+    if (!providerNames.has(key)) providerNames.set(key, name);
+    const item = activity.get(key) || {requests: 0, failed: 0, tokens: 0};
     item.requests++;
     if (row.failed) item.failed++;
     item.tokens += Number(row.total_tokens || 0);
-    activity.set(name, item);
+    activity.set(key, item);
+    if (!latestByProvider.has(key) || timestamp(row) >= timestamp(latestByProvider.get(key))) latestByProvider.set(key, row);
+    if (!latest || timestamp(row) >= timestamp(latest)) latest = row;
   }
-  const names = new Set([...providers.map(item => item.provider), ...activity.keys()].filter(Boolean));
-  const rows = [...names].sort((a, b) => (activity.get(b)?.requests || 0) - (activity.get(a)?.requests || 0) || a.localeCompare(b));
-  return `<section class="card usage-topology"><div class="section-head"><h2>${t("usage.routing")}</h2><span class="hint">${names.size} ${t("usage.connectedProviders")}</span></div>${rows.length ? `<div class="usage-route-list"><div class="usage-gateway-node"><span class="feature-icon">${icon("route")}</span><div><strong>CLIProxyAPI</strong><small>${t("usage.gateway")}</small></div><span class="badge">${records.length.toLocaleString(state.locale)} ${t("common.requests")}</span></div><div class="usage-provider-list">${rows.map(name => { const item = activity.get(name) || {requests: 0, failed: 0, tokens: 0}; return `<button type="button" class="usage-provider-node" data-usage-provider="${escapeHTML(name)}"><span class="usage-route-line" aria-hidden="true"></span>${providerIdentity(name, true)}<span class="usage-provider-stats"><strong>${item.requests.toLocaleString(state.locale)}</strong><small>${t("common.requests")}</small></span><span class="usage-provider-tokens">${item.tokens.toLocaleString(state.locale)} ${t("common.tokens")}</span>${item.failed ? `<span class="badge failed">${item.failed} ${t("usage.failed")}</span>` : ""}</button>`; }).join("")}</div></div>` : `<div class="empty usage-route-empty">${t("usage.noProviderActivity")}</div>`}</section>`;
+  for (const item of providers) {
+    const name = String(item.provider || "").trim();
+    if (name && !providerNames.has(name.toLowerCase())) providerNames.set(name.toLowerCase(), name);
+  }
+  const rows = [...providerNames].map(([key, name]) => ({key, name, ...activity.get(key)}))
+    .sort((a, b) => (b.requests || 0) - (a.requests || 0) || a.name.localeCompare(b.name));
+  if (!rows.length) return `<section class="card usage-topology"><div class="section-head"><h2>${t("usage.routing")}</h2></div><div class="empty usage-route-empty">${t("usage.noProviderActivity")}</div></section>`;
+
+  const nodeWidth = 188, nodeHeight = 58, gatewayWidth = 198, gatewayHeight = 66;
+  const radiusX = Math.max(300, Math.ceil((nodeWidth + 26) * rows.length / (2 * Math.PI)));
+  const radiusY = Math.max(180, Math.ceil(radiusX * 0.54));
+  const width = Math.ceil(2 * (radiusX + nodeWidth / 2) + 80);
+  const height = Math.ceil(2 * (radiusY + nodeHeight / 2) + 80);
+  const centerX = width / 2, centerY = height / 2;
+  const latestKey = String(latest?.provider || "").toLowerCase();
+  const positioned = rows.map((row, index) => {
+    const angle = -Math.PI / 2 + 2 * Math.PI * index / rows.length;
+    return {...row, x: centerX + radiusX * Math.cos(angle), y: centerY + radiusY * Math.sin(angle)};
+  });
+  const edges = positioned.map(row => {
+    const dx = row.x - centerX, dy = row.y - centerY;
+    const absX = Math.abs(dx) || Number.EPSILON, absY = Math.abs(dy) || Number.EPSILON;
+    const start = Math.min(gatewayWidth / 2 / absX, gatewayHeight / 2 / absY);
+    const end = Math.min(nodeWidth / 2 / absX, nodeHeight / 2 / absY);
+    const recent = latestByProvider.get(row.key);
+    const stateClass = recent?.failed ? "is-error" : row.key === latestKey ? "is-latest" : "";
+    return `<line class="usage-topology-edge ${stateClass}" x1="${centerX + dx * start}" y1="${centerY + dy * start}" x2="${row.x - dx * end}" y2="${row.y - dy * end}"/>`;
+  }).join("");
+  const nodes = positioned.map(row => {
+    const count = row.requests || 0;
+    const isLatest = row.key === latestKey;
+    return `<foreignObject x="${row.x - nodeWidth / 2}" y="${row.y - nodeHeight / 2}" width="${nodeWidth}" height="${nodeHeight}"><div xmlns="http://www.w3.org/1999/xhtml" class="usage-topology-html-root"><button class="usage-topology-node ${isLatest ? "is-latest" : ""}" type="button" data-usage-provider="${escapeHTML(row.name)}" aria-label="${escapeHTML(`${row.name}, ${count.toLocaleString(state.locale)} ${t("common.requests")}`)}"><span class="usage-topology-node-brand">${providerIdentity(row.name, true)}</span><span class="usage-topology-node-count">${count.toLocaleString(state.locale)}</span></button></div></foreignObject>`;
+  }).join("");
+  const gateway = `<foreignObject x="${centerX - gatewayWidth / 2}" y="${centerY - gatewayHeight / 2}" width="${gatewayWidth}" height="${gatewayHeight}"><div xmlns="http://www.w3.org/1999/xhtml" class="usage-topology-html-root"><div class="usage-topology-gateway"><span class="feature-icon">${icon("route")}</span><span class="usage-topology-gateway-copy"><strong>CLIProxyAPI</strong><small>${t("usage.gateway")}</small></span><span class="usage-topology-gateway-count">${records.length.toLocaleString(state.locale)}</span></div></div></foreignObject>`;
+  return `<section class="card usage-topology"><div class="section-head usage-topology-heading"><div><h2>${t("usage.routing")}</h2><span class="hint">${rows.length} ${t("usage.connectedProviders")} · ${t("usage.filterByProvider")}</span></div><span class="usage-latest-key"><i class="is-latest"></i>${t("usage.latestRoute")}</span></div><div class="usage-topology-viewport"><svg class="usage-topology-svg" viewBox="0 0 ${width} ${height}" role="group" aria-label="${t("usage.routing")}"><g data-topology-content>${edges}${nodes}${gateway}</g></svg><div class="usage-topology-controls" role="group" aria-label="${t("usage.routing")}"><button type="button" data-topology-zoom="in" aria-label="${t("usage.zoomIn")}" title="${t("usage.zoomIn")}">${icon("plus")}</button><button type="button" data-topology-zoom="out" aria-label="${t("usage.zoomOut")}" title="${t("usage.zoomOut")}">−</button><button type="button" data-topology-zoom="fit" aria-label="${t("usage.fitGraph")}" title="${t("usage.fitGraph")}">${icon("grid")}</button></div></div></section>`;
 }
 
 function usageRecentPanel(records) {
-  if (!records.length) return `<section class="card usage-recent"><div class="section-head"><h2>${t("usage.recent")}</h2></div><div class="empty">${t("usage.noRecent")}</div></section>`;
-  const rows = records.slice(0, 10).map(row => `<tr><td><span class="usage-status-dot ${row.failed ? "is-failed" : "is-ok"}" aria-label="${t(row.failed ? "usage.failed" : "usage.ok")}"></span></td><td><strong title="${escapeHTML(row.model || "-")}">${escapeHTML(row.model || "-")}</strong><small>${escapeHTML(row.provider || "-")}</small></td><td>${Number(row.input_tokens || 0).toLocaleString(state.locale)} ↑<br>${Number(row.output_tokens || 0).toLocaleString(state.locale)} ↓</td><td title="${escapeHTML(new Date(row.timestamp).toLocaleString(state.locale))}">${escapeHTML(new Date(row.timestamp).toLocaleTimeString(state.locale, {hour: "2-digit", minute: "2-digit"}))}</td></tr>`).join("");
-  return `<section class="card usage-recent"><div class="section-head"><h2>${t("usage.recent")}</h2><span class="hint">${Math.min(records.length, 10)} / ${records.length}</span></div><div class="usage-recent-scroll"><table><thead><tr><th></th><th>${t("usage.model")}</th><th>${t("usage.input")} / ${t("usage.output")}</th><th>${t("usage.time")}</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  const preview = records.slice(0, 3).map(row => {
+    const time = new Date(row.timestamp);
+    const timeLabel = Number.isNaN(time.getTime()) ? "-" : time.toLocaleTimeString(state.locale, {hour: "2-digit", minute: "2-digit"});
+    return `<div class="usage-recent-preview-row"><span class="usage-status-dot ${row.failed ? "is-failed" : "is-ok"}" aria-label="${t(row.failed ? "usage.failed" : "usage.ok")}"></span><span class="usage-recent-preview-model"><strong title="${escapeHTML(row.model || "-")}">${escapeHTML(row.model || "-")}</strong><small>${escapeHTML(row.provider || "-")} · ${escapeHTML(timeLabel)}</small></span><span class="usage-recent-preview-tokens">${Number(row.input_tokens || 0).toLocaleString(state.locale)} ↑<br>${Number(row.output_tokens || 0).toLocaleString(state.locale)} ↓</span></div>`;
+  }).join("");
+  return `<section class="card usage-recent-launcher"><div class="usage-recent-heading"><div><h2>${t("usage.recent")}</h2><span class="hint">${t("usage.recentModalHint")}</span></div><span class="usage-recent-count">${records.length.toLocaleString(state.locale)}</span></div>${preview ? `<div class="usage-recent-preview">${preview}</div>` : `<div class="empty">${t("usage.noRecent")}</div>`}<button type="button" class="secondary usage-recent-open" data-open-recent aria-haspopup="dialog" aria-controls="usage-recent-dialog">${icon("terminal")}${t("usage.viewRecent")}${icon("arrow")}</button></section>`;
+}
+
+function usageRecentDialog(records) {
+  const rows = records.map(row => {
+    const date = new Date(row.timestamp);
+    const time = Number.isNaN(date.getTime()) ? "-" : date.toLocaleString(state.locale);
+    return `<tr><td><span class="usage-status-dot ${row.failed ? "is-failed" : "is-ok"}" aria-label="${t(row.failed ? "usage.failed" : "usage.ok")}"></span></td><td><strong title="${escapeHTML(row.model || "-")}">${escapeHTML(row.model || "-")}</strong><small>${escapeHTML(row.provider || "-")}</small></td><td>${Number(row.input_tokens || 0).toLocaleString(state.locale)} ↑<br>${Number(row.output_tokens || 0).toLocaleString(state.locale)} ↓</td><td>${escapeHTML(time)}</td><td>${Number(row.latency_ms || 0).toLocaleString(state.locale)} ms</td></tr>`;
+  }).join("");
+  return `<dialog class="usage-recent-dialog" id="usage-recent-dialog" aria-labelledby="usage-recent-title"><div class="usage-recent-dialog-content"><header class="usage-recent-dialog-head"><div><h2 id="usage-recent-title">${t("usage.recent")}</h2><p class="hint">${t("usage.recentModalHint")}</p></div><span class="badge">${records.length.toLocaleString(state.locale)} ${t("common.requests")}</span><button type="button" class="secondary" data-close-recent aria-label="${t("usage.closeRecent")}" title="${t("usage.closeRecent")}">${icon("close")}</button></header><div class="usage-recent-dialog-scroll">${records.length ? `<table><thead><tr><th></th><th>${t("usage.model")}</th><th>${t("usage.input")} / ${t("usage.output")}</th><th>${t("usage.time")}</th><th>${t("usage.latency")}</th></tr></thead><tbody>${rows}</tbody></table>` : `<div class="empty">${t("usage.noRecent")}</div>`}</div><footer class="usage-recent-dialog-foot"><span class="hint">${t("usage.resultLimit")}</span><button type="button" class="secondary" data-close-recent>${t("usage.closeRecent")}</button></footer></div></dialog>`;
+}
+
+function bindUsageTopology(page) {
+  const svg = page.querySelector(".usage-topology-svg");
+  const content = svg?.querySelector("[data-topology-content]");
+  if (!svg || !content) return;
+  const bounds = svg.viewBox.baseVal;
+  let zoom = 1, translateX = 0, translateY = 0, drag = null;
+  const pointAt = event => {
+    const matrix = svg.getScreenCTM();
+    return matrix ? new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse()) : {x: 0, y: 0};
+  };
+  const applyTransform = () => content.setAttribute("transform", `translate(${translateX} ${translateY}) scale(${zoom})`);
+  const zoomAt = (factor, point) => {
+    const next = Math.max(0.65, Math.min(2.6, zoom * factor));
+    const ratio = next / zoom;
+    translateX = point.x - ratio * (point.x - translateX);
+    translateY = point.y - ratio * (point.y - translateY);
+    zoom = next;
+    applyTransform();
+  };
+  page.querySelectorAll("[data-topology-zoom]").forEach(button => button.addEventListener("click", () => {
+    if (button.dataset.topologyZoom === "fit") { zoom = 1; translateX = 0; translateY = 0; applyTransform(); return; }
+    zoomAt(button.dataset.topologyZoom === "in" ? 1.2 : 1 / 1.2, {x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2});
+  }));
+  svg.addEventListener("wheel", event => {
+    event.preventDefault();
+    zoomAt(event.deltaY < 0 ? 1.12 : 1 / 1.12, pointAt(event));
+  }, {passive: false});
+  svg.addEventListener("pointerdown", event => {
+    if (event.button !== 0 || event.target.closest("button")) return;
+    drag = {pointerId: event.pointerId, point: pointAt(event), x: translateX, y: translateY};
+    svg.setPointerCapture(event.pointerId);
+    svg.classList.add("is-dragging");
+  });
+  svg.addEventListener("pointermove", event => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const point = pointAt(event);
+    translateX = drag.x + point.x - drag.point.x;
+    translateY = drag.y + point.y - drag.point.y;
+    applyTransform();
+  });
+  const stopDrag = event => {
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag = null;
+    svg.classList.remove("is-dragging");
+  };
+  svg.addEventListener("pointerup", stopDrag);
+  svg.addEventListener("pointercancel", stopDrag);
+}
+
+function bindUsageRecentDialog(page) {
+  const dialog = page.querySelector("#usage-recent-dialog");
+  if (!dialog) return;
+  page.querySelector("[data-open-recent]")?.addEventListener("click", () => {
+    if (!dialog.open) { dialog.showModal(); document.body.classList.add("usage-dialog-open"); }
+  });
+  page.querySelectorAll("[data-close-recent]").forEach(button => button.addEventListener("click", () => dialog.close()));
+  dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
+  dialog.addEventListener("close", () => document.body.classList.remove("usage-dialog-open"));
+  dialog.addEventListener("cancel", () => document.body.classList.remove("usage-dialog-open"));
 }
 
 function usageTrendChart(records, period) {
@@ -987,6 +1100,7 @@ function usageBreakdown(records, field, title) {
 }
 
 async function renderUsage(page, filter = {}) {
+  document.body.classList.remove("usage-dialog-open");
   const run = page._usageRun = (page._usageRun || 0) + 1;
   const period = filter.period || "today";
   const tab = filter.tab === "details" ? "details" : "overview";
@@ -1026,11 +1140,13 @@ async function renderUsage(page, filter = {}) {
     if (!page.isConnected || page.dataset.page !== "usage" || page._usageRun !== run) return;
     if (tab === "overview") {
       const metrics = [["common.requests", summary.requests || 0], ["usage.failed", summary.failed || 0], ["common.tokens", summary.total_tokens || 0], ["usage.input", summary.input_tokens || 0], ["usage.output", summary.output_tokens || 0]];
-      page.innerHTML = renderHeader() + `<section class="metrics-grid usage-metrics">${metrics.map(([label, value], index) => metricCard(label, value, ["chart", "terminal", "zap", "arrow", "arrow"][index])).join("")}</section><section class="usage-overview-grid">${usageRoutePanel(records, providersResponse.items || [])}${usageRecentPanel(records)}</section><section class="usage-analysis-grid"><article class="card usage-trend"><div class="section-head"><h2>${t("usage.tokenTrend")}</h2><span class="hint">${t("usage.cached")}: ${Number(summary.cached_tokens || 0).toLocaleString(state.locale)}</span></div>${usageTrendChart(records, period)}</article>${usageBreakdown(records, "provider", t("usage.byProvider"))}${usageBreakdown(records, "model", t("usage.byModel"))}</section><div class="section-head"><h2>${t("usage.history")}</h2><button class="text-link" type="button" data-usage-tab="details">${t("usage.details")}${icon("arrow")}</button></div>${usageTable(records.slice(0, 12))}<p class="hint">${t("usage.resultLimit")}</p>`;
+      page.innerHTML = renderHeader() + `<section class="metrics-grid usage-metrics">${metrics.map(([label, value], index) => metricCard(label, value, ["chart", "terminal", "zap", "arrow", "arrow"][index])).join("")}</section><section class="usage-overview-grid">${usageRoutePanel(records, providersResponse.items || [])}${usageRecentPanel(records)}</section>${usageRecentDialog(records)}<section class="usage-analysis-grid"><article class="card usage-trend"><div class="section-head"><h2>${t("usage.tokenTrend")}</h2><span class="hint">${t("usage.cached")}: ${Number(summary.cached_tokens || 0).toLocaleString(state.locale)}</span></div>${usageTrendChart(records, period)}</article>${usageBreakdown(records, "provider", t("usage.byProvider"))}${usageBreakdown(records, "model", t("usage.byModel"))}</section><div class="section-head"><h2>${t("usage.history")}</h2><button class="text-link" type="button" data-usage-tab="details">${t("usage.details")}${icon("arrow")}</button></div>${usageTable(records.slice(0, 12))}<p class="hint">${t("usage.resultLimit")}</p>`;
     } else {
       page.innerHTML = renderHeader() + `<div class="section-head"><h2>${t("usage.history")}</h2><span class="hint">${t("usage.cached")}: ${Number(summary.cached_tokens || 0).toLocaleString(state.locale)} · ${t("usage.resultLimit")}</span></div>${usageTable(records)}`;
     }
     bind();
+    bindUsageTopology(page);
+    bindUsageRecentDialog(page);
     page.querySelectorAll("[data-usage-provider]").forEach(button => button.addEventListener("click", () => renderUsage(page, {...filter, provider: button.dataset.usageProvider, tab: "details"})));
   } catch (error) {
     if (error.message === "invalid_key") return logout();
