@@ -52,6 +52,11 @@ func (h *Handler) StartMITM(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": errStart.Error()})
 		return
 	}
+	if errTrust := setMITMNodeCA(certPath); errTrust != nil {
+		_ = h.mitm.stop(c.Request.Context())
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errTrust.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, h.mitm.status(certPath))
 }
 
@@ -71,6 +76,10 @@ func (h *Handler) StopMITM(c *gin.Context) {
 		return
 	}
 	certPath, _ := h.mitmCAPaths()
+	if errTrust := clearMITMNodeCA(certPath); errTrust != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errTrust.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, h.mitm.status(certPath))
 }
 
