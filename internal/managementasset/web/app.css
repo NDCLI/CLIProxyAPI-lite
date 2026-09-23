@@ -576,6 +576,11 @@ th, td { padding: 10px 13px; }
 .tool-preview { max-height: 460px; margin: 0; padding: 14px; overflow: auto; border: 1px solid var(--line-subtle); border-radius: 8px; background: #171717; color: #d5d5d5; font: 11px/1.6 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .mitm-detail { gap: 14px; }
 .mitm-server-card { display: grid; gap: 14px; padding: 18px; border-color: #60423a; border-radius: 10px; background: #252321; box-shadow: none; }
+.mitm-admin-warning { display: flex; align-items: flex-start; gap: 10px; padding: 11px 12px; border: 1px solid #e6b73955; border-radius: 8px; background: #e6b73912; color: #e8ce8a; font-size: 11px; line-height: 1.5; }
+.mitm-admin-warning > .icon { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 1px; color: #e6b739; }
+.mitm-admin-warning > div { display: grid; gap: 3px; min-width: 0; }
+.mitm-admin-warning strong { color: #ffe29a; font-size: 11px; }
+.mitm-admin-warning p { margin: 0; }
 .mitm-server-card .tool-config-meta > div:last-child { display: flex; flex-wrap: wrap; gap: 6px; }
 .mitm-server-card .hint { margin: 0; font-size: 10px; }
 .mitm-server-card .tool-form-grid > label:first-child { grid-column: auto; }

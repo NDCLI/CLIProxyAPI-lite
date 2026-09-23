@@ -531,6 +531,8 @@
   "tools.trustCA": "Tin cậy chứng chỉ",
   "tools.removeCA": "Xóa tin cậy",
   "tools.mitmPrivilege": "Cần quyền quản trị để thay đổi DNS hệ thống.",
+  "tools.adminRequiredTitle": "Cần chạy CLIProxyAPI bằng quyền quản trị",
+  "tools.mitmAdminRequired": "DNS chưa bật được vì CLIProxyAPI đang chạy bằng quyền thường. Hãy thoát CLIProxyAPI, mở lại bằng Run as administrator (Chạy với tư cách quản trị viên), rồi khởi động lại MITM.",
   "tools.mitmAddress": "Đang lắng nghe tại",
   "tools.admin": "Quản trị viên",
   "tools.notAdmin": "Người dùng thường",

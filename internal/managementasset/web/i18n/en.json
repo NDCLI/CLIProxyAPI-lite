@@ -531,6 +531,8 @@
   "tools.trustCA": "Trust certificate",
   "tools.removeCA": "Remove trust",
   "tools.mitmPrivilege": "Managing system DNS requires administrator rights.",
+  "tools.adminRequiredTitle": "Run CLIProxyAPI as administrator",
+  "tools.mitmAdminRequired": "DNS is unavailable because CLIProxyAPI is running as a standard user. Exit CLIProxyAPI, relaunch it with Run as administrator, then start MITM again.",
   "tools.mitmAddress": "Listening on",
   "tools.admin": "Administrator",
   "tools.notAdmin": "Standard user",
