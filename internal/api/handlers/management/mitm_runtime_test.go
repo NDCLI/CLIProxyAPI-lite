@@ -8,9 +8,13 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/miekg/dns"
 	_ "github.com/router-for-me/CLIProxyAPI/v7/internal/translator"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
 )
@@ -44,6 +48,62 @@ func TestMITMOpenAIResponseTranslatesBackToGemini(t *testing.T) {
 	)
 	if !bytes.Contains(converted, []byte(`"candidates"`)) || !bytes.Contains(converted, []byte("xin chao")) {
 		t.Fatalf("unexpected Gemini response: %s", converted)
+	}
+}
+
+func TestMITMHTTPClientPreservesHTTP2Redirect(t *testing.T) {
+	listener, errListen := net.Listen("tcp4", "127.0.0.1:0")
+	if errListen != nil {
+		t.Fatal(errListen)
+	}
+	server := &httptest.Server{Listener: listener, Config: &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Location", "/login")
+		w.WriteHeader(http.StatusFound)
+	})}, EnableHTTP2: true}
+	server.StartTLS()
+	defer server.Close()
+	client := directMITMClient()
+	transport := client.Transport.(*http.Transport)
+	transport.DialContext = (&net.Dialer{}).DialContext
+	transport.TLSClientConfig = server.Client().Transport.(*http.Transport).TLSClientConfig.Clone()
+	defer client.CloseIdleConnections()
+	response, errRequest := client.Get(server.URL)
+	if errRequest != nil {
+		t.Fatal(errRequest)
+	}
+	defer response.Body.Close()
+	if response.ProtoMajor != 2 {
+		t.Fatalf("protocol = %q, want HTTP/2", response.Proto)
+	}
+	if response.StatusCode != http.StatusFound || response.Header.Get("Location") != "/login" {
+		t.Fatalf("redirect was not preserved: status=%d location=%q", response.StatusCode, response.Header.Get("Location"))
+	}
+}
+
+func TestResolveMITMUpstreamBypassesHosts(t *testing.T) {
+	packet, errListen := net.ListenPacket("udp4", "127.0.0.1:0")
+	if errListen != nil {
+		t.Fatal(errListen)
+	}
+	server := &dns.Server{PacketConn: packet, Handler: dns.HandlerFunc(func(w dns.ResponseWriter, request *dns.Msg) {
+		response := new(dns.Msg)
+		response.SetReply(request)
+		ip := net.IPv4(8, 8, 4, 4)
+		if request.Question[0].Name == "blocked.test." {
+			ip = net.IPv4(127, 0, 0, 1)
+		}
+		response.Answer = []dns.RR{&dns.A{Hdr: dns.RR_Header{Name: request.Question[0].Name, Rrtype: dns.TypeA, Class: dns.ClassINET}, A: ip}}
+		_ = w.WriteMsg(response)
+	})}
+	go server.ActivateAndServe()
+	defer server.Shutdown()
+
+	got, errResolve := resolveMITMUpstream(context.Background(), "localhost", packet.LocalAddr().String())
+	if errResolve != nil || got != "8.8.4.4" {
+		t.Fatalf("localhost resolved through hosts instead of DNS: ip=%q err=%v", got, errResolve)
+	}
+	if _, errResolve := resolveMITMUpstream(context.Background(), "blocked.test", packet.LocalAddr().String()); errResolve == nil {
+		t.Fatal("loopback DNS answer must not route back into MITM")
 	}
 }
 

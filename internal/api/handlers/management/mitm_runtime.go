@@ -28,6 +28,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miekg/dns"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v7/sdk/translator"
 )
 
@@ -44,6 +45,8 @@ var mitmURLPatterns = map[string][]string{
 	"copilot":     {"/chat/completions", "/v1/messages", "/responses"},
 	"kiro":        {"/generateAssistantResponse"},
 }
+
+var mitmPassthroughClient = directMITMClient()
 
 type mitmRuntime struct {
 	mu          sync.RWMutex
@@ -392,7 +395,7 @@ func (m *mitmRuntime) passthrough(w http.ResponseWriter, req *http.Request, host
 		return
 	}
 	upstreamReq.Header = req.Header.Clone()
-	response, errDo := directMITMClient().Do(upstreamReq)
+	response, errDo := mitmPassthroughClient.Do(upstreamReq)
 	if errDo != nil {
 		http.Error(w, errDo.Error(), http.StatusBadGateway)
 		return
@@ -402,23 +405,49 @@ func (m *mitmRuntime) passthrough(w http.ResponseWriter, req *http.Request, host
 }
 
 func directMITMClient() *http.Client {
-	resolver := &net.Resolver{PreferGo: true, Dial: func(ctx context.Context, network, _ string) (net.Conn, error) {
-		return (&net.Dialer{}).DialContext(ctx, "udp", "8.8.8.8:53")
-	}}
 	transport := &http.Transport{
+		ForceAttemptHTTP2: true,
 		DialContext: func(ctx context.Context, network, address string) (net.Conn, error) {
 			host, port, errSplit := net.SplitHostPort(address)
 			if errSplit != nil {
 				return nil, errSplit
 			}
-			addresses, errLookup := resolver.LookupHost(ctx, host)
-			if errLookup != nil || len(addresses) == 0 {
-				return nil, fmt.Errorf("resolve upstream %s: %w", host, errLookup)
+			ip, errLookup := resolveMITMUpstream(ctx, host, "8.8.8.8:53")
+			if errLookup != nil {
+				return nil, errLookup
 			}
-			return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort(addresses[0], port))
+			return (&net.Dialer{}).DialContext(ctx, network, net.JoinHostPort(ip, port))
 		},
 	}
-	return &http.Client{Transport: transport}
+	return &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+}
+
+func resolveMITMUpstream(ctx context.Context, host, dnsServer string) (string, error) {
+	query := new(dns.Msg)
+	query.SetQuestion(dns.Fqdn(host), dns.TypeA)
+	reply, _, errLookup := (&dns.Client{Net: "udp"}).ExchangeContext(ctx, query, dnsServer)
+	if errLookup == nil && reply.Truncated {
+		reply, _, errLookup = (&dns.Client{Net: "tcp"}).ExchangeContext(ctx, query, dnsServer)
+	}
+	if errLookup != nil {
+		return "", fmt.Errorf("resolve MITM upstream %s: %w", host, errLookup)
+	}
+	if reply.Rcode != dns.RcodeSuccess {
+		return "", fmt.Errorf("resolve MITM upstream %s: %s", host, dns.RcodeToString[reply.Rcode])
+	}
+	for _, answer := range reply.Answer {
+		record, ok := answer.(*dns.A)
+		if !ok {
+			continue
+		}
+		ip := record.A.To4()
+		if ip != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() {
+			return ip.String(), nil
+		}
+	}
+	return "", fmt.Errorf("resolve MITM upstream %s: no public IPv4 address", host)
 }
 
 func copyMITMHeaders(dst, src http.Header) {
