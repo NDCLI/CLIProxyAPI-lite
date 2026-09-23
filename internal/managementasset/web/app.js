@@ -74,6 +74,25 @@ function providerIdentity(name, compact = false) {
   return `<span class="provider-identity ${compact ? "compact" : ""}"><span class="provider-logo">${brand ? `<img src="/management-next/providers/${brand[1]}.png" alt="" width="32" height="32">` : icon("server")}</span><span>${escapeHTML(brand?.[0] || name || t("providers.status.unknown"))}</span></span>`;
 }
 
+function providerFilterChips(names, selected = "") {
+  const counts = new Map();
+  for (const name of names) {
+    const key = String(name || "unknown").toLowerCase();
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return `<div class="provider-chips" role="group" aria-label="${t("quota.filterProvider")}"><button class="provider-chip ${selected ? "" : "active"}" type="button" data-provider-chip="" aria-pressed="${!selected}">${icon("grid")}<span>${t("quota.allProviders")}</span><span class="chip-count">${names.length}</span></button>${[...counts].sort(([a], [b]) => a.localeCompare(b)).map(([name, count]) => `<button class="provider-chip ${selected === name ? "active" : ""}" type="button" data-provider-chip="${escapeHTML(name)}" aria-pressed="${selected === name}">${providerIdentity(name, true)}<span class="chip-count">${count}</span></button>`).join("")}</div>`;
+}
+
+function bindProviderFilterChips(container, onSelect) {
+  container.querySelectorAll("[data-provider-chip]").forEach(button => button.addEventListener("click", () => {
+    container.querySelectorAll("[data-provider-chip]").forEach(chip => {
+      chip.classList.toggle("active", chip === button);
+      chip.setAttribute("aria-pressed", String(chip === button));
+    });
+    onSelect(button.dataset.providerChip);
+  }));
+}
+
 function metricCard(label, value, symbol) {
   return `<article class="card metric-card"><span class="metric-icon">${icon(symbol)}</span><h3>${t(label)}</h3><div class="metric">${Number(value || 0).toLocaleString(state.locale)}</div></article>`;
 }
@@ -357,15 +376,17 @@ async function renderProviders(page) {
     }
     const providerState = provider => !provider.enabled ? "disabled" : provider.status === "active" ? "active" : "attention";
     container.innerHTML = `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="provider-search" type="search" placeholder="${t("providers.search")}" aria-label="${t("providers.search")}"></label><select class="text-input provider-filter" id="provider-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select><a class="primary compact" href="#/auth-files">${icon("user")}${t("providers.manageAccounts")}</a></div><div class="provider-summary"><span><strong>${groups.size}</strong> ${t("providers.type")}</span><span><strong>${providers.length}</strong> ${t("providers.accounts")}</span><span class="ok"><strong>${providers.filter(item => providerState(item) === "active").length}</strong> ${t("providers.active")}</span></div><div class="provider-groups">${[...groups].map(([name, accounts]) => `<section class="provider-group"><header class="provider-group-head">${providerIdentity(name)}<span class="badge">${accounts.length} ${t("providers.accounts")}</span></header><div class="account-list">${accounts.map(provider => `<article class="account-row" data-account data-provider-state="${providerState(provider)}"><div class="account-main"><span class="account-avatar">${icon("user")}</span><div><strong class="account-name" title="${escapeHTML(provider.label || provider.id || "-")}">${escapeHTML(provider.label || provider.id || "-")}</strong><div class="account-meta"><span class="badge ${providerState(provider) === "active" ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.enabled ? provider.status : "disabled"))}</span><span>${Number(provider.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(provider.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></div></div><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${icon("grid")}${t("providers.models")}</button><a class="secondary" href="#/quota">${icon("gauge")}${t("quota.title")}</a><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${icon(provider.enabled ? "zap" : "shield")}${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></article>`).join("")}</div></section>`).join("")}</div><div id="provider-empty" class="empty" ${providers.length ? "hidden" : ""}>${providers.length ? t("providers.noMatches") : t("providers.empty")}</div><div id="provider-models" class="provider-models" aria-live="polite"></div>`;
+    container.querySelector(".search-field").outerHTML = providerFilterChips(providers.map(item => item.provider));
+    const groupNames = [...groups.keys()];
+    container.querySelectorAll(".provider-group").forEach((group, index) => { group.dataset.provider = groupNames[index].toLowerCase(); });
+    let selectedProvider = "";
     const applyFilter = () => {
-      const query = container.querySelector("#provider-search").value.trim().toLocaleLowerCase();
       const status = container.querySelector("#provider-status").value;
       let visible = 0;
       container.querySelectorAll(".provider-group").forEach(group => {
         let matches = 0;
         group.querySelectorAll("[data-account]").forEach(row => {
-          const text = `${group.querySelector(".provider-identity").textContent} ${row.querySelector(".account-name").textContent}`.toLocaleLowerCase();
-          row.hidden = (status !== "all" && row.dataset.providerState !== status) || !text.includes(query);
+          row.hidden = (selectedProvider && group.dataset.provider !== selectedProvider) || (status !== "all" && row.dataset.providerState !== status);
           if (!row.hidden) matches++;
         });
         group.hidden = !matches;
@@ -373,8 +394,25 @@ async function renderProviders(page) {
       });
       container.querySelector("#provider-empty").hidden = visible > 0;
     };
-    container.querySelector("#provider-search").addEventListener("input", applyFilter);
+    bindProviderFilterChips(container.querySelector(".provider-chips"), provider => { selectedProvider = provider; applyFilter(); });
     container.querySelector("#provider-status").addEventListener("change", applyFilter);
+    container.querySelectorAll("[data-account]").forEach(row => {
+      const id = row.querySelector("[data-provider-enabled]").dataset.providerEnabled;
+      row.querySelector(".actions").insertAdjacentHTML("beforeend", `<button class="danger-button" type="button" data-provider-delete="${escapeHTML(id)}" title="${t("authFiles.delete")}">${icon("trash")}${t("authFiles.delete")}</button>`);
+    });
+    container.querySelectorAll("[data-provider-delete]").forEach(button => button.addEventListener("click", async () => {
+      const name = button.dataset.providerDelete;
+      if (!confirm(t("authFiles.confirmDelete").replace("{name}", name))) return;
+      button.disabled = true;
+      try {
+        await api(`/auth-files?name=${encodeURIComponent(name)}`, {method: "DELETE"});
+        await renderProviders(page);
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        container.querySelector("#provider-models").innerHTML = `<div class="error">${t("authFiles.deleteFailed")}</div>`;
+        button.disabled = false;
+      }
+    }));
     container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
       button.disabled = true;
       const modelsPanel = document.getElementById("provider-models");
@@ -547,20 +585,21 @@ async function startOAuthLogin(provider, message, onSuccess) {
 
 async function renderAuthFiles(page) {
   page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-actions"><button class="secondary" data-oauth="codex">${providerIdentity("codex", true)}${t("authFiles.loginCodex")}</button><button class="secondary" data-oauth="anthropic">${providerIdentity("claude", true)}${t("authFiles.loginClaude")}</button><button class="secondary" data-oauth="antigravity">${providerIdentity("antigravity", true)}${t("authFiles.loginAntigravity")}</button></div><div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="auth-search" type="search" placeholder="${t("authFiles.search")}" aria-label="${t("authFiles.search")}"></label><select class="text-input provider-filter" id="auth-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select></div><div id="auth-files-content" class="loading">${t("common.loading")}</div><div id="auth-models" class="provider-models" aria-live="polite"></div>`;
+  page.querySelector(".search-field").outerHTML = `<div id="auth-provider-chips"></div>`;
   const content = page.querySelector("#auth-files-content");
+  content.insertAdjacentHTML("beforebegin", `<div class="form-message" id="auth-action-status" role="status" aria-live="polite"></div>`);
+  let selectedProvider = "";
   const fileState = file => file.disabled ? "disabled" : file.unavailable || file.status !== "active" ? "attention" : "active";
   const applyFilter = () => {
-    const query = page.querySelector("#auth-search").value.trim().toLocaleLowerCase();
     const status = page.querySelector("#auth-status").value;
     let visible = 0;
     content.querySelectorAll("[data-auth-row]").forEach(row => {
-      row.hidden = (status !== "all" && row.dataset.authState !== status) || !row.textContent.toLocaleLowerCase().includes(query);
+      row.hidden = (selectedProvider && row.dataset.provider !== selectedProvider) || (status !== "all" && row.dataset.authState !== status);
       if (!row.hidden) visible++;
     });
     const empty = content.querySelector(".auth-filter-empty");
     if (empty) empty.hidden = visible > 0;
   };
-  page.querySelector("#auth-search").addEventListener("input", applyFilter);
   page.querySelector("#auth-status").addEventListener("change", applyFilter);
   page.querySelectorAll("[data-oauth]").forEach(button => button.addEventListener("click", async () => {
     button.disabled = true;
@@ -577,9 +616,35 @@ async function renderAuthFiles(page) {
       if (!page.isConnected || page.dataset.page !== "auth-files") return;
       const files = response.files || [];
       content.className = "";
+      if (selectedProvider && !files.some(file => String(file.provider || file.type || "unknown").toLowerCase() === selectedProvider)) selectedProvider = "";
+      const chips = page.querySelector("#auth-provider-chips");
+      chips.innerHTML = providerFilterChips(files.map(file => file.provider || file.type), selectedProvider);
+      bindProviderFilterChips(chips, provider => { selectedProvider = provider; applyFilter(); });
       page.querySelector("#auth-models").innerHTML = "";
       content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => { const name = file.label || file.email || file.name || file.id || "-"; const filename = file.name || file.id || "-"; const status = file.disabled ? t("providers.disabled") : file.unavailable ? t("providers.unavailable") : providerStatusLabel(file.status); return `<tr data-auth-row data-auth-state="${fileState(file)}"><td><div class="auth-credential"><strong title="${escapeHTML(name)}">${escapeHTML(name)}</strong>${filename !== name ? `<small title="${escapeHTML(filename)}">${escapeHTML(filename)}</small>` : ""}</div></td><td>${providerIdentity(file.provider || file.type, true)}</td><td><span class="badge ${fileState(file) === "active" ? "ready" : "partial"}">${escapeHTML(status)}</span><div class="account-meta"><span>${Number(file.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(file.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></td><td><div class="actions"><button class="secondary" data-auth-models="${escapeHTML(file.id || "")}" data-auth-name="${escapeHTML(filename)}">${icon("grid")}${t("providers.models")}</button>${file.supports_quota ? `<a class="secondary" href="#/quota">${icon("gauge")}${t("quota.title")}</a>` : ""}<button class="secondary" data-auth-toggle="${escapeHTML(filename)}" data-auth-index="${escapeHTML(file.auth_index || "")}" data-disabled="${Boolean(file.disabled)}">${icon(file.disabled ? "check" : "pause")}${file.disabled ? t("providers.enable") : t("providers.disable")}</button></div></td></tr>`; }).join("")}</tbody></table></div><div class="empty auth-filter-empty" hidden>${t("authFiles.noMatches")}</div>` : `<div class="empty">${t("authFiles.empty")}</div>`;
+      content.querySelectorAll("[data-auth-row]").forEach((row, index) => {
+        const file = files[index];
+        row.dataset.provider = String(file.provider || file.type || "unknown").toLowerCase();
+        const name = file.name || file.id;
+        if (name) row.querySelector(".actions").insertAdjacentHTML("beforeend", `<button class="danger-button" type="button" data-auth-delete="${escapeHTML(name)}" title="${t("authFiles.delete")}">${icon("trash")}${t("authFiles.delete")}</button>`);
+      });
       applyFilter();
+      content.querySelectorAll("[data-auth-delete]").forEach(button => button.addEventListener("click", async () => {
+        const name = button.dataset.authDelete;
+        if (!confirm(t("authFiles.confirmDelete").replace("{name}", name))) return;
+        button.disabled = true;
+        const message = page.querySelector("#auth-action-status");
+        message.textContent = t("authFiles.deleting");
+        try {
+          await api(`/auth-files?name=${encodeURIComponent(name)}`, {method: "DELETE"});
+          await load();
+          message.textContent = t("authFiles.deleted");
+        } catch (error) {
+          if (error.message === "invalid_key") return logout();
+          message.textContent = t("authFiles.deleteFailed");
+          button.disabled = false;
+        }
+      }));
       content.querySelectorAll("[data-auth-models]").forEach(button => button.addEventListener("click", async () => {
         button.disabled = true;
         const modelsPanel = page.querySelector("#auth-models");
@@ -800,6 +865,7 @@ async function renderUsage(page, filter = {}) {
 
 function quotaFamily(name) {
   const lower = String(name || "").toLowerCase();
+  if (lower.includes("claude") && lower.includes("gpt")) return "Claude + GPT";
   if (lower.includes("claude")) return "Claude";
   if (lower.includes("gpt")) return "GPT";
   if (lower.includes("gemini") || lower.includes("flash") || lower.includes("pro")) return "Gemini";
@@ -833,20 +899,27 @@ function quotaResetLabel(resetTime) {
 function renderQuotaCockpit(value, provider) {
   provider = String(provider || "").toLowerCase();
   const families = new Map();
+  const hasWindowedSummary = provider === "antigravity" && (value.groups || []).some(group => (group.buckets || []).some(bucket => quotaWindow(bucket) !== "model"));
+  const modelDetails = [];
   for (const group of value.groups || []) {
     for (const bucket of group.buckets || []) {
       const family = provider === "codex" ? "GPT" : ["claude", "anthropic"].includes(provider) ? "Claude" : quotaFamily(group.displayName);
       const window = quotaWindow(bucket);
       const key = `${family}:${window}`;
       const remaining = Math.max(0, Math.min(1, Number(bucket.remainingFraction) || 0));
+      if (hasWindowedSummary && window === "model") {
+        modelDetails.push({name: group.displayName, remaining});
+        continue;
+      }
       const row = families.get(key) || {family, window, remaining, resetTime: bucket.resetTime || "", models: []};
       if (remaining < row.remaining) { row.remaining = remaining; row.resetTime = bucket.resetTime || ""; }
-      if (provider === "antigravity" && group.displayName) row.models.push({name: group.displayName, remaining});
+      if (provider === "antigravity" && !hasWindowedSummary && group.displayName) row.models.push({name: group.displayName, remaining});
       families.set(key, row);
     }
   }
   if (!families.size) return "";
-  return `<div class="quota-cockpit-grid">${[...families.values()].sort((a, b) => `${a.family}${a.window}`.localeCompare(`${b.family}${b.window}`)).map(row => `<section class="quota-family-card"><div class="quota-family-heading"><strong>${escapeHTML(row.family)}</strong><span>${row.window === "5h" ? "5h" : row.window === "week" ? t("quota.week") : t("quota.modelLimit")}</span></div><div class="quota-family-value"><span>${Math.round(row.remaining * 100)}%</span><span>${t("quota.remaining")}</span></div><progress max="1" value="${row.remaining}" aria-label="${escapeHTML(`${row.family} ${row.window}`)}"></progress>${row.resetTime ? `<span class="quota-reset" title="${escapeHTML(new Date(row.resetTime).toLocaleString(state.locale))}">${escapeHTML(quotaResetLabel(row.resetTime))}</span>` : ""}${row.models.length ? `<details class="quota-shared-models"><summary>${t("quota.sharedModels")} (${row.models.length})</summary>${row.models.sort((a, b) => a.name.localeCompare(b.name)).map(model => `<span>${escapeHTML(model.name)} · ${Math.round(model.remaining * 100)}%</span>`).join("")}</details>` : ""}</section>`).join("")}</div>`;
+  const cards = `<div class="quota-cockpit-grid">${[...families.values()].sort((a, b) => `${a.family}${a.window}`.localeCompare(`${b.family}${b.window}`)).map(row => `<section class="quota-family-card"><div class="quota-family-heading"><strong>${escapeHTML(row.family)}</strong><span>${row.window === "5h" ? "5h" : row.window === "week" ? t("quota.week") : t("quota.modelLimit")}</span></div><div class="quota-family-value"><span>${Math.round(row.remaining * 100)}%</span><span>${t("quota.remaining")}</span></div><progress max="1" value="${row.remaining}" aria-label="${escapeHTML(`${row.family} ${row.window}`)}"></progress>${row.resetTime ? `<span class="quota-reset" title="${escapeHTML(new Date(row.resetTime).toLocaleString(state.locale))}">${escapeHTML(quotaResetLabel(row.resetTime))}</span>` : ""}${row.models.length ? `<details class="quota-shared-models"><summary>${t("quota.sharedModels")} (${row.models.length})</summary>${row.models.sort((a, b) => a.name.localeCompare(b.name)).map(model => `<span>${escapeHTML(model.name)} · ${Math.round(model.remaining * 100)}%</span>`).join("")}</details>` : ""}</section>`).join("")}</div>`;
+  return cards + (modelDetails.length ? `<details class="quota-shared-models quota-model-details"><summary>${t("quota.sharedModels")} (${modelDetails.length})</summary>${modelDetails.sort((a, b) => a.name.localeCompare(b.name)).map(model => `<span>${escapeHTML(model.name)} · ${Math.round(model.remaining * 100)}%</span>`).join("")}</details>` : "");
 }
 
 function usageTable(records) {
@@ -864,22 +937,18 @@ async function renderQuota(page) {
     const quotaProviders = providerResponse.providers || [];
     const canReset = credential => quotaProviders.some(provider => provider.supports_reset && (provider.supported_providers || []).some(name => String(name).toLowerCase() === String(credential.provider).toLowerCase()));
     const cards = credentials.map(credential => `<article class="card quota-card" data-quota-card data-quota-provider="${escapeHTML(credential.provider || "")}"><div class="card-title"><h2 title="${escapeHTML(credential.label || credential.email || credential.name || credential.id)}">${escapeHTML(credential.label || credential.email || credential.name || credential.id)}</h2><span class="badge ${credential.unavailable || credential.status !== "active" ? "partial" : "ready"}">${escapeHTML(credential.unavailable ? t("providers.unavailable") : providerStatusLabel(credential.status))}</span></div><div class="quota-brand">${providerIdentity(credential.provider, true)}</div><p class="quota-observed" data-quota-checked>${t("quota.checking")}</p><div class="quota-card-result" data-quota-result="${escapeHTML(credential.auth_index)}"><div class="loading">${t("common.loading")}</div></div><div class="actions"><button class="secondary" data-quota-fetch="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.refresh")}</button>${canReset(credential) ? `<button class="secondary" data-quota-reset="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.reset")}</button>` : ""}</div></article>`).join("");
-    const providers = [...new Set(credentials.map(credential => credential.provider).filter(Boolean))].sort();
-    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="quota-search" type="search" placeholder="${t("quota.search")}" aria-label="${t("quota.search")}"></label><select class="text-input provider-filter" id="quota-provider" aria-label="${t("quota.filterProvider")}"><option value="">${t("quota.allProviders")}</option>${providers.map(name => `<option value="${escapeHTML(name)}">${escapeHTML(providerBrands[String(name).toLowerCase()]?.[0] || name)}</option>`).join("")}</select></div><section class="grid quota-grid">${cards}</section><div id="quota-filter-empty" class="empty" hidden>${t("quota.noMatches")}</div>` : `<div class="empty">${t("quota.empty")}</div>`);
+    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `${providerFilterChips(credentials.map(credential => credential.provider))}<section class="grid quota-grid">${cards}</section><div id="quota-filter-empty" class="empty" hidden>${t("quota.noMatches")}</div>` : `<div class="empty">${t("quota.empty")}</div>`);
     document.getElementById("refresh").addEventListener("click", () => renderQuota(page));
     if (cards) {
-      const applyFilter = () => {
-        const query = page.querySelector("#quota-search").value.trim().toLocaleLowerCase();
-        const provider = page.querySelector("#quota-provider").value;
+      const applyFilter = provider => {
         let visible = 0;
         page.querySelectorAll("[data-quota-card]").forEach(card => {
-          card.hidden = (provider && card.dataset.quotaProvider !== provider) || !card.textContent.toLocaleLowerCase().includes(query);
+          card.hidden = Boolean(provider && card.dataset.quotaProvider.toLowerCase() !== provider);
           if (!card.hidden) visible++;
         });
         page.querySelector("#quota-filter-empty").hidden = visible > 0;
       };
-      page.querySelector("#quota-search").addEventListener("input", applyFilter);
-      page.querySelector("#quota-provider").addEventListener("change", applyFilter);
+      bindProviderFilterChips(page.querySelector(".provider-chips"), applyFilter);
     }
     const renderResult = (target, value) => {
       const summary = (value.summary || []).map(metric => { const labels = {credit_amount: "quota.creditAmount", minimum_credit_amount: "quota.minimumCredit", observed_signals: "quota.observedSignals"}; return `<li><strong>${escapeHTML(t(labels[metric.key] || metric.label || metric.key))}</strong><span>${escapeHTML(`${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)}</span></li>`; });

@@ -64,3 +64,15 @@ func TestParseAntigravityNativeQuotaUsesVisibleModels(t *testing.T) {
 		}
 	}
 }
+
+func TestParseAntigravityQuotaSummaryIncludesWeeklyReset(t *testing.T) {
+	data := []byte(`{"groups":[{"displayName":"Gemini Models","buckets":[{"bucketId":"gemini-weekly","window":"weekly","remainingFraction":0.72,"resetTime":"2026-09-25T11:43:04Z"},{"bucketId":"gemini-5h","window":"5h","remainingFraction":1,"resetTime":"2026-09-23T06:13:28Z"}]},{"displayName":"Claude and GPT models","buckets":[{"window":"weekly","remainingFraction":0.9}]}]}`)
+	groups := parseAntigravityQuotaSummary(data)
+	if len(groups) != 2 || groups[0].DisplayName != "Gemini Models" || len(groups[0].Buckets) != 2 {
+		t.Fatalf("unexpected grouped quota: %+v", groups)
+	}
+	weekly := groups[0].Buckets[0]
+	if weekly.Window != "weekly" || weekly.RemainingFraction != 0.72 || weekly.ResetTime != "2026-09-25T11:43:04Z" {
+		t.Fatalf("weekly reset lost: %+v", weekly)
+	}
+}

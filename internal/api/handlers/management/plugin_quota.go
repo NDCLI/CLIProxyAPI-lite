@@ -264,7 +264,11 @@ func (h *Handler) fetchNativeQuota(ctx context.Context, auth *coreauth.Auth) (pl
 		if errFetch != nil {
 			return pluginapi.QuotaFetchResponse{}, true, errFetch
 		}
-		return parseAntigravityNativeQuota(data, antigravityVisibleModels(auth)), true, nil
+		result := parseAntigravityNativeQuota(data, antigravityVisibleModels(auth))
+		if summaryData, _, errSummary := requestJSON(http.MethodPost, "https://daily-cloudcode-pa.googleapis.com/v1internal:retrieveUserQuotaSummary", requestBody, headers); errSummary == nil {
+			result.Groups = append(result.Groups, parseAntigravityQuotaSummary(summaryData)...)
+		}
+		return result, true, nil
 	}
 	return pluginapi.QuotaFetchResponse{}, false, nil
 }
@@ -396,6 +400,41 @@ func parseAntigravityNativeQuota(data []byte, allowedNames ...map[string]string)
 	}
 	sort.Slice(result.Groups, func(i, j int) bool { return result.Groups[i].DisplayName < result.Groups[j].DisplayName })
 	return result
+}
+
+func parseAntigravityQuotaSummary(data []byte) []pluginapi.QuotaGroup {
+	groups := make([]pluginapi.QuotaGroup, 0, 2)
+	gjson.GetBytes(data, "groups").ForEach(func(_, rawGroup gjson.Result) bool {
+		name := strings.TrimSpace(rawGroup.Get("displayName").String())
+		if name == "" {
+			return true
+		}
+		group := pluginapi.QuotaGroup{DisplayName: name}
+		rawGroup.Get("buckets").ForEach(func(_, rawBucket gjson.Result) bool {
+			fraction := rawBucket.Get("remainingFraction")
+			if !fraction.Exists() || fraction.Type != gjson.Number || math.IsNaN(fraction.Float()) || math.IsInf(fraction.Float(), 0) {
+				return true
+			}
+			window := strings.TrimSpace(rawBucket.Get("window").String())
+			if window == "" {
+				window = strings.TrimSpace(rawBucket.Get("bucketId").String())
+			}
+			if window == "" {
+				return true
+			}
+			group.Buckets = append(group.Buckets, pluginapi.QuotaBucket{
+				Window:            window,
+				RemainingFraction: math.Max(0, math.Min(1, fraction.Float())),
+				ResetTime:         strings.TrimSpace(rawBucket.Get("resetTime").String()),
+			})
+			return true
+		})
+		if len(group.Buckets) > 0 {
+			groups = append(groups, group)
+		}
+		return true
+	})
+	return groups
 }
 
 func antigravityModelNameKey(name string) string {
