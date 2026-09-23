@@ -12,13 +12,13 @@ const routes = [
   ["endpoint", "nav.endpoint", "key", "endpoint_keys"],
   ["providers", "nav.providers", "server", "providers"],
   ["combo", "nav.combo", "route", "combos"],
+  ["cli-tools", "nav.cliTools", "command", "cli_tools"],
   ["usage", "nav.usage", "chart", "usage"],
   ["quota", "nav.quota", "gauge", "quota"],
   ["logs", "nav.logs", "terminal", "logs"],
   ["settings", "nav.settings", "settings", "system_settings"],
   ["plugins", "nav.plugins", "puzzle", "plugins"],
-  ["token-saver", "nav.tokenSaver", "zap", "token_saver"],
-  ["cli-tools", "nav.cliTools", "command", "cli_tools"]
+  ["token-saver", "nav.tokenSaver", "zap", "token_saver"]
 ];
 
 const app = document.getElementById("app");
