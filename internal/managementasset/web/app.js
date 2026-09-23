@@ -11,7 +11,6 @@ const routes = [
   ["quick-start", "nav.quickStart", "rocket"],
   ["endpoint", "nav.endpoint", "key", "endpoint_keys"],
   ["providers", "nav.providers", "server", "providers"],
-  ["auth-files", "nav.authFiles", "shield", "providers"],
   ["combo", "nav.combo", "route", "combos"],
   ["usage", "nav.usage", "chart", "usage"],
   ["quota", "nav.quota", "gauge", "quota"],
@@ -62,12 +61,14 @@ const icon = (name, className = "") => `<svg class="icon ${className}" viewBox="
 const providerBrands = {
   antigravity: ["Antigravity", "antigravity"], codex: ["OpenAI Codex", "codex"],
   claude: ["Claude", "claude"], anthropic: ["Anthropic", "claude"],
-  gemini: ["Google Gemini", "gemini"], "gemini-cli": ["Gemini CLI", "gemini"],
-  "gemini-cli-oauth": ["Gemini CLI", "gemini"], vertex: ["Vertex AI", "gemini"],
+  gemini: ["Google Gemini", "gemini"], "gemini-cli": ["Gemini CLI", "gemini"], "gemini-cli-oauth": ["Gemini CLI", "gemini"],
+  vertex: ["Vertex AI", "gemini"], "opencode": ["OpenCode Free", "opencode"],
   qwen: ["Qwen", "qwen"], kimi: ["Kimi", "kimi"], "kimi-coding": ["Kimi Coding", "kimi"],
   openai: ["OpenAI", "openai"], "openai-compatibility": ["OpenAI Compatible", "openai"],
   cursor: ["Cursor", "cursor"], cline: ["Cline", "cline"], continue: ["Continue", "continue"],
-  iflow: ["iFlow", "iflow"], github: ["GitHub", "github"]
+  iflow: ["iFlow", "iflow"], github: ["GitHub", "github"], xai: ["xAI", "grok-cli"], devin: ["Devin", "devin-cli"],
+  "kimi-ai": ["Kimi AI", "kimi"], "github-copilot": ["GitHub Copilot", "copilot"],
+  "cursor-ide": ["Cursor IDE", "cursor"], "kilo-code": ["Kilo Code", "kilocode"], "kim": ["Kimi", "kimi"]
 };
 function providerIdentity(name, compact = false) {
   const key = String(name || "").toLowerCase();
@@ -129,7 +130,15 @@ async function api(path, options = {}) {
 function routeName() {
   const name = location.hash.replace(/^#\/?/, "").split("?")[0];
   if (name.startsWith("cli-tools/")) return "cli-tools";
+  if (name === "auth-files" || name.startsWith("providers/")) return "providers";
   return routes.some(route => route[0] === name) ? name : "overview";
+}
+
+function providerRouteID() {
+  const name = location.hash.replace(/^#\/?/, "").split("?")[0];
+  if (!name.startsWith("providers/")) return "";
+  try { return decodeURIComponent(name.slice("providers/".length)).toLowerCase(); }
+  catch (_) { return ""; }
 }
 
 function cliToolRouteID() {
@@ -256,7 +265,7 @@ async function renderOverview(page) {
 }
 
 async function renderQuickStart(page) {
-  page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><h2>${t("quickStart.stepOne")}</h2><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${icon("copy")}${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${icon("key")}${t("quickStart.manageKeys")}</button><span class="form-message" id="quick-start-copy-status" role="status" aria-live="polite"></span></div></section><section class="grid"><article class="card"><span class="feature-icon">${icon("key")}</span><h3>${t("quickStart.stepTwo")}</h3><p>${t("quickStart.keys")}</p><div class="metric" id="quick-start-key-count" aria-live="polite">–</div></article><article class="card"><span class="feature-icon">${icon("shield")}</span><h3>${t("quickStart.credentials")}</h3><div class="metric" id="quick-start-credential-count" aria-live="polite">–</div><a class="text-link" href="#/auth-files">${t("quickStart.manageAccounts")}${icon("arrow")}</a></article><article class="card"><span class="feature-icon">${icon("terminal")}</span><h3>${t("quickStart.stepThree")}</h3><p>${t("cli.description")}</p><a class="text-link" href="#/cli-tools">${t("quickStart.connectTools")}${icon("arrow")}</a></article></section>`;
+  page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><h2>${t("quickStart.stepOne")}</h2><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${icon("copy")}${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${icon("key")}${t("quickStart.manageKeys")}</button><span class="form-message" id="quick-start-copy-status" role="status" aria-live="polite"></span></div></section><section class="grid"><article class="card"><span class="feature-icon">${icon("key")}</span><h3>${t("quickStart.stepTwo")}</h3><p>${t("quickStart.keys")}</p><div class="metric" id="quick-start-key-count" aria-live="polite">–</div></article><article class="card"><span class="feature-icon">${icon("shield")}</span><h3>${t("quickStart.credentials")}</h3><div class="metric" id="quick-start-credential-count" aria-live="polite">–</div><a class="text-link" href="#/providers">${t("quickStart.manageAccounts")}${icon("arrow")}</a></article><article class="card"><span class="feature-icon">${icon("terminal")}</span><h3>${t("quickStart.stepThree")}</h3><p>${t("cli.description")}</p><a class="text-link" href="#/cli-tools">${t("quickStart.connectTools")}${icon("arrow")}</a></article></section>`;
   document.getElementById("quick-start-copy").addEventListener("click", async event => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -389,7 +398,7 @@ async function renderEndpoint(page, secret = "", feedback = "") {
 
 function compatibleProviderSection(items) {
   const cards = items.map(item => `<article class="card compatible-provider-card"><div class="card-title"><h3>${escapeHTML(item.name)}</h3><span class="badge ${item.enabled ? "ready" : "partial"}">${t(item.enabled ? "providers.active" : "providers.disabled")}</span></div><code class="compatible-base-url">${escapeHTML(item.base_url)}</code><div class="account-meta"><span>${Number(item.models?.length || 0)} ${t("providers.models")}</span><span>${Number(item.api_key_masks?.length || 0)} ${t("providers.apiKeys")}</span></div>${item.models?.length ? `<details><summary>${t("providers.modelList")}</summary><div class="model-list">${item.models.map(model => `<code>${escapeHTML(model.alias || model.name)}</code>`).join("")}</div></details>` : ""}<div class="actions"><button class="secondary" type="button" data-custom-edit="${escapeHTML(item.id)}">${icon("edit")}${t("providers.edit")}</button><button class="secondary" type="button" data-custom-enabled="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${t(item.enabled ? "providers.disable" : "providers.enable")}</button><button class="danger-button" type="button" data-custom-delete="${escapeHTML(item.id)}">${icon("trash")}${t("endpoint.delete")}</button></div></article>`).join("");
-  return `<section class="compatible-provider-section"><div class="section-head"><div><h2>${t("providers.compatibleTitle")}</h2><p class="hint">${t("providers.compatibleDescription")}</p></div><button class="primary compact" type="button" id="show-custom-provider">${icon("plus")}${t("providers.addCompatible")}</button></div><form id="custom-provider-form" class="card compatible-provider-form" hidden><input type="hidden" name="id"><div class="settings-grid"><label>${t("providers.compatibleName")}<input class="text-input" name="name" required></label><label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.example.com/v1" required></label></div><div class="settings-grid"><label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("providers.apiKeyOptional")}"></label><label>${t("providers.prefix")}<input class="text-input" name="prefix"></label></div><label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="4" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button><button class="secondary" id="cancel-custom-provider" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>${items.length ? `<section class="grid compatible-provider-grid">${cards}</section>` : `<div class="empty compatible-empty">${t("providers.compatibleEmpty")}</div>`}</section>`;
+  return `<section class="compatible-provider-section"><div class="section-head"><div><h2>${t("providers.category.custom")}</h2><p class="hint">${t("providers.compatibleDescription")}</p></div><button class="primary compact" type="button" id="show-custom-provider">${icon("plus")}${t("providers.addCompatible")}</button></div><form id="custom-provider-form" class="card compatible-provider-form" hidden><input type="hidden" name="id"><div class="settings-grid"><label>${t("providers.compatibleName")}<input class="text-input" name="name" required></label><label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.example.com/v1" required></label></div><div class="settings-grid"><label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("providers.apiKeyOptional")}"></label><label>${t("providers.prefix")}<input class="text-input" name="prefix"></label></div><label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="4" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button><button class="secondary" id="cancel-custom-provider" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>${items.length ? `<section class="grid compatible-provider-grid">${cards}</section>` : `<div class="empty compatible-empty">${t("providers.compatibleEmpty")}</div>`}</section>`;
 }
 
 function bindCompatibleProviderControls(container, items, reload) {
@@ -456,97 +465,204 @@ function bindCompatibleProviderControls(container, items, reload) {
   }));
 }
 
-async function renderProviders(page) {
-  page.innerHTML = pageHeader("kicker.liveData", "page.providers", "providers.description", true) + `<div id="providers"><div class="loading">${t("common.loading")}</div></div>`;
-  document.getElementById("refresh").addEventListener("click", () => renderProviders(page));
-  try {
-    const [response, customResponse] = await Promise.all([api("/providers"), api("/provider-configs")]);
-    if (!page.isConnected || page.dataset.page !== "providers") return;
-    const providers = response.items || [];
-    const container = document.getElementById("providers");
-    const groups = new Map();
-    for (const provider of providers) {
-      const key = provider.provider || "unknown";
-      if (!groups.has(key)) groups.set(key, []);
-      groups.get(key).push(provider);
-    }
-    const providerState = provider => !provider.enabled ? "disabled" : provider.status === "active" ? "active" : "attention";
-    container.innerHTML = `<div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="provider-search" type="search" placeholder="${t("providers.search")}" aria-label="${t("providers.search")}"></label><select class="text-input provider-filter" id="provider-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select><a class="primary compact" href="#/auth-files">${icon("user")}${t("providers.manageAccounts")}</a></div><div class="provider-summary"><span><strong>${groups.size}</strong> ${t("providers.type")}</span><span><strong>${providers.length}</strong> ${t("providers.accounts")}</span><span class="ok"><strong>${providers.filter(item => providerState(item) === "active").length}</strong> ${t("providers.active")}</span></div><div class="provider-groups">${[...groups].map(([name, accounts]) => `<section class="provider-group"><header class="provider-group-head">${providerIdentity(name)}<span class="badge">${accounts.length} ${t("providers.accounts")}</span></header><div class="account-list">${accounts.map(provider => `<article class="account-row" data-account data-provider-state="${providerState(provider)}"><div class="account-main"><span class="account-avatar">${icon("user")}</span><div><strong class="account-name" title="${escapeHTML(provider.label || provider.id || "-")}">${escapeHTML(provider.label || provider.id || "-")}</strong><div class="account-meta"><span class="badge ${providerState(provider) === "active" ? "ready" : "partial"}">${escapeHTML(providerStatusLabel(provider.enabled ? provider.status : "disabled"))}</span><span>${Number(provider.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(provider.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></div></div><div class="actions"><button class="secondary" data-provider-models="${escapeHTML(provider.id)}">${icon("grid")}${t("providers.models")}</button><a class="secondary" href="#/quota">${icon("gauge")}${t("quota.title")}</a><button class="secondary" data-provider-enabled="${escapeHTML(provider.id)}" data-enabled="${provider.enabled}">${icon(provider.enabled ? "zap" : "shield")}${provider.enabled ? t("providers.disable") : t("providers.enable")}</button></div></article>`).join("")}</div></section>`).join("")}</div><div id="provider-empty" class="empty" ${providers.length ? "hidden" : ""}>${providers.length ? t("providers.noMatches") : t("providers.empty")}</div><div id="provider-models" class="provider-models" aria-live="polite"></div>`;
-    container.querySelector(".search-field").outerHTML = providerFilterChips(providers.map(item => item.provider));
-    const customProviders = customResponse.items || [];
-    container.querySelector("#provider-empty").insertAdjacentHTML("beforebegin", compatibleProviderSection(customProviders));
-    if (!providers.length && customProviders.length) container.querySelector("#provider-empty").hidden = true;
-    const groupNames = [...groups.keys()];
-    container.querySelectorAll(".provider-group").forEach((group, index) => { group.dataset.provider = groupNames[index].toLowerCase(); });
-    let selectedProvider = "";
-    const applyFilter = () => {
-      const status = container.querySelector("#provider-status").value;
-      let visible = 0;
-      container.querySelectorAll(".provider-group").forEach(group => {
-        let matches = 0;
-        group.querySelectorAll("[data-account]").forEach(row => {
-          row.hidden = (selectedProvider && group.dataset.provider !== selectedProvider) || (status !== "all" && row.dataset.providerState !== status);
-          if (!row.hidden) matches++;
-        });
-        group.hidden = !matches;
-        visible += matches;
-      });
-      container.querySelector("#provider-empty").hidden = visible > 0 || (!providers.length && customProviders.length > 0);
-    };
-    bindProviderFilterChips(container.querySelector(".provider-chips"), provider => { selectedProvider = provider; applyFilter(); });
-    container.querySelector("#provider-status").addEventListener("change", applyFilter);
-    container.querySelectorAll("[data-account]").forEach(row => {
-      const id = row.querySelector("[data-provider-enabled]").dataset.providerEnabled;
-      row.querySelector(".actions").insertAdjacentHTML("beforeend", `<button class="danger-button" type="button" data-provider-delete="${escapeHTML(id)}" title="${t("authFiles.delete")}">${icon("trash")}${t("authFiles.delete")}</button>`);
-    });
-    container.querySelectorAll("[data-provider-delete]").forEach(button => button.addEventListener("click", async () => {
-      const name = button.dataset.providerDelete;
-      if (!confirm(t("authFiles.confirmDelete").replace("{name}", name))) return;
-      button.disabled = true;
-      try {
-        await api(`/auth-files?name=${encodeURIComponent(name)}`, {method: "DELETE"});
-        await renderProviders(page);
-      } catch (error) {
-        if (error.message === "invalid_key") return logout();
-        container.querySelector("#provider-models").innerHTML = `<div class="error">${t("authFiles.deleteFailed")}</div>`;
-        button.disabled = false;
-      }
-    }));
-    container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
-      button.disabled = true;
-      const modelsPanel = document.getElementById("provider-models");
-      modelsPanel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
-      try {
-        const models = (await api(`/providers/${encodeURIComponent(button.dataset.providerModels)}/models`)).items || [];
-        const account = button.closest(".account-row").querySelector(".account-name").textContent;
-        modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("providers.availableModels")}: ${escapeHTML(account)}</h2><span class="badge">${models.length}</span></div>${models.length ? `<div class="model-list">${models.map(model => `<code title="${escapeHTML(model.id)}">${escapeHTML(model.display_name || model.id)}</code>`).join("")}</div>` : `<div class="empty">${t("providers.modelsEmpty")}</div>`}</section>`;
-        modelsPanel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
-      } catch (error) {
-        if (error.message === "invalid_key") return logout();
-        modelsPanel.innerHTML = `<div class="error">${t("common.error")}</div>`;
-      } finally {
-        button.disabled = false;
-      }
-    }));
-    container.querySelectorAll("[data-provider-enabled]").forEach(button => button.addEventListener("click", async () => {
-      const enabled = button.dataset.enabled !== "true";
-      if (!confirm(t(enabled ? "providers.confirmEnable" : "providers.confirmDisable"))) return;
-      button.disabled = true;
-      try {
-        await api(`/providers/${encodeURIComponent(button.dataset.providerEnabled)}`, {method: "PATCH", body: JSON.stringify({enabled})});
-        await renderProviders(page);
-      } catch (error) {
-        if (error.message === "invalid_key") return logout();
-        button.disabled = false;
-      }
-    }));
-    bindCompatibleProviderControls(container, customProviders, () => renderProviders(page));
-  } catch (error) {
-    if (error.message === "invalid_key") return logout();
-    document.getElementById("providers").innerHTML = `<div class="error">${t("common.error")}</div>`;
-  }
+const oauthProviderDefinitions = [
+  {id: "codex", auth: "codex"},
+  {id: "claude", auth: "anthropic"},
+  {id: "antigravity", auth: "antigravity"},
+  {id: "kimi", auth: "kimi"},
+  {id: "kimi-ai", auth: "kimi-ai"},
+  {id: "xai", auth: "xai"},
+  {id: "devin", auth: "devin"},
+  {id: "meta", auth: "meta"}
+];
+const freeTierProviderIDs = new Set(["gemini-cli", "gemini-cli-oauth", "gemini", "aistudio", "opencode", "opencode-free", "openrouter", "ollama", "nvidia-nim", "cloudflare"]);
+
+function providerKey(value) {
+  const key = String(value || "").trim().toLowerCase();
+  return ({"anthropic": "claude", "gemini-cli-oauth": "gemini-cli"})[key] || key;
 }
 
+function providerCategory(item) {
+  if (freeTierProviderIDs.has(item.id)) return "free";
+  if (item.authType === "oauth" || (!item.authType && item.oauthMethods.length)) return "oauth";
+  return "apikey";
+}
+
+function buildProviderCatalog(accounts) {
+  const catalog = new Map();
+  for (const account of accounts) {
+    const id = providerKey(account.provider);
+    if (!id) continue;
+    if (!catalog.has(id)) catalog.set(id, {id, authType: account.auth_type || "", oauthMethods: [], accounts: []});
+    const entry = catalog.get(id);
+    if (!entry.authType && account.auth_type) entry.authType = account.auth_type;
+    entry.accounts.push(account);
+  }
+  for (const definition of oauthProviderDefinitions) {
+    if (!catalog.has(definition.id)) catalog.set(definition.id, {id: definition.id, authType: "oauth", oauthMethods: [], accounts: []});
+    const entry = catalog.get(definition.id);
+    entry.oauthMethods.push(definition.auth);
+  }
+  return [...catalog.values()].map(item => ({...item, category: providerCategory(item)}));
+}
+
+function providerCatalogCard(item) {
+  const active = item.accounts.filter(account => account.enabled && account.status === "active").length;
+  const count = item.accounts.length;
+  const state = count ? (active ? "ready" : "partial") : "partial";
+  const detail = count ? active + " " + t("providers.active") + " · " + count + " " + t("providers.connections") : t("providers.notConnected");
+  return '<a class="card provider-catalog-card" href="#/providers/' + encodeURIComponent(item.id) + '">' +
+    '<span class="provider-catalog-main">' + providerIdentity(item.id) + '<small class="provider-catalog-status ' + state + '">' + escapeHTML(detail) + '</small></span>' +
+    '<span class="provider-card-arrow">' + icon("arrow") + '</span></a>';
+}
+
+function providerCategorySection(category, items) {
+  const cards = items.map(providerCatalogCard).join("");
+  const title = t("providers.category." + category);
+  const body = cards ? '<div class="grid provider-catalog-grid">' + cards + '</div>' : '<div class="empty provider-category-empty">' + t("providers.categoryEmpty") + '</div>';
+  return '<section class="provider-category"><div class="section-head"><h2>' + title + '</h2><span class="badge">' + items.length + '</span></div>' + body + '</section>';
+}
+
+function providerAccountRow(account, authFiles) {
+  const file = authFiles.find(item => item.id === account.id || (account.auth_index && item.auth_index === account.auth_index));
+  const name = file?.name || account.id;
+  const label = file?.label || file?.email || account.label || name;
+  const disabled = !account.enabled || Boolean(file?.disabled);
+  const status = disabled ? "disabled" : (file?.unavailable ? "unavailable" : file?.status || account.status);
+  const state = disabled ? "disabled" : status === "active" ? "active" : "attention";
+  const quota = file?.supports_quota ? '<a class="secondary" href="#/quota">' + icon("gauge") + t("quota.title") + '</a>' : "";
+  return '<article class="account-row" data-account data-provider-state="' + state + '">' +
+    '<div class="account-main"><span class="account-avatar">' + icon("user") + '</span><div><strong class="account-name" title="' + escapeHTML(label) + '">' + escapeHTML(label) + '</strong>' +
+    '<div class="account-meta"><span class="badge ' + (state === "active" ? "ready" : "partial") + '">' + escapeHTML(providerStatusLabel(status)) + '</span>' +
+    '<span>' + Number(account.success || 0).toLocaleString() + " " + t("usage.ok") + '</span><span>' + Number(account.failed || 0).toLocaleString() + " " + t("usage.failed") + '</span></div></div></div>' +
+    '<div class="actions"><button class="secondary" data-provider-models="' + escapeHTML(account.id) + '">' + icon("grid") + t("providers.models") + '</button>' + quota +
+    '<button class="secondary" data-provider-enabled="' + escapeHTML(account.id) + '" data-enabled="' + String(!disabled) + '">' + icon(disabled ? "check" : "pause") + t(disabled ? "providers.enable" : "providers.disable") + '</button>' +
+    '<button class="danger-button" data-provider-delete="' + escapeHTML(name) + '" title="' + t("authFiles.delete") + '">' + icon("trash") + t("authFiles.delete") + '</button></div></article>';
+}
+
+function bindProviderAccountControls(container, reload) {
+  container.querySelectorAll("[data-provider-delete]").forEach(button => button.addEventListener("click", async () => {
+    const name = button.dataset.providerDelete;
+    if (!confirm(t("authFiles.confirmDelete").replace("{name}", name))) return;
+    button.disabled = true;
+    try { await api("/auth-files?name=" + encodeURIComponent(name), {method: "DELETE"}); await reload(); }
+    catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; const status = container.querySelector("#provider-action-status"); if (status) { status.textContent = t("common.error"); status.className = "form-message failed"; } }
+  }));
+  container.querySelectorAll("[data-provider-models]").forEach(button => button.addEventListener("click", async () => {
+    button.disabled = true;
+    const panel = container.querySelector("#provider-models");
+    panel.innerHTML = '<div class="loading">' + t("common.loading") + '</div>';
+    try {
+      const models = (await api("/providers/" + encodeURIComponent(button.dataset.providerModels) + "/models")).items || [];
+      const label = button.closest(".account-row").querySelector(".account-name").textContent;
+      panel.innerHTML = '<section class="status-panel"><div class="card-title"><h2>' + t("providers.availableModels") + ': ' + escapeHTML(label) + '</h2><span class="badge">' + models.length + '</span></div>' +
+        (models.length ? '<div class="model-list">' + models.map(model => '<code title="' + escapeHTML(model.id) + '">' + escapeHTML(model.display_name || model.id) + '</code>').join("") + '</div>' : '<div class="empty">' + t("providers.modelsEmpty") + '</div>') + '</section>';
+      panel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
+    } catch (error) { if (error.message === "invalid_key") return logout(); panel.innerHTML = '<div class="error">' + t("common.error") + '</div>'; }
+    finally { button.disabled = false; }
+  }));
+  container.querySelectorAll("[data-provider-enabled]").forEach(button => button.addEventListener("click", async () => {
+    const enabled = button.dataset.enabled !== "true";
+    if (!confirm(t(enabled ? "providers.confirmEnable" : "providers.confirmDisable"))) return;
+    button.disabled = true;
+    try { await api("/providers/" + encodeURIComponent(button.dataset.providerEnabled), {method: "PATCH", body: JSON.stringify({enabled})}); await reload(); }
+    catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; const status = container.querySelector("#provider-action-status"); if (status) { status.textContent = t("common.error"); status.className = "form-message failed"; } }
+  }));
+}
+
+function bindProviderImport(container, reload) {
+  const button = container.querySelector("#provider-import");
+  const input = container.querySelector("#provider-upload-input");
+  if (!button || !input) return;
+  button.addEventListener("click", () => input.click());
+  input.addEventListener("change", async () => {
+    if (!input.files?.length) return;
+    const files = Array.from(input.files);
+    const form = new FormData();
+    for (const file of files) form.append("files", file, file.name);
+    button.disabled = true;
+    const status = container.querySelector("#provider-action-status");
+    if (status) status.textContent = t("authFiles.uploading");
+    try {
+      const result = await api("/auth-files", {method: "POST", body: form});
+      input.value = "";
+      await reload();
+      const refreshedStatus = container.querySelector("#provider-action-status");
+      if (refreshedStatus) {
+        refreshedStatus.textContent = t(result.status === "partial" ? "authFiles.uploadPartial" : "authFiles.uploaded");
+        refreshedStatus.className = "form-message ok";
+      }
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      const refreshedStatus = container.querySelector("#provider-action-status");
+      if (refreshedStatus) { refreshedStatus.textContent = t("authFiles.uploadFailed"); refreshedStatus.className = "form-message failed"; }
+    } finally {
+      const refreshedButton = container.querySelector("#provider-import");
+      if (refreshedButton) refreshedButton.disabled = false;
+    }
+  });
+}
+
+async function renderProviderDetail(page, providerID, accounts, authFiles, reload) {
+  const catalog = buildProviderCatalog(accounts);
+  const entry = catalog.find(item => item.id === providerID);
+  if (!entry) {
+    page.innerHTML = pageHeader("kicker.management", "page.providers", "providers.description", true) + '<div class="empty">' + t("providers.noMatches") + '</div><a class="text-link" href="#/providers">' + icon("arrow") + t("providers.back") + '</a>';
+    document.getElementById("refresh").onclick = reload;
+    return;
+  }
+  const providerAccounts = accounts.filter(account => providerKey(account.provider) === providerID);
+  const connected = providerAccounts.length;
+  const loginButtons = entry.oauthMethods.map(method => '<button class="secondary" type="button" data-provider-oauth="' + escapeHTML(method) + '">' + icon("user") + t("providers.connectAccount") + '</button>').join("");
+  const rows = providerAccounts.map(account => providerAccountRow(account, authFiles)).join("");
+  page.innerHTML = '<div class="page-head"><div class="provider-detail-title"><a class="provider-back" href="#/providers">' + icon("arrow") + t("providers.back") + '</a><div class="provider-detail-brand">' + providerIdentity(providerID) + '<div><h1>' + escapeHTML(providerBrands[providerID]?.[0] || providerID) + '</h1><p>' + connected + ' ' + t("providers.connections") + '</p></div></div></div>' +
+    '<button class="refresh" id="refresh">' + icon("refresh") + t("action.refresh") + '</button></div>' +
+    '<div class="provider-detail-actions">' + loginButtons + '<input id="provider-upload-input" type="file" accept=".json,application/json" multiple hidden><button class="primary compact" type="button" id="provider-import">' + icon("plus") + t("authFiles.upload") + '</button><span class="form-message" id="provider-action-status" role="status" aria-live="polite"></span></div>' +
+    '<section class="status-panel provider-connections"><div class="section-head"><h2>' + t("providers.connectionTitle") + '</h2><span class="badge">' + connected + '</span></div>' +
+    (rows ? '<div class="account-list">' + rows + '</div>' : '<div class="empty">' + t("providers.noAccounts") + '</div>') + '</section><div id="provider-models" class="provider-models" aria-live="polite"></div>';
+  document.getElementById("refresh").onclick = reload;
+  page.querySelectorAll("[data-provider-oauth]").forEach(button => button.addEventListener("click", async () => {
+    button.disabled = true;
+    const message = page.querySelector("#provider-action-status");
+    try { await startOAuthLogin(button.dataset.providerOauth, message, reload); }
+    catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = error.message; message.className = "form-message failed"; }
+    finally { button.disabled = false; }
+  }));
+  bindProviderImport(page, reload);
+  bindProviderAccountControls(page, reload);
+}
+
+async function renderProviders(page) {
+  page.innerHTML = pageHeader("kicker.liveData", "page.providers", "providers.description", true) + '<div id="providers"><div class="loading">' + t("common.loading") + '</div></div>';
+  const reload = () => renderProviders(page);
+  document.getElementById("refresh").onclick = reload;
+  try {
+    const [providerResponse, authResponse, customResponse] = await Promise.all([api("/providers"), api("/auth-files"), api("/provider-configs")]);
+    if (!page.isConnected || page.dataset.page !== "providers") return;
+    const accounts = providerResponse.items || [];
+    const authFiles = authResponse.files || [];
+    const customProviders = customResponse.items || [];
+    const detailID = providerRouteID();
+    if (detailID) {
+      await renderProviderDetail(page, detailID, accounts, authFiles, reload);
+      return;
+    }
+    const catalog = buildProviderCatalog(accounts);
+    const active = accounts.filter(account => account.enabled && account.status === "active").length;
+    const groups = ["oauth", "free", "apikey"].map(category => providerCategorySection(category, catalog.filter(item => item.category === category))).join("");
+    const container = page.querySelector("#providers");
+    container.innerHTML = '<div class="provider-catalog-toolbar"><div class="provider-summary"><span><strong>' + (catalog.length + customProviders.length) + '</strong> ' + t("providers.type") + '</span><span><strong>' + accounts.length + '</strong> ' + t("providers.accounts") + '</span><span class="ok"><strong>' + active + '</strong> ' + t("providers.active") + '</span></div>' +
+      '<div class="provider-import"><input id="provider-upload-input" type="file" accept=".json,application/json" multiple hidden><button class="primary compact" type="button" id="provider-import">' + icon("plus") + t("authFiles.upload") + '</button></div></div>' +
+      '<div class="form-message" id="provider-action-status" role="status" aria-live="polite"></div><div id="provider-custom"></div><div class="provider-categories">' + groups + '</div>';
+    container.querySelector("#provider-custom").innerHTML = compatibleProviderSection(customProviders);
+    bindCompatibleProviderControls(container, customProviders, reload);
+    bindProviderImport(container, reload);
+  } catch (error) {
+    if (error.message === "invalid_key") return logout();
+    const container = page.querySelector("#providers");
+    if (container) container.innerHTML = '<div class="error">' + t("common.error") + '</div>';
+  }
+}
 async function startOAuthLogin(provider, message, onSuccess) {
   let response;
   try {
@@ -601,110 +717,6 @@ async function startOAuthLogin(provider, message, onSuccess) {
   setTimeout(poll, 1500);
 }
 
-async function renderAuthFiles(page) {
-  const oauthButtons = [["codex", "codex", "authFiles.loginCodex"], ["anthropic", "claude", "authFiles.loginClaude"], ["antigravity", "antigravity", "authFiles.loginAntigravity"], ["kimi", "kimi", "authFiles.loginKimi"], ["kimi-ai", "kimi", "authFiles.loginKimiAI"], ["xai", "server", "authFiles.loginXAI"], ["devin", "server", "authFiles.loginDevin"], ["meta", "server", "authFiles.loginMeta"]];
-  page.innerHTML = pageHeader("kicker.management", "authFiles.title", "authFiles.description", true) + `<div class="auth-toolbar"><div class="auth-actions">${oauthButtons.map(([id, brand, label]) => `<button class="secondary" data-oauth="${id}">${brand === "server" ? icon("key") : providerIdentity(brand, true)}${t(label)}</button>`).join("")}</div><div class="auth-import"><input id="auth-upload-input" type="file" accept=".json,application/json" multiple hidden><button class="primary compact" type="button" id="auth-upload">${icon("plus")}${t("authFiles.upload")}</button></div></div><div class="provider-toolbar"><label class="search-field">${icon("search")}<input id="auth-search" type="search" placeholder="${t("authFiles.search")}" aria-label="${t("authFiles.search")}"></label><select class="text-input provider-filter" id="auth-status" aria-label="${t("providers.filterStatus")}"><option value="all">${t("providers.filterAll")}</option><option value="active">${t("providers.active")}</option><option value="attention">${t("providers.filterAttention")}</option><option value="disabled">${t("providers.disabled")}</option></select></div><div id="auth-files-content" class="loading">${t("common.loading")}</div><div id="auth-models" class="provider-models" aria-live="polite"></div>`;
-  page.querySelector(".search-field").outerHTML = `<div id="auth-provider-chips"></div>`;
-  const content = page.querySelector("#auth-files-content");
-  content.insertAdjacentHTML("beforebegin", `<div class="form-message" id="auth-action-status" role="status" aria-live="polite"></div>`);
-  let selectedProvider = "";
-  const fileState = file => file.disabled ? "disabled" : file.unavailable || file.status !== "active" ? "attention" : "active";
-  const applyFilter = () => {
-    const status = page.querySelector("#auth-status").value;
-    let visible = 0;
-    content.querySelectorAll("[data-auth-row]").forEach(row => {
-      row.hidden = (selectedProvider && row.dataset.provider !== selectedProvider) || (status !== "all" && row.dataset.authState !== status);
-      if (!row.hidden) visible++;
-    });
-    const empty = content.querySelector(".auth-filter-empty");
-    if (empty) empty.hidden = visible > 0;
-  };
-  page.querySelector("#auth-status").addEventListener("change", applyFilter);
-  page.querySelectorAll("[data-oauth]").forEach(button => button.addEventListener("click", async () => {
-    button.disabled = true;
-    try {
-      const message = document.getElementById("auth-oauth-status") || document.createElement("div");
-      message.id = "auth-oauth-status"; message.className = "form-message"; page.querySelector(".auth-actions").appendChild(message);
-      await startOAuthLogin(button.dataset.oauth, message, load);
-    } catch (error) { if (error.message === "invalid_key") return logout(); }
-    finally { button.disabled = false; }
-  }));
-  const load = async () => {
-    try {
-      const response = await api("/auth-files");
-      if (!page.isConnected || page.dataset.page !== "auth-files") return;
-      const files = response.files || [];
-      content.className = "";
-      if (selectedProvider && !files.some(file => String(file.provider || file.type || "unknown").toLowerCase() === selectedProvider)) selectedProvider = "";
-      const chips = page.querySelector("#auth-provider-chips");
-      chips.innerHTML = providerFilterChips(files.map(file => file.provider || file.type), selectedProvider);
-      bindProviderFilterChips(chips, provider => { selectedProvider = provider; applyFilter(); });
-      page.querySelector("#auth-models").innerHTML = "";
-      content.innerHTML = files.length ? `<div class="table-wrap"><table><thead><tr><th>${t("authFiles.name")}</th><th>${t("authFiles.provider")}</th><th>${t("authFiles.status")}</th><th>${t("authFiles.actions")}</th></tr></thead><tbody>${files.map(file => { const name = file.label || file.email || file.name || file.id || "-"; const filename = file.name || file.id || "-"; const status = file.disabled ? t("providers.disabled") : file.unavailable ? t("providers.unavailable") : providerStatusLabel(file.status); return `<tr data-auth-row data-auth-state="${fileState(file)}"><td><div class="auth-credential"><strong title="${escapeHTML(name)}">${escapeHTML(name)}</strong>${filename !== name ? `<small title="${escapeHTML(filename)}">${escapeHTML(filename)}</small>` : ""}</div></td><td>${providerIdentity(file.provider || file.type, true)}</td><td><span class="badge ${fileState(file) === "active" ? "ready" : "partial"}">${escapeHTML(status)}</span><div class="account-meta"><span>${Number(file.success || 0).toLocaleString()} ${t("usage.ok")}</span><span>${Number(file.failed || 0).toLocaleString()} ${t("usage.failed")}</span></div></td><td><div class="actions"><button class="secondary" data-auth-models="${escapeHTML(file.id || "")}" data-auth-name="${escapeHTML(filename)}">${icon("grid")}${t("providers.models")}</button>${file.supports_quota ? `<a class="secondary" href="#/quota">${icon("gauge")}${t("quota.title")}</a>` : ""}<button class="secondary" data-auth-toggle="${escapeHTML(filename)}" data-auth-index="${escapeHTML(file.auth_index || "")}" data-disabled="${Boolean(file.disabled)}">${icon(file.disabled ? "check" : "pause")}${file.disabled ? t("providers.enable") : t("providers.disable")}</button></div></td></tr>`; }).join("")}</tbody></table></div><div class="empty auth-filter-empty" hidden>${t("authFiles.noMatches")}</div>` : `<div class="empty">${t("authFiles.empty")}</div>`;
-      content.querySelectorAll("[data-auth-row]").forEach((row, index) => {
-        const file = files[index];
-        row.dataset.provider = String(file.provider || file.type || "unknown").toLowerCase();
-        const name = file.name || file.id;
-        if (name) row.querySelector(".actions").insertAdjacentHTML("beforeend", `<button class="danger-button" type="button" data-auth-delete="${escapeHTML(name)}" title="${t("authFiles.delete")}">${icon("trash")}${t("authFiles.delete")}</button>`);
-      });
-      applyFilter();
-      content.querySelectorAll("[data-auth-delete]").forEach(button => button.addEventListener("click", async () => {
-        const name = button.dataset.authDelete;
-        if (!confirm(t("authFiles.confirmDelete").replace("{name}", name))) return;
-        button.disabled = true;
-        const message = page.querySelector("#auth-action-status");
-        message.textContent = t("authFiles.deleting");
-        try {
-          await api(`/auth-files?name=${encodeURIComponent(name)}`, {method: "DELETE"});
-          await load();
-          message.textContent = t("authFiles.deleted");
-        } catch (error) {
-          if (error.message === "invalid_key") return logout();
-          message.textContent = t("authFiles.deleteFailed");
-          button.disabled = false;
-        }
-      }));
-      content.querySelectorAll("[data-auth-models]").forEach(button => button.addEventListener("click", async () => {
-        button.disabled = true;
-        const modelsPanel = page.querySelector("#auth-models");
-        modelsPanel.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
-        try {
-          const endpoint = button.dataset.authModels ? `/providers/${encodeURIComponent(button.dataset.authModels)}/models` : `/auth-files/models?name=${encodeURIComponent(button.dataset.authName)}`;
-          const result = await api(endpoint);
-          const models = result.items || result.models || [];
-          const account = button.closest("tr").querySelector(".auth-credential strong").textContent;
-          modelsPanel.innerHTML = `<section class="status-panel"><div class="card-title"><h2>${t("providers.availableModels")}: ${escapeHTML(account)}</h2><span class="badge">${models.length}</span></div>${models.length ? `<div class="model-list">${models.map(model => `<code title="${escapeHTML(model.id)}">${escapeHTML(model.display_name || model.id)}</code>`).join("")}</div>` : `<div class="empty">${t("providers.modelsEmpty")}</div>`}</section>`;
-          modelsPanel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
-        } catch (error) {
-          if (error.message === "invalid_key") return logout();
-          modelsPanel.innerHTML = `<div class="error">${t("common.error")}</div>`;
-        } finally { button.disabled = false; }
-      }));
-      content.querySelectorAll("[data-auth-toggle]").forEach(button => button.addEventListener("click", async () => { button.disabled = true; try { await api("/auth-files/status", {method: "PATCH", body: JSON.stringify({name: button.dataset.authToggle, auth_index: button.dataset.authIndex, disabled: button.dataset.disabled !== "true"})}); await load(); } catch (error) { if (error.message === "invalid_key") return logout(); button.disabled = false; } }));
-    } catch (error) { if (error.message === "invalid_key") return logout(); content.innerHTML = `<div class="error">${t("common.error")}</div>`; }
-  };
-  const upload = page.querySelector("#auth-upload-input");
-  page.querySelector("#auth-upload").addEventListener("click", () => upload.click());
-  upload.addEventListener("change", async () => {
-    if (!upload.files?.length) return;
-    const message = page.querySelector("#auth-action-status");
-    const form = new FormData();
-    for (const file of upload.files) form.append("files", file, file.name);
-    page.querySelector("#auth-upload").disabled = true;
-    message.textContent = t("authFiles.uploading");
-    try {
-      const result = await api("/auth-files", {method: "POST", body: form});
-      message.textContent = t(result.status === "partial" ? "authFiles.uploadPartial" : "authFiles.uploaded");
-      upload.value = "";
-      await load();
-    } catch (error) {
-      if (error.message === "invalid_key") return logout();
-      message.textContent = t("authFiles.uploadFailed");
-    } finally { page.querySelector("#auth-upload").disabled = false; }
-  });
-  document.getElementById("refresh").onclick = load;
-  await load();
-}
 
 async function renderCombos(page, feedback = "") {
   const formHTML = item => `<form id="combo-form" class="status-panel combo-form"><input name="id" type="hidden" value="${escapeHTML(item?.id || "")}"><div class="card-title"><h2>${t(item?.id ? "combo.edit" : "combo.create")}</h2></div><div class="settings-grid"><label>${t("combo.name")}<input class="text-input" name="name" value="${escapeHTML(item?.name || "")}" required></label><label>${t("combo.model")}<input class="text-input" name="model" value="${escapeHTML(item?.model || "")}" required></label></div><label>${t("combo.targets")}<textarea class="text-input" name="targets" rows="4" required placeholder="codex:gpt-5&#10;claude:sonnet">${escapeHTML((item?.targets || []).map(target => `${target.provider}:${target.model}`).join("\n"))}</textarea><span class="hint">${t("combo.targetsHint")}</span></label><div class="combo-options"><label><input name="enabled" type="checkbox" ${item?.enabled !== false ? "checked" : ""}> ${t("combo.enabled")}</label><label><input name="vision" type="checkbox" ${item?.vision ? "checked" : ""}> ${t("combo.vision")}</label></div><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("combo.save")}</button><button class="secondary" id="validate-combo" type="button">${icon("check")}${t("combo.validate")}</button>${item?.id ? `<button class="secondary" id="cancel-combo" type="button">${icon("close")}${t("action.cancel")}</button>` : ""}<span class="form-message" id="combo-message" aria-live="polite"></span></div></form>`;
@@ -1357,7 +1369,6 @@ function renderPage(name) {
     case "quick-start": renderQuickStart(page); break;
     case "endpoint": renderEndpoint(page); break;
     case "providers": renderProviders(page); break;
-    case "auth-files": renderAuthFiles(page); break;
     case "combo": renderCombos(page); break;
     case "usage": renderUsage(page); break;
     case "quota": renderQuota(page); break;
