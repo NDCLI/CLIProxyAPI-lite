@@ -110,7 +110,7 @@ async function api(path, options = {}) {
   headers.set("Authorization", `Bearer ${state.key}`);
   if (options.body && !(typeof FormData !== "undefined" && options.body instanceof FormData) && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(`/v0/management${path}`, {...options, headers});
-  if (response.status === 401 || response.status === 403) {
+  if (response.status === 401) {
     const error = new Error("invalid_key");
     error.status = response.status;
     throw error;
@@ -128,7 +128,13 @@ async function api(path, options = {}) {
 
 function routeName() {
   const name = location.hash.replace(/^#\/?/, "").split("?")[0];
+  if (name.startsWith("cli-tools/")) return "cli-tools";
   return routes.some(route => route[0] === name) ? name : "overview";
+}
+
+function cliToolRouteID() {
+  const name = location.hash.replace(/^#\/?/, "").split("?")[0];
+  return name.startsWith("cli-tools/") ? decodeURIComponent(name.slice("cli-tools/".length)) : "";
 }
 
 function statusLabel(status) {
@@ -538,88 +544,6 @@ async function renderProviders(page) {
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     document.getElementById("providers").innerHTML = `<div class="error">${t("common.error")}</div>`;
-  }
-}
-
-const cliTools = [
-  ["claude-code", "Claude Code", true],
-  ["codex-cli", "Codex CLI", true],
-  ["continue", "Continue.dev", false],
-  ["cline", "Cline", false],
-  ["vscode", "VS Code", false],
-  ["cursor", "Cursor", false],
-  ["env-openai", "OpenAI environment", false],
-  ["env-anthropic", "Anthropic environment", false]
-];
-
-async function renderCLITools(page) {
-  page.innerHTML = pageHeader("kicker.management", "page.cliTools", "cli.description") + `<div class="tool-grid">${cliTools.map(([id, label, reset]) => `<form class="card tool-form" data-tool="${id}"><div class="card-title"><h2 class="tool-title">${providerIdentity(({"claude-code":"claude", "codex-cli":"codex", "env-openai":"openai", "env-anthropic":"anthropic"})[id] || id, true)}<span>${escapeHTML(label)}</span></h2><span class="badge partial" data-tool-status>${t("common.loading")}</span></div><label>${t("cli.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="off" required></label><label>${t(id === "codex-cli" ? "cli.modelRequired" : "cli.model")}<input class="text-input" name="model" autocomplete="off" ${id === "codex-cli" ? "required" : ""}></label><div class="actions"><button class="primary compact" type="submit">${icon("check")}${t("cli.apply")}</button><button class="secondary" type="button" data-copy-config>${icon("copy")}${t("cli.copyConfig")}</button>${reset ? `<button class="secondary" type="button" data-reset>${icon("refresh")}${t("cli.reset")}</button>` : ""}</div><div class="form-message" role="status" aria-live="polite"></div></form>`).join("")}</div>`;
-  const setStatus = (form, item) => {
-    const badge = form.querySelector("[data-tool-status]");
-    const unknown = form.dataset.tool.startsWith("env-");
-    badge.className = `badge ${item?.configured && !unknown ? "ready" : "partial"}`;
-    badge.textContent = t(unknown ? "cli.statusUnknown" : item ? item.configured ? "cli.configured" : "cli.notConfigured" : "cli.statusUnavailable");
-  };
-  const refreshStatus = async form => {
-    try { setStatus(form, (await api(`/cli-tools/${encodeURIComponent(form.dataset.tool)}`)).item); }
-    catch (error) { if (error.message === "invalid_key") return logout(); setStatus(form, null); }
-  };
-  page.querySelectorAll("[data-tool]").forEach(form => {
-    const message = form.querySelector(".form-message");
-    form.addEventListener("submit", async event => {
-      event.preventDefault();
-      const submit = form.querySelector('[type="submit"]');
-      submit.disabled = true;
-      message.textContent = t("common.loading");
-      try {
-        const body = {tool: form.dataset.tool, api_key: form.elements.api_key.value, model: form.elements.model.value.trim()};
-        await api("/configure-tool", {method: "POST", body: JSON.stringify(body)});
-        form.elements.api_key.value = "";
-        message.textContent = t("cli.saved");
-        message.className = "form-message ok";
-        await refreshStatus(form);
-      } catch (error) {
-        if (error.message === "invalid_key") return logout();
-        message.textContent = t("common.error");
-        message.className = "form-message failed";
-      } finally {
-        submit.disabled = false;
-      }
-    });
-    const reset = form.querySelector("[data-reset]");
-    form.querySelector("[data-copy-config]").addEventListener("click", async () => {
-      const model = form.elements.model.value.trim() || "MODEL";
-      const endpoint = `${location.origin}/v1`;
-      const config = `Endpoint: ${endpoint}\nModel: ${model}\nAPI key: \$ENDPOINT_API_KEY`;
-      try { await copyText(config); message.textContent = t("cli.configCopied"); message.className = "form-message ok"; }
-      catch (_) { message.textContent = t("common.error"); message.className = "form-message failed"; }
-    });
-    if (reset) reset.addEventListener("click", async () => {
-      if (!confirm(t("cli.confirmReset"))) return;
-      reset.disabled = true;
-      message.textContent = t("common.loading");
-      try {
-        await api("/configure-tool", {method: "POST", body: JSON.stringify({tool: form.dataset.tool, action: "reset"})});
-        message.textContent = t("cli.resetDone");
-        message.className = "form-message ok";
-        await refreshStatus(form);
-      } catch (error) {
-        if (error.message === "invalid_key") return logout();
-        message.textContent = t("common.error");
-        message.className = "form-message failed";
-      } finally {
-        reset.disabled = false;
-      }
-    });
-  });
-  try {
-    const statusByID = new Map(((await api("/cli-tools")).items || []).map(item => [item.id, item]));
-    page.querySelectorAll("[data-tool]").forEach(form => {
-      setStatus(form, statusByID.get(form.dataset.tool));
-    });
-  } catch (error) {
-    if (error.message === "invalid_key") return logout();
-    page.querySelectorAll("[data-tool]").forEach(form => setStatus(form, null));
   }
 }
 
@@ -1441,7 +1365,7 @@ function renderPage(name) {
     case "settings": renderSettings(page); break;
     case "plugins": renderPlugins(page); break;
     case "token-saver": renderStatusPage(page, "token_saver", "page.tokenSaver"); break;
-    case "cli-tools": renderCLITools(page); break;
+    case "cli-tools": window.ManagementTools.render(page, cliToolRouteID()); break;
     default: renderOverview(page);
   }
 }

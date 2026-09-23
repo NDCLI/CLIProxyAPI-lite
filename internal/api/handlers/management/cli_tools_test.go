@@ -43,4 +43,11 @@ func TestCLIToolsReportConfiguredWithoutSecrets(t *testing.T) {
 	if len(response.Items) == 0 || !response.Items[0].Configured {
 		t.Fatalf("items = %#v", response.Items)
 	}
+	seen := make(map[string]struct{}, len(response.Items))
+	for _, item := range response.Items {
+		if _, exists := seen[item.ID]; exists {
+			t.Fatalf("duplicate CLI tool id %q", item.ID)
+		}
+		seen[item.ID] = struct{}{}
+	}
 }

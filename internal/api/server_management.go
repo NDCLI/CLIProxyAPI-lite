@@ -221,6 +221,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PATCH("/combos/:id", s.mgmt.PatchCombo)
 		mgmt.DELETE("/combos/:id", s.mgmt.DeleteCombo)
 		mgmt.GET("/cli-tools", s.mgmt.GetCLITools)
+		mgmt.GET("/cli-tools-models", s.mgmt.GetCLIToolModels)
 		mgmt.GET("/cli-tools/:id", s.mgmt.GetCLITool)
 		mgmt.GET("/system-settings", s.mgmt.GetSystemSettings)
 		mgmt.PATCH("/system-settings", s.mgmt.PatchSystemSettings)

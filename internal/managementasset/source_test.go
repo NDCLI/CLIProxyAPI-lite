@@ -8,9 +8,10 @@ import (
 
 func TestSourceManagementAssets(t *testing.T) {
 	for _, name := range []string{
-		"index.html", "app.css", "app.js", "i18n/en.json", "i18n/vi.json",
+		"index.html", "app.css", "app.js", "tools.js", "i18n/en.json", "i18n/vi.json",
 		"providers/antigravity.png", "providers/codex.png", "providers/claude.png",
-		"providers/gemini.png", "providers/openai.png",
+		"providers/gemini.png", "providers/openai.png", "providers/opencode.png",
+		"providers/kiro.png", "providers/hermes.png", "providers/droid.png",
 	} {
 		body, contentType, ok := SourceManagementAsset(name)
 		if !ok || len(body) == 0 || contentType == "" {
@@ -49,15 +50,29 @@ func TestSourceManagementTranslationsHaveMatchingKeys(t *testing.T) {
 		}
 	}
 
-	script, _, ok := SourceManagementAsset("app.js")
-	if !ok {
-		t.Fatal("app.js unavailable")
+	for _, scriptName := range []string{"app.js", "tools.js"} {
+		script, _, ok := SourceManagementAsset(scriptName)
+		if !ok {
+			t.Fatalf("%s unavailable", scriptName)
+		}
+		keyPattern := regexp.MustCompile(`(?:^|[^[:alnum:]_$])t\("([^"]+)"\)`)
+		for _, match := range keyPattern.FindAllSubmatch(script, -1) {
+			key := string(match[1])
+			if _, exists := english[key]; !exists {
+				t.Errorf("%s references missing translation %q", scriptName, key)
+			}
+		}
 	}
-	keyPattern := regexp.MustCompile(`(?:^|[^[:alnum:]_$])t\("([^"]+)"\)`)
-	for _, match := range keyPattern.FindAllSubmatch(script, -1) {
-		key := string(match[1])
+	for _, key := range []string{
+		"tools.guide.copilot", "tools.guide.cursor", "tools.guide.cline", "tools.guide.continue",
+		"tools.guide.continue-dev", "tools.guide.roo", "tools.guide.amp", "tools.guide.qwen-code", "tools.guide.opendesign",
+		"tools.slot.fable", "tools.slot.opus", "tools.slot.sonnet", "tools.slot.haiku",
+	} {
 		if _, exists := english[key]; !exists {
-			t.Errorf("app.js references missing translation %q", key)
+			t.Errorf("missing dynamic tools translation %q", key)
+		}
+		if _, exists := vietnamese[key]; !exists {
+			t.Errorf("Vietnamese translation missing dynamic tools key %q", key)
 		}
 	}
 }

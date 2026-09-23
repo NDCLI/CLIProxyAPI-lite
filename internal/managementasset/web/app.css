@@ -540,6 +540,80 @@ th, td { padding: 10px 13px; }
   .usage-gateway-node { width: fit-content; max-width: 100%; }
   .usage-provider-list { margin-left: 14px; }
 }
+.tools-board { width: min(1080px, 100%); margin: 0 auto; display: grid; gap: 30px; }
+.tools-board .section-head { margin: 0 0 12px; }
+.tools-board .section-head h2 { font-size: 15px; }
+.tool-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.tool-summary-card { display: flex; align-items: center; gap: 12px; min-height: 68px; padding: 12px 14px; border-radius: 9px; background: #222; box-shadow: none; transition: border-color .16s ease, background-color .16s ease; }
+.tool-summary-card:hover { border-color: #a9543d; background: #292624; }
+.tool-summary-logo, .tool-detail-logo { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; overflow: hidden; border-radius: 8px; background: #ffffff08; }
+.tool-logo { display: block; width: 32px; height: 32px; object-fit: contain; }
+.tool-summary-copy { display: grid; min-width: 0; gap: 5px; }
+.tool-summary-copy strong { overflow: hidden; color: #e7e7e8; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.tool-summary-copy .badge { padding: 2px 6px; font-size: 10px; }
+.tool-card-arrow { width: 17px; height: 17px; margin-left: auto; color: #8daac7; }
+.tools-mitm-section { padding-top: 4px; }
+.tools-mitm-section .section-head { padding-left: 2px; }
+.tools-mitm-section .section-head .badge { color: #bd94ff; background: #8d5bff14; border-color: #8d5bff33; }
+.tool-detail { width: min(860px, 100%); margin: 0 auto; display: grid; gap: 14px; }
+.tool-detail > .text-link { width: fit-content; color: var(--muted); }
+.tool-detail-heading { display: flex; align-items: center; gap: 13px; min-width: 0; padding: 5px 0 8px; }
+.tool-detail-logo { width: 44px; height: 44px; flex-basis: 44px; }
+.tool-detail-logo .tool-logo { width: 38px; height: 38px; }
+.tool-detail-heading > div { min-width: 0; }
+.tool-detail-heading h1 { margin: 0; color: #eee; font-size: 22px; font-weight: 650; letter-spacing: -.4px; }
+.tool-detail-heading p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.tool-detail-heading > .badge { margin-left: auto; }
+.tool-config-card { display: grid; gap: 14px; padding: 18px; border-radius: 10px; background: #242424; box-shadow: none; }
+.tool-config-meta { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.tool-config-meta h2 { margin: 0; font-size: 14px; }
+.tool-config-meta code { max-width: 55%; overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.tool-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.tool-form-grid > label, .tool-slot-grid > label { display: grid; align-content: start; gap: 6px; min-width: 0; font-size: 11px; font-weight: 600; }
+.tool-form-grid > label:first-child { grid-column: 1 / -1; }
+.tool-form-grid .hint { font-size: 10px; font-weight: 400; }
+.tool-slot-grid { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; border: 1px solid var(--line-subtle); border-radius: 8px; background: #1e1e1e; }
+.tool-preview { max-height: 460px; margin: 0; padding: 14px; overflow: auto; border: 1px solid var(--line-subtle); border-radius: 8px; background: #171717; color: #d5d5d5; font: 11px/1.6 ui-monospace, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.mitm-detail { gap: 14px; }
+.mitm-server-card { display: grid; gap: 14px; padding: 18px; border-color: #60423a; border-radius: 10px; background: #252321; box-shadow: none; }
+.mitm-server-card .tool-config-meta > div:last-child { display: flex; flex-wrap: wrap; gap: 6px; }
+.mitm-server-card .hint { margin: 0; font-size: 10px; }
+.mitm-server-card .tool-form-grid > label:first-child { grid-column: auto; }
+.mitm-tools-list { display: grid; gap: 10px; }
+.mitm-tools-list > .section-head { margin: 0 0 2px; }
+.mitm-tool-card { padding: 0; overflow: hidden; border-radius: 9px; background: #222; box-shadow: none; }
+.mitm-tool-heading { display: flex; align-items: center; gap: 11px; width: 100%; padding: 12px 14px; border: 0; background: transparent; text-align: left; }
+.mitm-tool-heading:hover, .mitm-tool-heading[aria-expanded="true"] { background: #292624; }
+.mitm-tool-heading > span:nth-child(2) { display: grid; min-width: 0; gap: 2px; }
+.mitm-tool-heading strong { font-size: 13px; }
+.mitm-tool-heading small { overflow: hidden; color: var(--muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.mitm-tool-heading > .badge { margin-left: auto; }
+.mitm-tool-heading > .icon { width: 16px; height: 16px; color: var(--muted); transform: rotate(90deg); }
+.mitm-tool-heading[aria-expanded="true"] > .icon { transform: rotate(-90deg); }
+.mitm-tool-content { display: grid; gap: 10px; padding: 0 14px 14px; }
+.mitm-tool-content > p { margin: 0; font-size: 10px; }
+.mitm-mapping-list { display: grid; gap: 6px; max-height: 420px; overflow: auto; padding: 2px; }
+.mitm-mapping-row { display: grid; grid-template-columns: minmax(145px, .75fr) 18px minmax(0, 1.35fr) 32px; align-items: center; gap: 8px; min-width: 0; }
+.mitm-mapping-row > span:first-child { overflow: hidden; color: #ddd; font-size: 10px; font-weight: 600; text-align: right; text-overflow: ellipsis; }
+.mitm-mapping-arrow { color: #8daac6; text-align: center; }
+.mitm-mapping-row > .text-input { min-width: 0; min-height: 31px; padding: 5px 8px; font-size: 10px; }
+.mitm-mapping-row > button { min-height: 30px; padding: 5px; }
+.mitm-mapping-row > button .icon { width: 13px; height: 13px; }
+.mitm-tool-content .actions { justify-content: flex-start; }
+@media (max-width: 900px) {
+  .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 680px) {
+  .tool-grid, .tool-form-grid, .tool-slot-grid { grid-template-columns: 1fr; }
+  .tool-form-grid > label:first-child { grid-column: auto; }
+  .tool-config-meta { align-items: flex-start; flex-direction: column; }
+  .tool-config-meta code { max-width: 100%; }
+  .tool-detail-heading { flex-wrap: wrap; }
+  .tool-detail-heading > .badge { margin-left: 0; }
+  .mitm-server-card .tool-form-grid > label:first-child { grid-column: auto; }
+  .mitm-mapping-row { grid-template-columns: minmax(95px, .85fr) 14px minmax(0, 1.2fr) 30px; gap: 4px; }
+  .mitm-mapping-row > span:first-child { font-size: 9px; }
+}
 @media (max-width: 900px) {
   .app-shell { grid-template-columns: 200px minmax(0, 1fr); }
   .tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

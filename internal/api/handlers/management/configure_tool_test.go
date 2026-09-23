@@ -74,8 +74,11 @@ func TestConfigureAndResetCodexCLIPreservesUnrelatedSettings(t *testing.T) {
 	if !contains(string(configData), `model_provider = 'cliproxyapi-lite'`) || !contains(string(configData), `approval_policy = 'never'`) {
 		t.Fatalf("unexpected Codex config: %s", configData)
 	}
+	if !contains(string(configData), `Authorization = 'Bearer gateway-key'`) {
+		t.Fatalf("Codex provider is missing its gateway authorization header: %s", configData)
+	}
 	authData, _ := os.ReadFile(filepath.Join(codexDir, "auth.json"))
-	if !contains(string(authData), "gateway-key") || !contains(string(authData), "keep-me") {
+	if contains(string(authData), "gateway-key") || !contains(string(authData), "keep-me") {
 		t.Fatalf("unexpected Codex auth: %s", authData)
 	}
 
@@ -108,7 +111,7 @@ func TestConfigureEnvMessagesDoNotEchoAPIKey(t *testing.T) {
 	}
 }
 
-func TestConfigureContinueDevWritesConfig(t *testing.T) {
+func TestConfigureContinueDevUsesManualGuide(t *testing.T) {
 	home := t.TempDir()
 	origHome := os.Getenv("HOME")
 	os.Setenv("HOME", home)
@@ -122,21 +125,13 @@ func TestConfigureContinueDevWritesConfig(t *testing.T) {
 	if errCfg != nil {
 		t.Fatalf("configureContinueDev failed: %v", errCfg)
 	}
-	if resp.Status != "ok" {
+	if resp.Status != "guide" {
 		t.Fatalf("unexpected status: %s", resp.Status)
 	}
 
 	configPath := filepath.Join(home, ".continue", "config.json")
-	data, errRead := os.ReadFile(configPath)
-	if errRead != nil {
-		t.Fatalf("config file not created: %v", errRead)
-	}
-	content := string(data)
-	if !contains(content, "CLIProxyAPI-lite") {
-		t.Fatalf("config missing provider title: %s", content)
-	}
-	if !contains(content, "claude-sonnet-4-20250514") {
-		t.Fatalf("config missing selected model: %s", content)
+	if _, errRead := os.Stat(configPath); !os.IsNotExist(errRead) {
+		t.Fatalf("manual guide unexpectedly changed the Continue config: %v", errRead)
 	}
 }
 

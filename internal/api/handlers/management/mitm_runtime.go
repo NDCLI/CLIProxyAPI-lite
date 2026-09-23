@@ -6,9 +6,11 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -34,11 +36,13 @@ const mitmListenAddress = "127.0.0.1:443"
 var mitmToolHosts = map[string][]string{
 	"antigravity": {"daily-cloudcode-pa.googleapis.com", "cloudcode-pa.googleapis.com"},
 	"copilot":     {"api.individual.githubcopilot.com"},
+	"kiro":        {"runtime.us-east-1.kiro.dev", "q.us-east-1.amazonaws.com", "codewhisperer.us-east-1.amazonaws.com"},
 }
 
 var mitmURLPatterns = map[string][]string{
 	"antigravity": {":generateContent", ":streamGenerateContent"},
 	"copilot":     {"/chat/completions", "/v1/messages", "/responses"},
+	"kiro":        {"/generateAssistantResponse"},
 }
 
 type mitmRuntime struct {
@@ -48,6 +52,8 @@ type mitmRuntime struct {
 	gatewayPort int
 	baseDir     string
 	apiKey      string
+	baseURL     string
+	apiKeyID    string
 	mappings    map[string]map[string]string
 	leafCerts   map[string]*tls.Certificate
 	rootCert    *x509.Certificate
@@ -55,12 +61,16 @@ type mitmRuntime struct {
 }
 
 type mitmStatus struct {
-	Running     bool            `json:"running"`
-	Address     string          `json:"address"`
-	CertExists  bool            `json:"cert_exists"`
-	CertTrusted bool            `json:"cert_trusted"`
-	IsAdmin     bool            `json:"is_admin"`
-	DNS         map[string]bool `json:"dns"`
+	Running          bool            `json:"running"`
+	Address          string          `json:"address"`
+	CertExists       bool            `json:"cert_exists"`
+	CertTrusted      bool            `json:"cert_trusted"`
+	IsAdmin          bool            `json:"is_admin"`
+	DNS              map[string]bool `json:"dns"`
+	BaseURL          string          `json:"base_url"`
+	APIKeyID         string          `json:"api_key_id,omitempty"`
+	APIKeyConfigured bool            `json:"api_key_configured"`
+	Tools            []mitmToolInfo  `json:"tools"`
 }
 
 func newMITMRuntime(configFilePath string, gatewayPort int) *mitmRuntime {
@@ -85,7 +95,10 @@ func (m *mitmRuntime) mappingsPath() string {
 func (m *mitmRuntime) loadMappings() {
 	data, errRead := os.ReadFile(m.mappingsPath())
 	if errRead == nil {
-		_ = json.Unmarshal(data, &m.mappings)
+		var mappings map[string]map[string]string
+		if json.Unmarshal(data, &mappings) == nil && mappings != nil {
+			m.mappings = mappings
+		}
 	}
 }
 
@@ -97,28 +110,45 @@ func (m *mitmRuntime) saveMappingsLocked() error {
 	if errMarshal != nil {
 		return errMarshal
 	}
-	return os.WriteFile(m.mappingsPath(), data, 0o600)
+	tmp, errCreate := os.CreateTemp(filepath.Dir(m.mappingsPath()), ".mitm-mappings-*")
+	if errCreate != nil {
+		return errCreate
+	}
+	defer os.Remove(tmp.Name())
+	if _, errWrite := tmp.Write(data); errWrite != nil {
+		_ = tmp.Close()
+		return errWrite
+	}
+	if errClose := tmp.Close(); errClose != nil {
+		return errClose
+	}
+	return os.Rename(tmp.Name(), m.mappingsPath())
 }
 
 func (m *mitmRuntime) status(certPath string) mitmStatus {
 	m.mu.RLock()
 	running := m.server != nil && m.listener != nil
+	baseURL, apiKeyID, hasKey := m.gatewayBaseURLLocked(), m.apiKeyID, m.apiKey != ""
 	m.mu.RUnlock()
 	return mitmStatus{
-		Running:     running,
-		Address:     mitmListenAddress,
-		CertExists:  fileExists(certPath),
-		CertTrusted: certificateTrusted(certPath),
-		IsAdmin:     currentProcessIsAdmin(),
-		DNS:         mitmDNSStatus(),
+		Running:          running,
+		Address:          mitmListenAddress,
+		CertExists:       fileExists(certPath),
+		CertTrusted:      certificateTrusted(certPath),
+		IsAdmin:          currentProcessIsAdmin(),
+		DNS:              mitmDNSStatus(),
+		BaseURL:          baseURL,
+		APIKeyID:         apiKeyID,
+		APIKeyConfigured: hasKey,
+		Tools:            mitmTools(),
 	}
 }
 
-func (m *mitmRuntime) start(certPath, keyPath, apiKey string) error {
+func (m *mitmRuntime) start(certPath, keyPath, apiKey, baseURL, apiKeyID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.server != nil {
-		return nil
+		return fmt.Errorf("MITM server is already running; stop it before changing settings")
 	}
 
 	rootCert, rootKey, errLoad := loadMITMCAKeyPair(certPath, keyPath)
@@ -132,6 +162,8 @@ func (m *mitmRuntime) start(certPath, keyPath, apiKey string) error {
 	m.rootCert = rootCert
 	m.rootKey = rootKey
 	m.apiKey = apiKey
+	m.baseURL = baseURL
+	m.apiKeyID = apiKeyID
 	m.leafCerts = make(map[string]*tls.Certificate)
 	tlsListener := tls.NewListener(listener, &tls.Config{
 		MinVersion:     tls.VersionTLS12,
@@ -162,6 +194,7 @@ func (m *mitmRuntime) stop(ctx context.Context) error {
 	m.server = nil
 	m.listener = nil
 	m.apiKey = ""
+	m.apiKeyID = ""
 	m.mu.Unlock()
 	if server == nil {
 		return nil
@@ -195,12 +228,16 @@ func (m *mitmRuntime) serveHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 	host := strings.ToLower(strings.Split(req.Host, ":")[0])
 	tool := mitmToolForHost(host)
+	if tool == "" {
+		http.Error(w, "unsupported MITM host", http.StatusBadRequest)
+		return
+	}
 	body, errRead := io.ReadAll(http.MaxBytesReader(w, req.Body, 32<<20))
 	if errRead != nil {
 		http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
 		return
 	}
-	if tool == "" || !matchesMITMPath(tool, req.URL.Path) {
+	if !matchesMITMRequest(tool, req) {
 		m.passthrough(w, req, host, body)
 		return
 	}
@@ -218,8 +255,17 @@ func (m *mitmRuntime) serveHTTP(w http.ResponseWriter, req *http.Request) {
 func (m *mitmRuntime) mappedModel(tool, model string) string {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	if tool == "antigravity" && model == "gemini-default" {
-		model = "gemini-3-flash"
+	model = strings.TrimPrefix(model, "models/")
+	if strings.HasPrefix(model, "tab_") || strings.HasPrefix(model, "tab-") {
+		return ""
+	}
+	if exact := strings.TrimSpace(m.mappings[tool][model]); exact != "" {
+		return exact
+	}
+	if tool == "antigravity" {
+		if alias := mitmAntigravityAliases[model]; alias != "" {
+			model = alias
+		}
 	}
 	return strings.TrimSpace(m.mappings[tool][model])
 }
@@ -240,6 +286,12 @@ func (m *mitmRuntime) proxyMapped(w http.ResponseWriter, req *http.Request, tool
 		} else if strings.Contains(req.URL.Path, "/responses") {
 			path = "/v1/responses"
 		}
+	} else if tool == "kiro" {
+		var errConvert error
+		body, errConvert = translateKiroMITMRequest(original, mapped)
+		if errConvert != nil {
+			return errConvert
+		}
 	} else {
 		var envelope map[string]json.RawMessage
 		if errDecode := json.Unmarshal(body, &envelope); errDecode != nil {
@@ -252,24 +304,42 @@ func (m *mitmRuntime) proxyMapped(w http.ResponseWriter, req *http.Request, tool
 		body = sdktranslator.TranslateRequest(sdktranslator.FormatGemini, sdktranslator.FormatOpenAI, mapped, geminiBody, stream)
 	}
 
-	gatewayURL := fmt.Sprintf("http://127.0.0.1:%d%s", m.gatewayPort, path)
+	m.mu.RLock()
+	gatewayURL := m.gatewayBaseURLLocked() + path
+	apiKey := m.apiKey
+	m.mu.RUnlock()
 	proxyReq, errRequest := http.NewRequestWithContext(req.Context(), http.MethodPost, gatewayURL, bytes.NewReader(body))
 	if errRequest != nil {
 		return errRequest
 	}
 	copyMITMHeaders(proxyReq.Header, req.Header)
 	proxyReq.Header.Set("Content-Type", "application/json")
-	proxyReq.Header.Set("Authorization", "Bearer "+m.apiKey)
-	response, errDo := http.DefaultClient.Do(proxyReq)
+	proxyReq.Header.Set("Authorization", "Bearer "+apiKey)
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	response, errDo := client.Do(proxyReq)
 	if errDo != nil {
 		return errDo
 	}
 	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		copyResponse(w, response)
+		return nil
+	}
+	if tool == "kiro" {
+		return proxyKiroMITMResponse(w, response, mapped)
+	}
 	if tool == "copilot" {
 		copyResponse(w, response)
 		return nil
 	}
 	return proxyAntigravityResponse(w, response, mapped, original, body, stream)
+}
+
+func (m *mitmRuntime) gatewayBaseURLLocked() string {
+	if m.baseURL != "" {
+		return m.baseURL
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d", m.gatewayPort)
 }
 
 func proxyAntigravityResponse(w http.ResponseWriter, response *http.Response, model string, original, translated []byte, stream bool) error {
@@ -354,7 +424,7 @@ func directMITMClient() *http.Client {
 func copyMITMHeaders(dst, src http.Header) {
 	for key, values := range src {
 		switch strings.ToLower(key) {
-		case "host", "content-length", "connection", "transfer-encoding", "authorization":
+		case "host", "content-length", "connection", "transfer-encoding", "authorization", "x-api-key", "cookie", "x-amz-security-token", "x-amz-target", "accept-encoding":
 			continue
 		}
 		for _, value := range values {
@@ -393,6 +463,10 @@ func matchesMITMPath(tool, path string) bool {
 	return false
 }
 
+func matchesMITMRequest(tool string, req *http.Request) bool {
+	return matchesMITMPath(tool, req.URL.Path) || (tool == "kiro" && req.Method == http.MethodPost && strings.HasSuffix(req.Header.Get("X-Amz-Target"), ".GenerateAssistantResponse"))
+}
+
 func extractMITMModel(path string, body []byte) string {
 	if marker := strings.Index(path, "/models/"); marker >= 0 {
 		value := path[marker+len("/models/"):]
@@ -402,9 +476,45 @@ func extractMITMModel(path string, body []byte) string {
 		return value
 	}
 	var payload struct {
-		Model string `json:"model"`
+		Model             string `json:"model"`
+		ConversationState struct {
+			CurrentMessage struct {
+				UserInputMessage struct {
+					ModelID string `json:"modelId"`
+				} `json:"userInputMessage"`
+			} `json:"currentMessage"`
+		} `json:"conversationState"`
+		Request          json.RawMessage `json:"request"`
+		GenerationConfig struct {
+			ThinkingConfig struct {
+				ThinkingLevel string `json:"thinkingLevel"`
+			} `json:"thinkingConfig"`
+		} `json:"generationConfig"`
 	}
 	_ = json.Unmarshal(body, &payload)
+	if payload.ConversationState.CurrentMessage.UserInputMessage.ModelID != "" {
+		return payload.ConversationState.CurrentMessage.UserInputMessage.ModelID
+	}
+	if strings.HasSuffix(payload.Model, "-flash-tiered") {
+		level := strings.ToLower(payload.GenerationConfig.ThinkingConfig.ThinkingLevel)
+		if len(payload.Request) > 0 {
+			var nested struct {
+				GenerationConfig struct {
+					ThinkingConfig struct {
+						ThinkingLevel string `json:"thinkingLevel"`
+					} `json:"thinkingConfig"`
+				} `json:"generationConfig"`
+			}
+			_ = json.Unmarshal(payload.Request, &nested)
+			if nested.GenerationConfig.ThinkingConfig.ThinkingLevel != "" {
+				level = strings.ToLower(nested.GenerationConfig.ThinkingConfig.ThinkingLevel)
+			}
+		}
+		if level != "high" && level != "low" {
+			level = "medium"
+		}
+		return strings.TrimSuffix(payload.Model, "-tiered") + "-" + level
+	}
 	return payload.Model
 }
 
@@ -482,8 +592,8 @@ func certificateTrusted(certPath string) bool {
 	if errLoad != nil {
 		return false
 	}
-	_ = cert
-	return exec.Command("certutil", "-user", "-store", "Root", mitmCAName).Run() == nil
+	fingerprint := sha1.Sum(cert.Raw)
+	return exec.Command("certutil", "-user", "-store", "Root", hex.EncodeToString(fingerprint[:])).Run() == nil
 }
 
 func mitmDNSStatus() map[string]bool {
@@ -492,11 +602,25 @@ func mitmDNSStatus() map[string]bool {
 	if errRead != nil {
 		return status
 	}
-	content := string(data)
+	return mitmDNSStatusFor(string(data))
+}
+
+func mitmDNSStatusFor(content string) map[string]bool {
+	status := make(map[string]bool, len(mitmToolHosts))
+	redirected := make(map[string]bool)
+	for _, line := range strings.Split(content, "\n") {
+		fields := strings.Fields(strings.SplitN(line, "#", 2)[0])
+		if len(fields) < 2 || fields[0] != "127.0.0.1" {
+			continue
+		}
+		for _, host := range fields[1:] {
+			redirected[strings.ToLower(host)] = true
+		}
+	}
 	for tool, hosts := range mitmToolHosts {
 		status[tool] = true
 		for _, host := range hosts {
-			if !strings.Contains(content, "127.0.0.1 "+host) {
+			if !redirected[host] {
 				status[tool] = false
 				break
 			}
@@ -529,29 +653,53 @@ func setMITMDNS(tool string, enabled bool) error {
 	if errRead != nil {
 		return errRead
 	}
-	lines := strings.Split(strings.ReplaceAll(string(data), "\r\n", "\n"), "\n")
-	filtered := lines[:0]
-	for _, line := range lines {
-		remove := false
-		for _, host := range hosts {
-			if strings.Contains(line, host) {
-				remove = true
-				break
-			}
-		}
-		if !remove {
-			filtered = append(filtered, line)
-		}
+	content, errUpdate := updateMITMHosts(string(data), hosts, enabled)
+	if errUpdate != nil {
+		return errUpdate
 	}
-	if enabled {
-		for _, host := range hosts {
-			filtered = append(filtered, "127.0.0.1 "+host+" # CLIProxyAPI-lite MITM")
-		}
-	}
-	content := strings.TrimRight(strings.Join(filtered, "\r\n"), "\r\n") + "\r\n"
 	if errWrite := os.WriteFile(path, []byte(content), 0o644); errWrite != nil {
 		return errWrite
 	}
 	_ = exec.Command("ipconfig", "/flushdns").Run()
 	return nil
+}
+
+func updateMITMHosts(content string, hosts []string, enabled bool) (string, error) {
+	wanted := make(map[string]bool, len(hosts))
+	for _, host := range hosts {
+		wanted[host] = true
+	}
+	var kept []string
+	for _, line := range strings.Split(strings.ReplaceAll(content, "\r\n", "\n"), "\n") {
+		parts := strings.SplitN(line, "#", 2)
+		fields := strings.Fields(parts[0])
+		owned := len(parts) == 2 && strings.TrimSpace(parts[1]) == "CLIProxyAPI-lite MITM"
+		matching := false
+		remaining := []string{}
+		if len(fields) > 1 {
+			for _, host := range fields[1:] {
+				if wanted[strings.ToLower(host)] {
+					matching = true
+				} else {
+					remaining = append(remaining, host)
+				}
+			}
+		}
+		if matching && !owned && enabled {
+			return "", fmt.Errorf("hosts file already contains an unmanaged entry for %s; remove it manually before enabling DNS", strings.Join(hosts, ", "))
+		}
+		if matching && owned {
+			if len(remaining) > 0 {
+				kept = append(kept, fields[0]+" "+strings.Join(remaining, " ")+" # CLIProxyAPI-lite MITM")
+			}
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if enabled {
+		for _, host := range hosts {
+			kept = append(kept, "127.0.0.1 "+host+" # CLIProxyAPI-lite MITM")
+		}
+	}
+	return strings.TrimRight(strings.Join(kept, "\r\n"), "\r\n") + "\r\n", nil
 }
