@@ -47,6 +47,13 @@ var mitmURLPatterns = map[string][]string{
 
 var mitmPassthroughClient = directMITMClient()
 
+type mitmDNSCacheEntry struct {
+	ip        string
+	expiresAt time.Time
+}
+
+var mitmDNSCache sync.Map
+
 type mitmRuntime struct {
 	mu          sync.RWMutex
 	server      *http.Server
@@ -439,7 +446,7 @@ func directMITMClient() *http.Client {
 			if errSplit != nil {
 				return nil, errSplit
 			}
-			ip, errLookup := resolveMITMUpstream(ctx, host, "8.8.8.8:53")
+			ip, errLookup := resolveMITMUpstream(ctx, host)
 			if errLookup != nil {
 				return nil, errLookup
 			}
@@ -451,28 +458,46 @@ func directMITMClient() *http.Client {
 	}}
 }
 
-func resolveMITMUpstream(ctx context.Context, host, dnsServer string) (string, error) {
+func resolveMITMUpstream(ctx context.Context, host string) (string, error) {
+	if cached, ok := mitmDNSCache.Load(host); ok {
+		entry := cached.(mitmDNSCacheEntry)
+		if time.Now().Before(entry.expiresAt) {
+			return entry.ip, nil
+		}
+		mitmDNSCache.Delete(host)
+	}
+
 	query := new(dns.Msg)
 	query.SetQuestion(dns.Fqdn(host), dns.TypeA)
-	reply, _, errLookup := (&dns.Client{Net: "udp"}).ExchangeContext(ctx, query, dnsServer)
-	if errLookup == nil && reply.Truncated {
-		reply, _, errLookup = (&dns.Client{Net: "tcp"}).ExchangeContext(ctx, query, dnsServer)
-	}
-	if errLookup != nil {
-		return "", fmt.Errorf("resolve MITM upstream %s: %w", host, errLookup)
-	}
-	if reply.Rcode != dns.RcodeSuccess {
-		return "", fmt.Errorf("resolve MITM upstream %s: %s", host, dns.RcodeToString[reply.Rcode])
-	}
-	for _, answer := range reply.Answer {
-		record, ok := answer.(*dns.A)
-		if !ok {
+	var lastErr error
+	for _, dnsServer := range []string{"1.1.1.1:53", "1.0.0.1:53", "8.8.8.8:53", "8.8.4.4:53"} {
+		reply, _, errLookup := (&dns.Client{Net: "udp"}).ExchangeContext(ctx, query, dnsServer)
+		if errLookup == nil && reply.Truncated {
+			reply, _, errLookup = (&dns.Client{Net: "tcp"}).ExchangeContext(ctx, query, dnsServer)
+		}
+		if errLookup != nil {
+			lastErr = fmt.Errorf("DNS server %s: %w", dnsServer, errLookup)
 			continue
 		}
-		ip := record.A.To4()
-		if ip != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() {
-			return ip.String(), nil
+		if reply.Rcode != dns.RcodeSuccess {
+			lastErr = fmt.Errorf("DNS server %s: %s", dnsServer, dns.RcodeToString[reply.Rcode])
+			continue
 		}
+		for _, answer := range reply.Answer {
+			record, ok := answer.(*dns.A)
+			if !ok {
+				continue
+			}
+			ip := record.A.To4()
+			if ip != nil && ip.IsGlobalUnicast() && !ip.IsPrivate() {
+				resolved := ip.String()
+				mitmDNSCache.Store(host, mitmDNSCacheEntry{ip: resolved, expiresAt: time.Now().Add(5 * time.Minute)})
+				return resolved, nil
+			}
+		}
+	}
+	if lastErr != nil {
+		return "", fmt.Errorf("resolve MITM upstream %s: %w", host, lastErr)
 	}
 	return "", fmt.Errorf("resolve MITM upstream %s: no public IPv4 address", host)
 }
