@@ -13,40 +13,48 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 )
 
-func TestPostOAuthCallbackCreatesMissingAuthDir(t *testing.T) {
+func TestPostOAuthCallbackFromRedirectURL(t *testing.T) {
+	for _, tc := range []struct {
+		provider string
+		url      string
+	}{
+		{"antigravity", "http://localhost:59788/oauth-callback"},
+		{"codex", "http://localhost:1455/auth/callback"},
+	} {
+		t.Run(tc.provider, func(t *testing.T) {
+			authDir := filepath.Join(t.TempDir(), "missing-auth")
+			state := "test-" + tc.provider + "-state"
+			RegisterOAuthSession(state, tc.provider)
+			defer CompleteOAuthSession(state)
 
-	authDir := filepath.Join(t.TempDir(), "missing-auth")
-	state := "test-antigravity-state"
-	RegisterOAuthSession(state, "antigravity")
-	defer CompleteOAuthSession(state)
+			h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir}, nil)
+			router := gin.New()
+			router.POST("/v0/management/oauth-callback", h.PostOAuthCallback)
 
-	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: authDir}, nil)
-	router := gin.New()
-	router.POST("/v0/management/oauth-callback", h.PostOAuthCallback)
+			body := `{"provider":"` + tc.provider + `","redirect_url":"` + tc.url + `?state=` + state + `&code=test-code"}`
+			req := httptest.NewRequest(http.MethodPost, "/v0/management/oauth-callback", strings.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-	body := `{"provider":"antigravity","redirect_url":"http://localhost:59788/oauth-callback?state=test-antigravity-state&code=test-code"}`
-	req := httptest.NewRequest(http.MethodPost, "/v0/management/oauth-callback", strings.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	w := httptest.NewRecorder()
+			if w.Code != http.StatusOK {
+				t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, w.Code, w.Body.String())
+			}
 
-	router.ServeHTTP(w, req)
+			callbackPath := filepath.Join(authDir, ".oauth-"+tc.provider+"-"+state+".oauth")
+			data, errRead := os.ReadFile(callbackPath)
+			if errRead != nil {
+				t.Fatalf("expected callback file to be written: %v", errRead)
+			}
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d with body %s", http.StatusOK, w.Code, w.Body.String())
-	}
-
-	callbackPath := filepath.Join(authDir, ".oauth-antigravity-"+state+".oauth")
-	data, errRead := os.ReadFile(callbackPath)
-	if errRead != nil {
-		t.Fatalf("expected callback file to be written: %v", errRead)
-	}
-
-	var payload oauthCallbackFilePayload
-	if errUnmarshal := json.Unmarshal(data, &payload); errUnmarshal != nil {
-		t.Fatalf("failed to decode callback payload: %v", errUnmarshal)
-	}
-	if payload.State != state || payload.Code != "test-code" || payload.Error != "" {
-		t.Fatalf("unexpected callback payload: %+v", payload)
+			var payload oauthCallbackFilePayload
+			if errUnmarshal := json.Unmarshal(data, &payload); errUnmarshal != nil {
+				t.Fatalf("failed to decode callback payload: %v", errUnmarshal)
+			}
+			if payload.State != state || payload.Code != "test-code" || payload.Error != "" {
+				t.Fatalf("unexpected callback payload: %+v", payload)
+			}
+		})
 	}
 }
 

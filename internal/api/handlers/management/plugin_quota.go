@@ -3,6 +3,7 @@ package management
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	codexauth "github.com/router-for-me/CLIProxyAPI/v7/internal/auth/codex"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
@@ -30,6 +30,8 @@ type credentialQuotaRequest struct {
 	PluginID        string  `json:"plugin_id"`
 	Provider        string  `json:"provider"`
 }
+
+var errCodexReauthRequired = errors.New("Codex OAuth sign-in required")
 
 func (r credentialQuotaRequest) resolveAuthIndex() string {
 	if r.AuthIndexSnake != nil && strings.TrimSpace(*r.AuthIndexSnake) != "" {
@@ -88,8 +90,12 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 	if provider == "" {
 		provider = auth.Provider
 	}
-	if native, handledNative, errNative := h.fetchNativeQuota(c.Request.Context(), auth, provider); handledNative {
+	if native, handledNative, errNative := h.fetchNativeQuota(c.Request.Context(), auth); handledNative {
 		if errNative != nil {
+			if errors.Is(errNative, errCodexReauthRequired) {
+				c.JSON(http.StatusBadGateway, gin.H{"error": gin.H{"code": "reauth_required", "message": errCodexReauthRequired.Error()}})
+				return
+			}
 			log.WithError(errNative).Warnf("native quota fetch failed for provider %s", provider)
 			c.JSON(http.StatusBadGateway, gin.H{"error": errNative.Error()})
 			return
@@ -155,14 +161,11 @@ func (h *Handler) FetchCredentialQuota(c *gin.Context) {
 // fetchNativeQuota mirrors 9router's provider-specific usage fetchers. It reads
 // quota APIs directly and never sends a generation request, so opening the tracker
 // does not consume model quota.
-func (h *Handler) fetchNativeQuota(ctx context.Context, auth *coreauth.Auth, providerOverride string) (pluginapi.QuotaFetchResponse, bool, error) {
+func (h *Handler) fetchNativeQuota(ctx context.Context, auth *coreauth.Auth) (pluginapi.QuotaFetchResponse, bool, error) {
 	if auth == nil {
 		return pluginapi.QuotaFetchResponse{}, false, nil
 	}
-	provider := strings.ToLower(strings.TrimSpace(providerOverride))
-	if provider == "" {
-		provider = strings.ToLower(strings.TrimSpace(auth.Provider))
-	}
+	provider := strings.ToLower(strings.TrimSpace(auth.Provider))
 	if provider != "codex" && provider != "claude" && provider != "antigravity" {
 		return pluginapi.QuotaFetchResponse{}, false, nil
 	}
@@ -211,9 +214,23 @@ func (h *Handler) fetchNativeQuota(ctx context.Context, auth *coreauth.Auth, pro
 		baseHeaders["Originator"] = "codex_cli_rs"
 		data, status, errFetch := requestJSON(http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", nil, baseHeaders)
 		if status == http.StatusUnauthorized {
-			if refreshed, errRefresh := h.refreshCodexQuotaToken(ctx, auth); errRefresh == nil && refreshed != "" {
-				baseHeaders["Authorization"] = "Bearer " + refreshed
-				data, _, errFetch = requestJSON(http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", nil, baseHeaders)
+			refreshed, errRefresh := h.authManager.ForceRefreshAuth(ctx, auth.ID)
+			if errRefresh != nil {
+				if codexRefreshRequiresSignIn(errRefresh) {
+					return pluginapi.QuotaFetchResponse{}, true, errCodexReauthRequired
+				}
+				return pluginapi.QuotaFetchResponse{}, true, errors.New("Codex quota token refresh failed; retry later")
+			}
+			if refreshed == nil || tokenValueForAuth(refreshed) == "" {
+				return pluginapi.QuotaFetchResponse{}, true, errCodexReauthRequired
+			}
+			baseHeaders["Authorization"] = "Bearer " + tokenValueForAuth(refreshed)
+			if accountID := metadataString(refreshed, "account_id", "accountId", "chatgptAccountId"); accountID != "" {
+				baseHeaders["ChatGPT-Account-ID"] = accountID
+			}
+			data, status, errFetch = requestJSON(http.MethodGet, "https://chatgpt.com/backend-api/wham/usage", nil, baseHeaders)
+			if status == http.StatusUnauthorized {
+				return pluginapi.QuotaFetchResponse{}, true, errCodexReauthRequired
 			}
 		}
 		if errFetch != nil {
@@ -252,39 +269,16 @@ func (h *Handler) fetchNativeQuota(ctx context.Context, auth *coreauth.Auth, pro
 	return pluginapi.QuotaFetchResponse{}, false, nil
 }
 
-func (h *Handler) refreshCodexQuotaToken(ctx context.Context, auth *coreauth.Auth) (string, error) {
-	if auth == nil || auth.Metadata == nil {
-		return "", fmt.Errorf("codex refresh token not found")
+func codexRefreshRequiresSignIn(err error) bool {
+	if err == nil {
+		return false
 	}
-	refreshToken, _ := auth.Metadata["refresh_token"].(string)
-	refreshToken = strings.TrimSpace(refreshToken)
-	if refreshToken == "" {
-		return "", fmt.Errorf("codex refresh token not found")
-	}
-	td, errRefresh := codexauth.NewCodexAuthWithProxyURL(h.cfg, auth.ProxyURL).RefreshTokensWithRetry(ctx, refreshToken, 3)
-	if errRefresh != nil {
-		return "", errRefresh
-	}
-	if td == nil || strings.TrimSpace(td.AccessToken) == "" {
-		return "", fmt.Errorf("codex token refresh returned empty access_token")
-	}
-	auth.Metadata["id_token"] = td.IDToken
-	auth.Metadata["access_token"] = td.AccessToken
-	if strings.TrimSpace(td.RefreshToken) != "" {
-		auth.Metadata["refresh_token"] = td.RefreshToken
-	}
-	if strings.TrimSpace(td.AccountID) != "" {
-		auth.Metadata["account_id"] = td.AccountID
-	}
-	auth.Metadata["email"] = td.Email
-	auth.Metadata["expired"] = td.Expire
-	auth.Metadata["last_refresh"] = time.Now().Format(time.RFC3339)
-	if h.postAuthPersistHook != nil {
-		if errPersist := h.postAuthPersistHook(ctx, auth); errPersist != nil {
-			log.WithError(errPersist).Warn("failed to persist refreshed Codex quota token")
-		}
-	}
-	return td.AccessToken, nil
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "invalid_grant") ||
+		strings.Contains(message, "refresh_token_reused") ||
+		strings.Contains(message, "refresh_token_revoked") ||
+		strings.Contains(message, "token_revoked") ||
+		strings.Contains(message, "token refresh failed with status 401")
 }
 
 func parseCodexNativeQuota(data []byte) pluginapi.QuotaFetchResponse {

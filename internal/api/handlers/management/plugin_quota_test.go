@@ -3,6 +3,7 @@ package management
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -192,6 +193,40 @@ func TestFetchCredentialQuota_Endpoint(t *testing.T) {
 	}
 	if quotaResp.Groups[0].Buckets[0].RemainingFraction != 0.9 {
 		t.Fatalf("unexpected fraction: %f", quotaResp.Groups[0].Buckets[0].RemainingFraction)
+	}
+}
+
+func TestFetchCredentialQuota_NativeProviderCannotBeOverridden(t *testing.T) {
+	manager := coreauth.NewManager(nil, nil, nil)
+	auth := &coreauth.Auth{ID: "custom-auth", Provider: "custom", Metadata: map[string]any{"access_token": "test-token"}}
+	authIndex := auth.EnsureIndex()
+	if _, err := manager.Register(context.Background(), auth); err != nil {
+		t.Fatal(err)
+	}
+	h := NewHandlerWithoutConfigFilePath(&config.Config{AuthDir: t.TempDir()}, manager)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v0/management/quota/fetch", strings.NewReader(`{"auth_index":"`+authIndex+`","provider":"codex"}`))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	h.FetchCredentialQuota(ctx)
+	if recorder.Code != http.StatusNotImplemented {
+		t.Fatalf("status = %d, want 501: %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestCodexRefreshRequiresSignIn(t *testing.T) {
+	for _, tc := range []struct {
+		message string
+		want    bool
+	}{
+		{"token refresh failed with status 400: invalid_grant", true},
+		{"refresh_token_reused", true},
+		{"token refresh failed with status 401", true},
+		{"token refresh request failed: connection reset", false},
+	} {
+		if got := codexRefreshRequiresSignIn(errors.New(tc.message)); got != tc.want {
+			t.Errorf("codexRefreshRequiresSignIn(%q) = %t, want %t", tc.message, got, tc.want)
+		}
 	}
 }
 
