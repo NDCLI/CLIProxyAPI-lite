@@ -1027,7 +1027,6 @@ async function renderCombos(page, feedback = "") {
       }));
     } catch (error) { if (error.message === "invalid_key") return logout(); document.getElementById("combos-list").className = "error"; document.getElementById("combos-list").textContent = t("common.error"); }
   };
-  bindForm();
   document.getElementById("refresh").addEventListener("click", load);
   await load();
 }
