@@ -2,15 +2,15 @@
 
 ## Purpose
 
-Replace the legacy management surface in CLIProxyAPI-lite with the feature set and visual structure used by 9router. The end state is a single, source-owned management application with real Go APIs behind every enabled control, English as the default language, and complete Vietnamese translations.
+Port applicable 9router management features into CLIProxyAPI-lite. Media Providers are explicitly out of scope. The end state is a single, source-owned management application with real Go APIs behind every enabled control, English as the default language, and complete Vietnamese translations.
 
-This is an implementation plan for the isolated `test` branch. The `main` branch is unchanged until the migration is reviewed and approved.
+This plan tracks incremental implementation in the current checkout. Every completed item records its verification in the completion ledger.
 
 ## Baseline
 
-- Reference implementation: the local 9router checkout, version `v0.5.81`.
-- Target branch: `test`.
-- Current status: the existing management bundle and experimental navigation still exist; the full replacement is not complete.
+- Reference implementation: the local 9router checkout, version `v0.5.85`.
+- Target branch: `main`.
+- Current status: the source-owned management application is the default; remaining pages must use real Go APIs.
 - The first experiment removed fake router panels and preserved the existing management routes. That experiment is not considered feature completion.
 
 ## Rules for the migration
@@ -85,7 +85,8 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 
 ### Phase 9 — Remaining 9router management areas
 
-- Add the remaining applicable pages: auth files, OAuth, logs/translator, proxy pools, skills, media providers, system information, and quick start. Auth files, OAuth, logs, and Quick Start are implemented; proxy pools, skills, media providers, and system information remain unavailable without matching Go authorities.
+- ~~Add Basic Chat with credential-scoped model discovery and streamed chat completions; keep the endpoint key in tab memory only.~~
+- Continue applicable areas: proxy pools, Skills compatibility, and system information. Media Providers are excluded at the user's request.
 - Reuse the shared shell, localization, permissions, and error handling from earlier phases.
 - Mark a page unavailable until its backend behavior is complete and tested.
 
@@ -135,6 +136,7 @@ This is an implementation plan for the isolated `test` branch. The `main` branch
 | 2026-09-22 | Credential quota details completed | `d8aaf2ab` | Quota page lists only backend-supported credentials, renders normalized buckets/remaining capacity/reset time, and exposes reset only where the provider supports it |
 | 2026-09-22 | Quick Start page completed | `WORKTREE` | Source-owned Quick Start page uses live endpoint-key and auth-file APIs, copies the real `/v1` endpoint, and links to key management; unsupported 9router domains remain unavailable rather than fabricated |
 | 2026-09-22 | CLI/Token Saver verification gates completed | `b9ea29fe` | Supported CLI status/configuration and explicit Token Saver unavailable state are covered by focused tests; full `go test ./...` and `go build -o test-output.exe ./cmd/server` pass on `test` |
+| 2026-09-24 | Basic Chat added | `WORKTREE` | Source-owned page discovers models with the endpoint key and streams `/v1/chat/completions`; browser verified login, localized empty state, and zero-model handling on an isolated server; `go test ./...`, build, and JavaScript syntax checks pass |
 
 ## Update convention
 

@@ -9,6 +9,7 @@ const state = {
 const routes = [
   ["overview", "nav.overview", "grid"],
   ["quick-start", "nav.quickStart", "rocket"],
+  ["chat", "nav.chat", "message"],
   ["endpoint", "nav.endpoint", "key", "endpoint_keys"],
   ["providers", "nav.providers", "server", "providers"],
   ["combo", "nav.combo", "route", "combos"],
@@ -25,6 +26,7 @@ const app = document.getElementById("app");
 const escapeHTML = value => String(value ?? "").replace(/[&<>"']/g, char => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[char]));
 const t = key => state.messages[key] || key;
 const iconPaths = {
+  message: '<path d="M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7a8.4 8.4 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.4 8.4 0 0 1 3.8-.9h.5a8.5 8.5 0 0 1 8 8v.5Z"/>',
   refresh: '<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 7a7 7 0 0 1 12-1l2 6M4 12l2 6a7 7 0 0 0 12-1"/>',
   search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/>',
   arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>',
@@ -1650,6 +1652,7 @@ function renderPage(name) {
   const page = document.getElementById("page");
   switch (name) {
     case "quick-start": renderQuickStart(page); break;
+    case "chat": renderBasicChat(page); break;
     case "endpoint": renderEndpoint(page); break;
     case "providers": renderProviders(page); break;
     case "combo": renderCombos(page); break;
@@ -1662,6 +1665,180 @@ function renderPage(name) {
     case "cli-tools": window.ManagementTools.render(page, cliToolRouteID()); break;
     default: renderOverview(page);
   }
+}
+
+async function renderBasicChat(page) {
+  page.innerHTML = pageHeader("kicker.liveData", "chat.title", "chat.description", true) + `
+    <section class="card chat-panel">
+      <div class="chat-settings">
+        <label>${t("chat.apiKey")}<input id="chat-api-key" class="text-input" type="password" autocomplete="off" spellcheck="false" placeholder="${t("chat.apiKeyPlaceholder")}" /></label>
+        <button class="secondary compact" id="chat-load-models" type="button">${icon("refresh")}${t("chat.loadModels")}</button>
+        <label>${t("chat.model")}<select id="chat-model" class="text-input"><option value="">${t("chat.loadModelsFirst")}</option></select></label>
+      </div>
+      <div class="hint">${t("chat.keyHint")}</div>
+      <div class="chat-history" id="chat-history" role="log" aria-live="polite"><div class="empty">${t("chat.empty")}</div></div>
+      <div class="chat-composer">
+        <textarea id="chat-prompt" class="text-input" rows="3" placeholder="${t("chat.promptPlaceholder")}"></textarea>
+        <div class="actions"><button class="secondary compact" id="chat-clear" type="button">${t("chat.clear")}</button><button class="secondary compact" id="chat-stop" type="button" hidden>${t("chat.stop")}</button><button class="primary compact" id="chat-send" type="button">${icon("arrow")}${t("chat.send")}</button></div>
+      </div>
+      <span class="form-message" id="chat-status" role="status" aria-live="polite"></span>
+    </section>`;
+
+  const keyInput = page.querySelector("#chat-api-key");
+  const modelSelect = page.querySelector("#chat-model");
+  const history = page.querySelector("#chat-history");
+  const prompt = page.querySelector("#chat-prompt");
+  const status = page.querySelector("#chat-status");
+  const loadButton = page.querySelector("#chat-load-models");
+  const sendButton = page.querySelector("#chat-send");
+  const stopButton = page.querySelector("#chat-stop");
+  let messages = [];
+  let controller = null;
+
+  const setStatus = (message = "", kind = "") => {
+    status.textContent = message;
+    status.className = `form-message ${kind}`;
+  };
+
+  const renderMessages = () => {
+    history.replaceChildren();
+    if (!messages.length) {
+      const empty = document.createElement("div");
+      empty.className = "empty";
+      empty.textContent = t("chat.empty");
+      history.appendChild(empty);
+      return;
+    }
+    for (const message of messages) {
+      const turn = document.createElement("article");
+      turn.className = `chat-turn ${message.role}`;
+      const role = document.createElement("strong");
+      role.textContent = t(message.role === "user" ? "chat.you" : "chat.assistant");
+      const content = document.createElement("pre");
+      content.textContent = message.content || (message.role === "assistant" ? t("chat.thinking") : "");
+      turn.append(role, content);
+      history.appendChild(turn);
+    }
+    history.scrollTop = history.scrollHeight;
+  };
+
+  const loadModels = async () => {
+    const apiKey = keyInput.value.trim();
+    if (!apiKey) {
+      setStatus(t("chat.apiKeyRequired"), "failed");
+      keyInput.focus();
+      return;
+    }
+    loadButton.disabled = true;
+    setStatus(t("chat.loadingModels"));
+    try {
+      const response = await fetch("/v1/models", {headers: {Authorization: `Bearer ${apiKey}`}});
+      if (!response.ok) throw new Error("models_failed");
+      const payload = await response.json();
+      const models = [...new Set((payload.data || []).map(item => String(item.id || "").trim()).filter(Boolean))].sort();
+      modelSelect.replaceChildren(new Option(t("chat.selectModel"), ""));
+      for (const model of models) modelSelect.add(new Option(model, model));
+      setStatus(models.length ? `${t("chat.modelsLoaded")} (${models.length})` : t("chat.noModels"), models.length ? "ok" : "failed");
+    } catch {
+      modelSelect.replaceChildren(new Option(t("chat.loadModelsFirst"), ""));
+      setStatus(t("chat.modelsFailed"), "failed");
+    } finally {
+      loadButton.disabled = false;
+    }
+  };
+
+  const sendMessage = async () => {
+    if (controller) return;
+    const apiKey = keyInput.value.trim();
+    const model = modelSelect.value;
+    const content = prompt.value.trim();
+    if (!apiKey) return setStatus(t("chat.apiKeyRequired"), "failed");
+    if (!model) return setStatus(t("chat.selectModel"), "failed");
+    if (!content) return setStatus(t("chat.promptRequired"), "failed");
+
+    messages.push({role: "user", content}, {role: "assistant", content: ""});
+    const assistantIndex = messages.length - 1;
+    prompt.value = "";
+    renderMessages();
+    controller = new AbortController();
+    sendButton.disabled = true;
+    stopButton.hidden = false;
+    setStatus(t("chat.waiting"));
+    const stopOnNavigate = () => { if (routeName() !== "chat") controller?.abort(); };
+    window.addEventListener("hashchange", stopOnNavigate);
+
+    try {
+      const response = await fetch("/v1/chat/completions", {
+        method: "POST",
+        headers: {Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", Accept: "text/event-stream"},
+        body: JSON.stringify({model, messages: messages.slice(0, assistantIndex).map(({role, content: text}) => ({role, content: text})), stream: true}),
+        signal: controller.signal
+      });
+      if (!response.ok || !response.body) throw new Error("chat_failed");
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let receivedText = false;
+      let finished = false;
+      const consumeLine = line => {
+        if (!line.startsWith("data:")) return false;
+        const data = line.slice(5).trim();
+        if (data === "[DONE]") return true;
+        try {
+          const chunk = JSON.parse(data);
+          const delta = chunk.choices?.[0]?.delta?.content;
+          if (typeof delta === "string" && delta) {
+            messages[assistantIndex].content += delta;
+            receivedText = true;
+            renderMessages();
+          }
+        } catch { /* Ignore non-JSON SSE lines. */ }
+        return false;
+      };
+      while (!finished) {
+        const {value, done} = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), {stream: !done});
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop() || "";
+        for (const line of lines) {
+          if (consumeLine(line)) { finished = true; break; }
+        }
+        if (done) {
+          if (buffer) consumeLine(buffer);
+          break;
+        }
+      }
+      if (!receivedText) setStatus(t("chat.emptyResponse"), "failed");
+      else setStatus(t("chat.complete"), "ok");
+    } catch {
+      if (controller.signal.aborted) {
+        if (!messages[assistantIndex].content) messages[assistantIndex].content = t("chat.stopped");
+        renderMessages();
+        setStatus(t("chat.stopped"));
+      }
+      else {
+        messages[assistantIndex].content ||= t("chat.replyFailed");
+        renderMessages();
+        setStatus(t("chat.requestFailed"), "failed");
+      }
+    } finally {
+      window.removeEventListener("hashchange", stopOnNavigate);
+      controller = null;
+      sendButton.disabled = false;
+      stopButton.hidden = true;
+      prompt.focus();
+    }
+  };
+
+  loadButton.addEventListener("click", loadModels);
+  sendButton.addEventListener("click", sendMessage);
+  stopButton.addEventListener("click", () => controller?.abort());
+  page.querySelector("#chat-clear").addEventListener("click", () => { messages = []; renderMessages(); setStatus(); });
+  prompt.addEventListener("keydown", event => {
+    if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); sendMessage(); }
+  });
+  document.getElementById("refresh").onclick = loadModels;
 }
 
 window.addEventListener("hashchange", () => state.key && renderShell());
