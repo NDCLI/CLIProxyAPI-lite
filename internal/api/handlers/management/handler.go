@@ -15,8 +15,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/buildinfo"
-	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/combo"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginstore"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v7/sdk/auth"
@@ -64,6 +64,7 @@ type Handler struct {
 	pluginReleases          pluginReleaseCache
 	mitm                    *mitmRuntime
 	combos                  *combo.Store
+	proxyPools              *proxyPoolStore
 }
 
 type configReloadSnapshot struct {
@@ -87,6 +88,7 @@ func NewHandler(cfg *config.Config, configFilePath string, manager *coreauth.Man
 	}
 	h.mitm = newMITMRuntime(configFilePath, cfg.Port)
 	h.combos = combo.New(configFilePath)
+	h.proxyPools = newProxyPoolStore(configFilePath)
 	h.startAttemptCleanup()
 	return h
 }

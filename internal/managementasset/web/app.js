@@ -12,6 +12,7 @@ const routes = [
   ["chat", "nav.chat", "message"],
   ["endpoint", "nav.endpoint", "key", "endpoint_keys"],
   ["providers", "nav.providers", "server", "providers"],
+  ["proxy-pools", "nav.proxyPools", "server", "proxy_pools"],
   ["combo", "nav.combo", "route", "combos"],
   ["cli-tools", "nav.cliTools", "command", "cli_tools"],
   ["usage", "nav.usage", "chart", "usage"],
@@ -1700,6 +1701,77 @@ function renderSkills(page) {
   });
 }
 
+async function renderProxyPools(page) {
+  page.innerHTML = pageHeader("kicker.management", "proxyPools.title", "proxyPools.description", true) + `<div class="settings-layout"><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("server")}</span><div><h2>${t("proxyPools.createTitle")}</h2><p>${t("proxyPools.createDescription")}</p></div></div><form id="proxy-pool-create" class="settings-grid"><label>${t("proxyPools.name")}<input class="text-input" name="name" required maxlength="80"></label><label>${t("proxyPools.url")}<input class="text-input" name="proxy_url" type="password" autocomplete="new-password" required placeholder="socks5://host:1080"></label><div class="actions"><button class="primary compact" type="submit">${icon("plus")}${t("proxyPools.create")}</button><span class="form-message" id="proxy-pool-create-message" role="status" aria-live="polite"></span></div></form></section><div id="proxy-pool-list" class="loading">${t("common.loading")}</div><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("user")}</span><div><h2>${t("proxyPools.assignTitle")}</h2><p>${t("proxyPools.assignDescription")}</p></div></div><div id="proxy-pool-assignments" class="loading">${t("common.loading")}</div></section></div>`;
+  const poolList = page.querySelector("#proxy-pool-list");
+  const assignments = page.querySelector("#proxy-pool-assignments");
+  const createMessage = page.querySelector("#proxy-pool-create-message");
+  const load = async () => {
+    poolList.className = "loading";
+    poolList.textContent = t("common.loading");
+    assignments.className = "loading";
+    assignments.textContent = t("common.loading");
+    try {
+      const [poolResponse, providerResponse] = await Promise.all([api("/proxy-pools"), api("/providers")]);
+      const pools = poolResponse.items || [];
+      const providers = providerResponse.items || [];
+      if (!poolList.isConnected) return;
+      poolList.className = "settings-layout";
+      poolList.innerHTML = pools.length ? pools.map(pool => `<section class="card settings-section" data-proxy-pool="${escapeHTML(pool.id)}"><div class="tool-title"><div><h2>${escapeHTML(pool.name)}</h2><p>${escapeHTML(pool.proxy_url_masked || t("proxyPools.urlHidden"))}</p></div><span class="badge ${pool.is_active ? "ready" : "partial"}">${t(pool.is_active ? "proxyPools.active" : "proxyPools.inactive")}</span></div><div class="settings-grid"><label>${t("proxyPools.name")}<input class="text-input" data-pool-name value="${escapeHTML(pool.name)}" maxlength="80"></label><label>${t("proxyPools.replaceURL")}<input class="text-input" data-pool-url type="password" autocomplete="new-password" placeholder="${t("proxyPools.keepURL")}"></label></div><div class="actions"><button class="primary compact" type="button" data-save-pool>${icon("save")}${t("proxyPools.save")}</button><button class="secondary compact" type="button" data-toggle-pool>${t(pool.is_active ? "proxyPools.disable" : "proxyPools.enable")}</button><button class="danger-button" type="button" data-delete-pool>${icon("trash")}${t("proxyPools.delete")}</button><span class="form-message" data-pool-message role="status" aria-live="polite"></span></div><p class="hint">${t("proxyPools.boundCount").replace("{count}", String(pool.bound_credentials || 0))}</p></section>`).join("") : `<div class="empty">${t("proxyPools.empty")}</div>`;
+      assignments.className = "provider-connections";
+      assignments.innerHTML = providers.length ? providers.map(provider => `<label class="account-row"><span class="account-main"><strong>${escapeHTML(provider.label || provider.id)}</strong><small>${escapeHTML(provider.provider)}</small></span><select class="text-input" data-provider-pool="${escapeHTML(provider.id)}"><option value="">${t("proxyPools.noPool")}</option>${pools.map(pool => `<option value="${escapeHTML(pool.id)}" ${provider.proxy_pool_id === pool.id ? "selected" : ""}>${escapeHTML(pool.name)}${pool.is_active ? "" : ` · ${t("proxyPools.inactive")}`}</option>`).join("")}</select></label>`).join("") : `<div class="empty">${t("proxyPools.noProviders")}</div>`;
+      bindPoolControls(pools);
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      poolList.className = "error";
+      poolList.textContent = t("proxyPools.loadFailed");
+      assignments.className = "error";
+      assignments.textContent = t("proxyPools.loadFailed");
+    }
+  };
+  const bindPoolControls = pools => {
+    poolList.querySelectorAll("[data-save-pool]").forEach(button => button.addEventListener("click", async () => {
+      const card = button.closest("[data-proxy-pool]");
+      const message = card.querySelector("[data-pool-message]");
+      const body = {name: card.querySelector("[data-pool-name]").value.trim()};
+      const proxyURL = card.querySelector("[data-pool-url]").value.trim();
+      if (proxyURL) body.proxy_url = proxyURL;
+      button.disabled = true;
+      try { await api(`/proxy-pools/${encodeURIComponent(card.dataset.proxyPool)}`, {method: "PATCH", body: JSON.stringify(body)}); await load(); }
+      catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("proxyPools.saveFailed"); message.className = "form-message failed"; button.disabled = false; }
+    }));
+    poolList.querySelectorAll("[data-toggle-pool]").forEach(button => button.addEventListener("click", async () => {
+      const card = button.closest("[data-proxy-pool]");
+      const pool = pools.find(item => item.id === card.dataset.proxyPool);
+      try { await api(`/proxy-pools/${encodeURIComponent(pool.id)}`, {method: "PATCH", body: JSON.stringify({is_active: !pool.is_active})}); await load(); }
+      catch (error) { if (error.message === "invalid_key") return logout(); card.querySelector("[data-pool-message]").textContent = t("proxyPools.saveFailed"); }
+    }));
+    poolList.querySelectorAll("[data-delete-pool]").forEach(button => button.addEventListener("click", async () => {
+      const card = button.closest("[data-proxy-pool]");
+      const pool = pools.find(item => item.id === card.dataset.proxyPool);
+      if (!confirm(t("proxyPools.confirmDelete").replace("{name}", pool.name))) return;
+      try { await api(`/proxy-pools/${encodeURIComponent(pool.id)}`, {method: "DELETE"}); await load(); }
+      catch (error) { if (error.message === "invalid_key") return logout(); card.querySelector("[data-pool-message]").textContent = t(error.code === "proxy_pool_in_use" ? "proxyPools.inUse" : "proxyPools.deleteFailed"); card.querySelector("[data-pool-message]").className = "form-message failed"; }
+    }));
+    assignments.querySelectorAll("[data-provider-pool]").forEach(select => select.addEventListener("change", async () => {
+      select.disabled = true;
+      try { await api(`/providers/${encodeURIComponent(select.dataset.providerPool)}`, {method: "PATCH", body: JSON.stringify({proxy_pool_id: select.value})}); await load(); }
+      catch (error) { if (error.message === "invalid_key") return logout(); select.disabled = false; alert(t("proxyPools.assignFailed")); await load(); }
+    }));
+  };
+  page.querySelector("#proxy-pool-create").addEventListener("submit", async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    try { await api("/proxy-pools", {method: "POST", body: JSON.stringify({name: form.elements.name.value.trim(), proxy_url: form.elements.proxy_url.value.trim()})}); form.reset(); createMessage.textContent = t("proxyPools.created"); createMessage.className = "form-message ok"; await load(); }
+    catch (error) { if (error.message === "invalid_key") return logout(); createMessage.textContent = t("proxyPools.createFailed"); createMessage.className = "form-message failed"; }
+    finally { button.disabled = false; }
+  });
+  page.querySelector("#refresh").addEventListener("click", load);
+  await load();
+}
+
 function renderPage(name) {
   const page = document.getElementById("page");
   switch (name) {
@@ -1707,6 +1779,7 @@ function renderPage(name) {
     case "chat": renderBasicChat(page); break;
     case "endpoint": renderEndpoint(page); break;
     case "providers": renderProviders(page); break;
+    case "proxy-pools": renderProxyPools(page); break;
     case "combo": renderCombos(page); break;
     case "usage": renderUsage(page); break;
     case "quota": renderQuota(page); break;

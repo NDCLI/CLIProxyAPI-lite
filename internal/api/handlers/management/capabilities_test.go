@@ -42,6 +42,7 @@ func TestGetCapabilitiesContract(t *testing.T) {
 		"logs":            "ready",
 		"system_settings": "ready",
 		"system_info":     "ready",
+		"proxy_pools":     "partial",
 	}
 	if len(response.Capabilities) != len(wantStates) {
 		t.Fatalf("capabilities count = %d, want %d", len(response.Capabilities), len(wantStates))

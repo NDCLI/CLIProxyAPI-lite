@@ -34,6 +34,7 @@ func (h *Handler) GetCapabilities(c *gin.Context) {
 			{ID: "logs", State: "ready"},
 			{ID: "system_settings", State: "ready"},
 			{ID: "system_info", State: "ready"},
+			{ID: "proxy_pools", State: "partial", ReasonCode: "proxy_pool_advanced_features_partial"},
 		},
 	})
 }

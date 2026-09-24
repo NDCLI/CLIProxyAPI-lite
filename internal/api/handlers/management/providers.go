@@ -15,15 +15,16 @@ import (
 )
 
 type providerItem struct {
-	ID        string `json:"id"`
-	AuthIndex string `json:"auth_index"`
-	Label     string `json:"label"`
-	Provider  string `json:"provider"`
-	AuthType  string `json:"auth_type,omitempty"`
-	Enabled   bool   `json:"enabled"`
-	Status    string `json:"status"`
-	Success   int64  `json:"success"`
-	Failed    int64  `json:"failed"`
+	ID          string `json:"id"`
+	AuthIndex   string `json:"auth_index"`
+	Label       string `json:"label"`
+	Provider    string `json:"provider"`
+	AuthType    string `json:"auth_type,omitempty"`
+	Enabled     bool   `json:"enabled"`
+	Status      string `json:"status"`
+	Success     int64  `json:"success"`
+	Failed      int64  `json:"failed"`
+	ProxyPoolID string `json:"proxy_pool_id,omitempty"`
 }
 
 type providerModelItem struct {
@@ -49,15 +50,16 @@ func providerDisplayLabel(auth *coreauth.Auth) string {
 func providerItemFromAuth(auth *coreauth.Auth) providerItem {
 	enabled := auth != nil && !auth.Disabled && auth.Status != coreauth.StatusDisabled
 	item := providerItem{
-		ID:        strings.TrimSpace(auth.ID),
-		AuthIndex: auth.EnsureIndex(),
-		Label:     providerDisplayLabel(auth),
-		Provider:  strings.TrimSpace(auth.Provider),
-		AuthType:  auth.AuthKind(),
-		Enabled:   enabled,
-		Status:    string(auth.Status),
-		Success:   auth.Success,
-		Failed:    auth.Failed,
+		ID:          strings.TrimSpace(auth.ID),
+		AuthIndex:   auth.EnsureIndex(),
+		Label:       providerDisplayLabel(auth),
+		Provider:    strings.TrimSpace(auth.Provider),
+		AuthType:    auth.AuthKind(),
+		Enabled:     enabled,
+		Status:      string(auth.Status),
+		Success:     auth.Success,
+		Failed:      auth.Failed,
+		ProxyPoolID: proxyPoolIDForAuth(auth),
 	}
 	if item.Status == "" {
 		item.Status = string(coreauth.StatusUnknown)
@@ -118,15 +120,20 @@ func (h *Handler) GetProvider(c *gin.Context) {
 // PatchProvider changes the enabled state through the existing auth-file persistence path.
 func (h *Handler) PatchProvider(c *gin.Context) {
 	var body struct {
-		Enabled *bool `json:"enabled"`
+		Enabled     *bool   `json:"enabled"`
+		ProxyPoolID *string `json:"proxy_pool_id"`
 	}
-	if errBind := c.ShouldBindJSON(&body); errBind != nil || body.Enabled == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_body", "message": "enabled is required"}})
+	if errBind := c.ShouldBindJSON(&body); errBind != nil || (body.Enabled == nil && body.ProxyPoolID == nil) || (body.Enabled != nil && body.ProxyPoolID != nil) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_body", "message": "Provide one provider field to update"}})
 		return
 	}
 	auth, ok := h.findProvider(strings.TrimSpace(c.Param("id")))
 	if !ok {
 		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "provider_not_found", "message": "Provider not found"}})
+		return
+	}
+	if body.ProxyPoolID != nil {
+		h.assignProxyPool(c, auth, *body.ProxyPoolID)
 		return
 	}
 	legacyBody, errMarshal := json.Marshal(struct {
