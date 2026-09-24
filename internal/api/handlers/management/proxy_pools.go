@@ -21,12 +21,15 @@ import (
 )
 
 type proxyPoolRecord struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	ProxyURL  string    `json:"proxy_url"`
-	IsActive  bool      `json:"is_active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	ProxyURL      string     `json:"proxy_url"`
+	IsActive      bool       `json:"is_active"`
+	TestStatus    string     `json:"test_status,omitempty"`
+	TestLatencyMS int64      `json:"test_latency_ms,omitempty"`
+	LastTestedAt  *time.Time `json:"last_tested_at,omitempty"`
+	CreatedAt     time.Time  `json:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at"`
 }
 
 type proxyPoolStore struct {
@@ -82,6 +85,32 @@ func (s *proxyPoolStore) save(item proxyPoolRecord) error {
 	return s.persistLocked(items)
 }
 
+func (s *proxyPoolStore) recordTestResult(id, proxyURL, status string, latency int64, testedAt time.Time) (bool, bool, error) {
+	if s == nil || strings.TrimSpace(s.path) == "" {
+		return false, false, errors.New("proxy pool store unavailable")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items, errLoad := s.loadLocked()
+	if errLoad != nil {
+		return false, false, errLoad
+	}
+	for index := range items {
+		if items[index].ID != id {
+			continue
+		}
+		if items[index].ProxyURL != proxyURL {
+			return true, false, nil
+		}
+		items[index].TestStatus = status
+		items[index].TestLatencyMS = latency
+		items[index].LastTestedAt = &testedAt
+		items[index].UpdatedAt = testedAt
+		return true, true, s.persistLocked(items)
+	}
+	return false, false, nil
+}
+
 func (s *proxyPoolStore) delete(id string) error {
 	if s == nil || strings.TrimSpace(s.path) == "" {
 		return errors.New("proxy pool store unavailable")
@@ -113,14 +142,17 @@ func (s *proxyPoolStore) persistLocked(items []proxyPoolRecord) error {
 }
 
 type proxyPoolItem struct {
-	ID                 string    `json:"id"`
-	Name               string    `json:"name"`
-	ProxyURLMasked     string    `json:"proxy_url_masked"`
-	ProxyURLConfigured bool      `json:"proxy_url_configured"`
-	IsActive           bool      `json:"is_active"`
-	BoundCredentials   int       `json:"bound_credentials"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	ID                 string     `json:"id"`
+	Name               string     `json:"name"`
+	ProxyURLMasked     string     `json:"proxy_url_masked"`
+	ProxyURLConfigured bool       `json:"proxy_url_configured"`
+	IsActive           bool       `json:"is_active"`
+	BoundCredentials   int        `json:"bound_credentials"`
+	TestStatus         string     `json:"test_status"`
+	TestLatencyMS      int64      `json:"test_latency_ms,omitempty"`
+	LastTestedAt       *time.Time `json:"last_tested_at,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 }
 
 func maskProxyURL(raw string) string {
@@ -152,9 +184,14 @@ func (h *Handler) proxyPoolItems() ([]proxyPoolItem, error) {
 	}
 	result := make([]proxyPoolItem, 0, len(items))
 	for _, item := range items {
+		testStatus := item.TestStatus
+		if testStatus == "" {
+			testStatus = "unknown"
+		}
 		result = append(result, proxyPoolItem{
 			ID: item.ID, Name: item.Name, ProxyURLMasked: maskProxyURL(item.ProxyURL), ProxyURLConfigured: item.ProxyURL != "",
-			IsActive: item.IsActive, BoundCredentials: counts[item.ID], CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
+			IsActive: item.IsActive, BoundCredentials: counts[item.ID], TestStatus: testStatus, TestLatencyMS: item.TestLatencyMS,
+			LastTestedAt: item.LastTestedAt, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 		})
 	}
 	return result, nil
@@ -207,12 +244,79 @@ func (h *Handler) PostProxyPool(c *gin.Context) {
 		return
 	}
 	now := time.Now().UTC()
-	item := proxyPoolRecord{ID: id, Name: name, ProxyURL: proxyURL, IsActive: true, CreatedAt: now, UpdatedAt: now}
+	item := proxyPoolRecord{ID: id, Name: name, ProxyURL: proxyURL, IsActive: true, TestStatus: "unknown", CreatedAt: now, UpdatedAt: now}
 	if errSave := h.proxyPools.save(item); errSave != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "proxy_pool_create_failed", "message": "Could not save proxy pool"}})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"schema_version": 1, "item": proxyPoolItem{ID: item.ID, Name: item.Name, ProxyURLMasked: maskProxyURL(item.ProxyURL), ProxyURLConfigured: true, IsActive: true, CreatedAt: now, UpdatedAt: now}})
+	c.JSON(http.StatusCreated, gin.H{"schema_version": 1, "item": proxyPoolItem{ID: item.ID, Name: item.Name, ProxyURLMasked: maskProxyURL(item.ProxyURL), ProxyURLConfigured: true, IsActive: true, TestStatus: "unknown", CreatedAt: now, UpdatedAt: now}})
+}
+
+func probeProxyPool(ctx context.Context, proxyURL, targetURL string) (bool, int, int64, string) {
+	transport, mode, errTransport := proxyutil.BuildHTTPTransport(proxyURL)
+	if errTransport != nil || mode != proxyutil.ModeProxy || transport == nil {
+		return false, 0, 0, "invalid_proxy"
+	}
+	defer transport.CloseIdleConnections()
+
+	request, errRequest := http.NewRequestWithContext(ctx, http.MethodHead, targetURL, nil)
+	if errRequest != nil {
+		return false, 0, 0, "invalid_test_target"
+	}
+	started := time.Now()
+	response, errDo := (&http.Client{Transport: transport}).Do(request)
+	elapsed := time.Since(started).Milliseconds()
+	if errDo != nil {
+		return false, 0, elapsed, "proxy_unreachable"
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return false, response.StatusCode, elapsed, "test_target_rejected"
+	}
+	return true, response.StatusCode, elapsed, ""
+}
+
+// TestProxyPool checks the configured proxy against a fixed public HTTPS target without changing its active state.
+func (h *Handler) TestProxyPool(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	items, errList := h.proxyPools.list()
+	if errList != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "proxy_pool_read_failed", "message": "Could not read proxy pools"}})
+		return
+	}
+	var item proxyPoolRecord
+	found := false
+	for _, pool := range items {
+		if pool.ID == id {
+			item, found = pool, true
+			break
+		}
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "proxy_pool_not_found", "message": "Proxy pool not found"}})
+		return
+	}
+
+	testedAt := time.Now().UTC()
+	ok, status, elapsed, reason := probeProxyPool(c.Request.Context(), item.ProxyURL, "https://google.com/")
+	testStatus := "error"
+	if ok {
+		testStatus = "active"
+	}
+	found, unchanged, errSave := h.proxyPools.recordTestResult(id, item.ProxyURL, testStatus, elapsed, testedAt)
+	if errSave != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "proxy_pool_test_save_failed", "message": "Could not save proxy test result"}})
+		return
+	}
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "proxy_pool_not_found", "message": "Proxy pool not found"}})
+		return
+	}
+	if !unchanged {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "proxy_pool_changed_during_test", "message": "Proxy pool URL changed while its connection was being tested"}})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"schema_version": 1, "ok": ok, "status": status, "error_code": reason, "elapsed_ms": elapsed, "tested_at": testedAt})
 }
 
 func (h *Handler) PatchProxyPool(c *gin.Context) {

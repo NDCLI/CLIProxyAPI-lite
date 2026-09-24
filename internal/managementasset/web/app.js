@@ -339,6 +339,39 @@ function flashAction(button, label) {
   }, 2200);
 }
 
+function bindDirtyAction(root, button, readValue, canSubmit = () => true) {
+  let saved = JSON.stringify(readValue());
+  let sending = false;
+  const serialize = value => JSON.stringify(value);
+  const update = () => {
+    const dirty = serialize(readValue()) !== saved;
+    button.disabled = sending || !dirty || !canSubmit();
+    return dirty;
+  };
+  root.addEventListener("input", update);
+  root.addEventListener("change", update);
+  update();
+  return {
+    update,
+    isDirty: update,
+    begin() {
+      update();
+      if (button.disabled) return false;
+      sending = true;
+      update();
+      return true;
+    },
+    accept(value) {
+      saved = serialize(value === undefined ? readValue() : value);
+      update();
+    },
+    finish() {
+      sending = false;
+      update();
+    }
+  };
+}
+
 function endpointKeyTable(items) {
   if (!items.length) return `<div class="empty">${t("endpoint.empty")}</div>`;
   return `<div class="table-wrap"><table><thead><tr><th>${t("endpoint.key")}</th><th>${t("common.requests")}</th><th>${t("usage.failed")}</th><th>${t("endpoint.actions")}</th></tr></thead><tbody>${items.map(item => `<tr><td><strong>${escapeHTML(item.label)}</strong><br><code>${escapeHTML(item.mask)}</code></td><td>${Number(item.success || 0).toLocaleString()}</td><td>${Number(item.failed || 0).toLocaleString()}</td><td><div class="actions"><button class="secondary" data-copy-key="${escapeHTML(item.id)}">${icon("copy")}${t("endpoint.copy")}</button><button class="secondary" data-rotate-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("refresh")}${t("endpoint.rotate")}</button><button class="danger-button" data-delete-key="${escapeHTML(item.id)}" data-revision="${escapeHTML(item.revision)}">${icon("trash")}${t("endpoint.delete")}</button></div></td></tr>`).join("")}</tbody></table></div>`;
@@ -439,24 +472,106 @@ async function renderEndpoint(page, secret = "", feedback = "") {
   }
 }
 
+function compatibleProviderCard(item) {
+  return `<article class="card compatible-provider-card" data-custom-provider="${escapeHTML(item.id)}"><div class="card-title"><h3>${escapeHTML(item.name)}</h3><span class="badge ${item.enabled ? "ready" : "partial"}">${t(item.enabled ? "providers.active" : "providers.disabled")}</span></div><code class="compatible-base-url">${escapeHTML(item.base_url)}</code><div class="account-meta"><span>${Number(item.models?.length || 0)} ${t("providers.models")}</span><span>${Number(item.api_key_masks?.length || 0)} ${t("providers.apiKeys")}</span></div>${item.models?.length ? `<details><summary>${t("providers.modelList")}</summary><div class="model-list">${item.models.map(model => `<code>${escapeHTML(model.alias || model.name)}</code>`).join("")}</div></details>` : ""}<div class="actions"><button class="secondary" type="button" data-custom-edit="${escapeHTML(item.id)}">${icon("edit")}${t("providers.edit")}</button><button class="secondary" type="button" data-custom-enabled="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${t(item.enabled ? "providers.disable" : "providers.enable")}</button><button class="danger-button" type="button" data-custom-delete="${escapeHTML(item.id)}">${icon("trash")}${t("endpoint.delete")}</button></div></article>`;
+}
+
+function updateCompatibleProviderCard(card, item) {
+  if (!card) return;
+  card.querySelector(".card-title h3").textContent = item.name;
+  card.querySelector(".compatible-base-url").textContent = item.base_url;
+  const badge = card.querySelector(".card-title .badge");
+  badge.className = "badge " + (item.enabled ? "ready" : "partial");
+  badge.textContent = t(item.enabled ? "providers.active" : "providers.disabled");
+  const counts = card.querySelectorAll(".account-meta span");
+  counts[0].textContent = `${Number(item.models?.length || 0)} ${t("providers.models")}`;
+  counts[1].textContent = `${Number(item.api_key_masks?.length || 0)} ${t("providers.apiKeys")}`;
+  let details = card.querySelector("details");
+  if (!item.models?.length) { details?.remove(); return; }
+  if (!details) {
+    details = document.createElement("details");
+    const summary = document.createElement("summary");
+    const list = document.createElement("div");
+    list.className = "model-list";
+    details.append(summary, list);
+    card.querySelector(".actions").before(details);
+  }
+  details.querySelector("summary").textContent = t("providers.modelList");
+  const list = details.querySelector(".model-list");
+  list.replaceChildren(...item.models.map(model => {
+    const code = document.createElement("code");
+    code.textContent = model.alias || model.name;
+    return code;
+  }));
+}
+
 function compatibleProviderSection(items) {
-  const cards = items.map(item => `<article class="card compatible-provider-card"><div class="card-title"><h3>${escapeHTML(item.name)}</h3><span class="badge ${item.enabled ? "ready" : "partial"}">${t(item.enabled ? "providers.active" : "providers.disabled")}</span></div><code class="compatible-base-url">${escapeHTML(item.base_url)}</code><div class="account-meta"><span>${Number(item.models?.length || 0)} ${t("providers.models")}</span><span>${Number(item.api_key_masks?.length || 0)} ${t("providers.apiKeys")}</span></div>${item.models?.length ? `<details><summary>${t("providers.modelList")}</summary><div class="model-list">${item.models.map(model => `<code>${escapeHTML(model.alias || model.name)}</code>`).join("")}</div></details>` : ""}<div class="actions"><button class="secondary" type="button" data-custom-edit="${escapeHTML(item.id)}">${icon("edit")}${t("providers.edit")}</button><button class="secondary" type="button" data-custom-enabled="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${t(item.enabled ? "providers.disable" : "providers.enable")}</button><button class="danger-button" type="button" data-custom-delete="${escapeHTML(item.id)}">${icon("trash")}${t("endpoint.delete")}</button></div></article>`).join("");
-  return `<section class="compatible-provider-section"><div class="section-head"><div><h2>${t("providers.category.custom")}</h2><p class="hint">${t("providers.compatibleDescription")}</p></div><button class="primary compact" type="button" id="show-custom-provider">${icon("plus")}${t("providers.addCompatible")}</button></div><form id="custom-provider-form" class="card compatible-provider-form" hidden><input type="hidden" name="id"><div class="settings-grid"><label>${t("providers.compatibleName")}<input class="text-input" name="name" required></label><label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.example.com/v1" required></label></div><div class="settings-grid"><label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("providers.apiKeyOptional")}"></label><label>${t("providers.prefix")}<input class="text-input" name="prefix"></label></div><label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="4" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label><div class="actions"><button class="secondary" id="discover-provider-models" type="button">${icon("refresh")}${t("providers.discoverModels")}</button><button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button><button class="secondary" id="cancel-custom-provider" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>${items.length ? `<section class="grid compatible-provider-grid">${cards}</section>` : `<div class="empty compatible-empty">${t("providers.compatibleEmpty")}</div>`}</section>`;
+  const cards = items.map(compatibleProviderCard).join("");
+  return `<section class="compatible-provider-section"><div class="section-head"><div><h2>${t("providers.category.custom")}</h2><p class="hint">${t("providers.compatibleDescription")}</p></div><button class="primary compact" type="button" id="show-custom-provider">${icon("plus")}${t("providers.addCompatible")}</button></div><form id="custom-provider-form" class="card compatible-provider-form" hidden><input type="hidden" name="id"><input type="hidden" name="api_key_action"><input type="hidden" name="api_key_index"><div class="settings-grid"><label>${t("providers.compatibleName")}<input class="text-input" name="name" required></label><label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.example.com/v1" required></label></div><section id="compatible-key-editor" class="compatible-key-editor" hidden><strong>${t("providers.savedApiKeys")}</strong><div id="compatible-key-list" class="compatible-key-list"></div><div class="actions"><button class="secondary" id="add-provider-api-key" type="button">${icon("plus")}${t("providers.addApiKey")}</button><span class="hint">${t("providers.apiKeyEditHint")}</span></div></section><div class="settings-grid"><label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("providers.apiKeyOptional")}"></label><label>${t("providers.prefix")}<input class="text-input" name="prefix"></label></div><div class="actions"><button class="secondary" id="cancel-provider-key-edit" type="button" hidden>${icon("close")}${t("providers.cancelApiKeyEdit")}</button></div><label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="4" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label><div class="actions"><button class="secondary" id="discover-provider-models" type="button">${icon("refresh")}${t("providers.discoverModels")}</button><button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button><button class="secondary" id="cancel-custom-provider" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>${items.length ? `<section class="grid compatible-provider-grid">${cards}</section>` : `<div class="empty compatible-empty">${t("providers.compatibleEmpty")}</div>`}</section>`;
 }
 
 function bindCompatibleProviderControls(container, items, reload) {
   const section = container.querySelector(".compatible-provider-section");
   const form = section.querySelector("#custom-provider-form");
   const message = form.querySelector(".form-message");
+  const keyEditor = form.querySelector("#compatible-key-editor");
+  const keyList = form.querySelector("#compatible-key-list");
+  const apiKeyInput = form.elements.api_key;
+  let keyEditVersion = 0;
+  let providerFormVersion = 0;
+  form.addEventListener("input", () => { providerFormVersion++; });
+  form.addEventListener("change", () => { providerFormVersion++; });
+  const submitButton = form.querySelector('[type="submit"]');
+  const providerSnapshot = () => ({name: form.elements.name.value.trim(), base_url: form.elements.base_url.value.trim(), prefix: form.elements.prefix.value.trim(), models: form.elements.models.value, api_key_action: form.elements.api_key_action.value, api_key_index: form.elements.api_key_index.value, has_api_key: Boolean(apiKeyInput.value.trim())});
+  const providerChanges = bindDirtyAction(form, submitButton, providerSnapshot, () => form.checkValidity() && (!['append', 'replace'].includes(form.elements.api_key_action.value) || Boolean(apiKeyInput.value.trim())));
+  const resetKeyEdit = () => {
+    form.elements.api_key_action.value = "";
+    form.elements.api_key_index.value = "";
+    apiKeyInput.value = "";
+    apiKeyInput.disabled = Boolean(form.elements.id.value);
+    apiKeyInput.placeholder = form.elements.id.value ? t("providers.apiKeySelectPrompt") : t("providers.apiKeyOptional");
+    form.querySelector("#cancel-provider-key-edit").hidden = !form.elements.api_key_action.value;
+    keyList.querySelectorAll("[data-provider-api-key-action]").forEach(button => button.setAttribute("aria-pressed", "false"));
+    providerChanges.update();
+  };
+  const selectKeyAction = (action, index = "") => {
+    keyEditVersion++;
+    providerFormVersion++;
+    form.elements.api_key_action.value = action;
+    form.elements.api_key_index.value = index;
+    apiKeyInput.value = "";
+    apiKeyInput.disabled = action === "delete";
+    apiKeyInput.placeholder = action === "delete" ? t("providers.apiKeyDeletePrompt") : t("providers.apiKeyEnterReplacement");
+    form.querySelector("#cancel-provider-key-edit").hidden = false;
+    keyList.querySelectorAll("[data-provider-api-key-action]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.providerApiKeyAction === action && button.dataset.providerApiKeyIndex === String(index))));
+    const keyNumber = index === "" ? "" : String(Number(index) + 1);
+    message.textContent = action === "append" ? t("providers.apiKeyAppendPrompt") : (action === "delete" ? t("providers.apiKeyDeletePrompt") : t("providers.apiKeyReplacePrompt").replace("{index}", keyNumber));
+    message.className = "form-message";
+    providerChanges.update();
+  };
+  const renderKeyList = item => {
+    keyList.innerHTML = (item.api_key_masks || []).map((mask, index) => `<div class="compatible-key-row"><code>${escapeHTML(mask)}</code><div class="actions"><button class="secondary" type="button" data-provider-api-key-action="replace" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "replace" && form.elements.api_key_index.value === String(index)}">${icon("edit")}${t("providers.replaceApiKey")}</button><button class="danger-button" type="button" data-provider-api-key-action="delete" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "delete" && form.elements.api_key_index.value === String(index)}">${icon("trash")}${t("providers.deleteApiKey")}</button></div></div>`).join("") || `<p class="hint">${t("providers.noSavedApiKeys")}</p>`;
+  };
+  apiKeyInput.addEventListener("input", () => { keyEditVersion++; });
   section.querySelector("#show-custom-provider").addEventListener("click", () => {
     form.reset();
     form.elements.id.value = "";
     form.elements.name.disabled = false;
+    keyEditor.hidden = true;
+    keyList.innerHTML = "";
+    resetKeyEdit();
     delete form.dataset.initialBaseUrl;
     form.hidden = !form.hidden;
+    providerChanges.accept();
     if (!form.hidden) form.elements.name.focus();
   });
-  section.querySelector("#cancel-custom-provider").addEventListener("click", () => { form.reset(); form.hidden = true; message.textContent = ""; });
+  section.querySelector("#cancel-custom-provider").addEventListener("click", () => { form.reset(); form.hidden = true; message.textContent = ""; providerChanges.accept(); });
+  section.querySelector("#cancel-provider-key-edit").addEventListener("click", () => { keyEditVersion++; providerFormVersion++; resetKeyEdit(); message.textContent = ""; });
+  section.querySelector("#add-provider-api-key").addEventListener("click", () => selectKeyAction("append"));
+  keyList.addEventListener("click", event => {
+    const button = event.target.closest("[data-provider-api-key-action]");
+    if (button) selectKeyAction(button.dataset.providerApiKeyAction, button.dataset.providerApiKeyIndex);
+  });
   section.querySelector("#discover-provider-models").addEventListener("click", async event => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -474,9 +589,7 @@ function bindCompatibleProviderControls(container, items, reload) {
       message.className = "form-message failed";
     } finally { button.disabled = false; }
   });
-  section.querySelectorAll("[data-custom-edit]").forEach(button => button.addEventListener("click", () => {
-    const item = items.find(provider => provider.id === button.dataset.customEdit);
-    if (!item) return;
+  const openEdit = item => {
     form.reset();
     form.elements.id.value = item.id;
     form.elements.name.value = item.name;
@@ -484,31 +597,112 @@ function bindCompatibleProviderControls(container, items, reload) {
     form.elements.base_url.value = item.base_url;
     form.dataset.initialBaseUrl = item.base_url;
     form.elements.prefix.value = item.prefix || "";
-    form.elements.api_key.value = "";
+    keyEditor.hidden = false;
+    resetKeyEdit();
+    renderKeyList(item);
     form.elements.models.value = (item.models || []).map(model => `${model.name} | ${model.alias}`).join("\n");
     message.textContent = "";
+    providerChanges.accept();
     form.hidden = false;
     form.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
+  };
+  section.querySelectorAll("[data-custom-edit]").forEach(button => button.addEventListener("click", () => {
+    const item = items.find(provider => provider.id === button.dataset.customEdit);
+    if (item) openEdit(item);
   }));
   form.addEventListener("submit", async event => {
     event.preventDefault();
     const lines = form.elements.models.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     const models = lines.map(line => { const [name, alias] = line.split("|").map(value => value.trim()); return {name, alias: alias || name}; });
     const id = form.elements.id.value;
-    const body = {name: form.elements.name.value.trim(), prefix: form.elements.prefix.value.trim(), api_key: form.elements.api_key.value.trim(), models};
+    const apiKey = apiKeyInput.value.trim();
+    const apiKeyAction = form.elements.api_key_action.value;
+    const sentSnapshot = providerSnapshot();
+    const sentKeyVersion = keyEditVersion;
+    const sentFormVersion = providerFormVersion;
+    const sentBaseURL = form.elements.base_url.value.trim();
+    const body = {name: form.elements.name.value.trim(), prefix: form.elements.prefix.value.trim(), models};
+    if (!id && apiKey) body.api_key = apiKey;
+    if (id && apiKeyAction) {
+      if ((apiKeyAction === "replace" || apiKeyAction === "append") && !apiKey) {
+        message.textContent = t("providers.apiKeyRequired");
+        message.className = "form-message failed";
+        return;
+      }
+      if (apiKeyAction === "delete") {
+        const index = Number(form.elements.api_key_index.value);
+        const mask = items.find(provider => provider.id === id)?.api_key_masks?.[index] || "";
+        if (!confirm(t("providers.confirmDeleteApiKey").replace("{key}", mask))) return;
+      }
+      body.api_key_action = apiKeyAction;
+      if (apiKeyAction !== "delete") body.api_key = apiKey;
+      if (apiKeyAction !== "append") body.api_key_index = Number(form.elements.api_key_index.value);
+    }
     if (!id || form.elements.base_url.value.trim() !== form.dataset.initialBaseUrl) body.base_url = form.elements.base_url.value.trim();
-    const submit = form.querySelector("[type=submit]");
-    submit.disabled = true;
+    if (!providerChanges.begin()) return;
     message.textContent = t("providers.savingCompatible");
     try {
-      await api(id ? `/provider-configs/${encodeURIComponent(id)}` : "/provider-configs", {method: id ? "PATCH" : "POST", body: JSON.stringify(body)});
-      await reload();
+      const response = await api(id ? `/provider-configs/${encodeURIComponent(id)}` : "/provider-configs", {method: id ? "PATCH" : "POST", body: JSON.stringify(body)});
+      if (!id) {
+        const keepDraft = providerFormVersion !== sentFormVersion || keyEditVersion !== sentKeyVersion && apiKeyInput.value.trim() !== apiKey;
+        const draft = keepDraft ? {
+          name: form.elements.name.value,
+          base_url: form.elements.base_url.value,
+          prefix: form.elements.prefix.value,
+          models: form.elements.models.value,
+          api_key: keyEditVersion === sentKeyVersion ? "" : apiKeyInput.value
+        } : null;
+        await reload();
+        if (draft) {
+          page.querySelector("#show-custom-provider")?.click();
+          const draftForm = page.querySelector("#custom-provider-form");
+          if (draftForm) {
+            for (const [name, value] of Object.entries(draft)) {
+              const input = draftForm.elements[name];
+              if (!input) continue;
+              input.value = value;
+              input.dispatchEvent(new Event("input", {bubbles: true}));
+            }
+            const status = page.querySelector("#provider-action-status");
+            if (status) { status.textContent = t("providers.compatibleSaved"); status.className = "form-message ok"; }
+          }
+        }
+        return;
+      }
+      const saved = response.item;
+      if (!saved) { await reload(); return; }
+      const itemIndex = items.findIndex(provider => provider.id === id);
+      if (itemIndex >= 0) items[itemIndex] = saved;
+      updateCompatibleProviderCard(section.querySelector(`[data-custom-provider="${CSS.escape(id)}"]`), saved);
+      form.dataset.initialBaseUrl = sentBaseURL;
+      renderKeyList(saved);
+      if (keyEditVersion === sentKeyVersion) {
+        apiKeyInput.value = "";
+        form.elements.api_key_action.value = "";
+        form.elements.api_key_index.value = "";
+        apiKeyInput.disabled = true;
+        apiKeyInput.placeholder = t("providers.apiKeySelectPrompt");
+        form.querySelector("#cancel-provider-key-edit").hidden = true;
+      } else {
+        const currentAction = form.elements.api_key_action.value;
+        const currentIndex = Number(form.elements.api_key_index.value);
+        if (["replace", "delete"].includes(currentAction) && (!Number.isInteger(currentIndex) || currentIndex < 0 || currentIndex >= (saved.api_key_masks || []).length)) {
+          form.elements.api_key_action.value = "";
+          form.elements.api_key_index.value = "";
+          apiKeyInput.disabled = true;
+          apiKeyInput.placeholder = t("providers.apiKeySelectPrompt");
+          form.querySelector("#cancel-provider-key-edit").hidden = true;
+        }
+      }
+      renderKeyList(saved);
+      providerChanges.accept({...sentSnapshot, api_key_action: "", api_key_index: "", has_api_key: false});
+      message.textContent = t(providerChanges.isDirty() ? "providers.savedEditsPending" : "providers.compatibleSaved");
+      message.className = "form-message ok";
     } catch (error) {
       if (error.message === "invalid_key") return logout();
       message.textContent = t(error.code === "provider_exists" ? "providers.compatibleExists" : "providers.compatibleSaveFailed");
       message.className = "form-message failed";
-      submit.disabled = false;
-    }
+    } finally { providerChanges.finish(); }
   });
   section.querySelectorAll("[data-custom-enabled]").forEach(button => button.addEventListener("click", async () => {
     const enabled = button.dataset.enabled !== "true";
@@ -540,6 +734,12 @@ const freeTierProviderIDs = new Set(["gemini-cli", "gemini-cli-oauth", "gemini",
 function providerKey(value) {
   const key = String(value || "").trim().toLowerCase();
   return ({"anthropic": "claude", "gemini-cli-oauth": "gemini-cli"})[key] || key;
+}
+
+function compatibleProviderKey(value) {
+  const key = String(value || "").trim().toLowerCase();
+  if (!key || key === "openai-compatibility" || key.startsWith("openai-compatible-")) return key || "openai-compatibility";
+  return "openai-compatible-" + key;
 }
 
 function providerCategory(item) {
@@ -579,8 +779,9 @@ function providerCatalogCard(item) {
 function providerCategorySection(category, items) {
   const cards = items.map(providerCatalogCard).join("");
   const title = t("providers.category." + category);
+  const description = category === "apikey" ? '<p class="hint">' + t("providers.officialApiKeyDescription") + '</p>' : "";
   const body = cards ? '<div class="grid provider-catalog-grid">' + cards + '</div>' : '<div class="empty provider-category-empty">' + t("providers.categoryEmpty") + '</div>';
-  return '<section class="provider-category"><div class="section-head"><h2>' + title + '</h2><span class="badge">' + items.length + '</span></div>' + body + '</section>';
+  return '<section class="provider-category"><div class="section-head"><div><h2>' + title + '</h2>' + description + '</div><span class="badge">' + items.length + '</span></div>' + body + '</section>';
 }
 
 function providerAccountRow(account, authFiles) {
@@ -732,11 +933,13 @@ async function renderProviders(page) {
       await renderProviderDetail(page, detailID, accounts, authFiles, reload);
       return;
     }
-    const catalog = buildProviderCatalog(accounts);
-    const active = accounts.filter(account => account.enabled && account.status === "active").length;
+    const customProviderKeys = new Set(customProviders.map(item => compatibleProviderKey(item.name)));
+    const officialAccounts = accounts.filter(account => !customProviderKeys.has(providerKey(account.provider)));
+    const catalog = buildProviderCatalog(officialAccounts);
+    const active = officialAccounts.filter(account => account.enabled && account.status === "active").length;
     const groups = ["oauth", "free", "apikey"].map(category => providerCategorySection(category, catalog.filter(item => item.category === category))).join("");
     const container = page.querySelector("#providers");
-    container.innerHTML = '<div class="provider-catalog-toolbar"><div class="provider-summary"><span><strong>' + (catalog.length + customProviders.length) + '</strong> ' + t("providers.type") + '</span><span><strong>' + accounts.length + '</strong> ' + t("providers.accounts") + '</span><span class="ok"><strong>' + active + '</strong> ' + t("providers.active") + '</span></div>' +
+    container.innerHTML = '<div class="provider-catalog-toolbar"><div class="provider-summary"><span><strong>' + (catalog.length + customProviders.length) + '</strong> ' + t("providers.type") + '</span><span><strong>' + officialAccounts.length + '</strong> ' + t("providers.accounts") + '</span><span class="ok"><strong>' + active + '</strong> ' + t("providers.active") + '</span></div>' +
       '<div class="provider-import"><input id="provider-upload-input" type="file" accept=".json,application/json" multiple hidden><button class="primary compact" type="button" id="provider-import">' + icon("plus") + t("authFiles.upload") + '</button></div></div>' +
       '<div class="form-message" id="provider-action-status" role="status" aria-live="polite"></div><div id="provider-custom"></div><div class="provider-categories">' + groups + '</div>';
     container.querySelector("#provider-custom").innerHTML = compatibleProviderSection(customProviders);
@@ -860,7 +1063,7 @@ async function renderCombos(page, feedback = "") {
   const targetRowHTML = target => {
     const provider = String(target?.provider || "").trim().toLowerCase();
     const model = String(target?.model || "").trim();
-    return `<div class="combo-target-row"><select class="text-input" data-target-provider aria-label="${t("combo.selectProvider")}">${providerOptions(provider)}</select><span class="combo-target-arrow">${icon("arrow")}</span><select class="text-input" data-target-model aria-label="${t("combo.selectModel")}">${modelOptions(provider, model)}</select><button class="secondary combo-remove-target" type="button" data-remove-target aria-label="${t("combo.removeTarget")}" title="${t("combo.removeTarget")}">${icon("close")}</button></div>`;
+    return `<div class="combo-target-row"><select class="text-input" data-target-provider aria-label="${t("combo.selectProvider")}" required>${providerOptions(provider)}</select><span class="combo-target-arrow">${icon("arrow")}</span><select class="text-input" data-target-model aria-label="${t("combo.selectModel")}" required>${modelOptions(provider, model)}</select><button class="secondary combo-remove-target" type="button" data-remove-target aria-label="${t("combo.removeTarget")}" title="${t("combo.removeTarget")}">${icon("close")}</button></div>`;
   };
   const values = (form, message) => {
     const name = form.elements.name.value.trim();
@@ -905,6 +1108,11 @@ async function renderCombos(page, feedback = "") {
     const message = page.querySelector("#combo-message");
     const targetList = page.querySelector("#combo-target-list");
     targetList.innerHTML = (item?.targets?.length ? item.targets : [{}]).map(targetRowHTML).join("");
+    const submit = form.querySelector('[type="submit"]');
+    const comboSnapshot = () => ({name: form.elements.name.value.trim(), model: form.elements.model.value.trim() || comboModelID(form.elements.name.value), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: [...form.querySelectorAll(".combo-target-row")].map(row => [row.querySelector("[data-target-provider]").value, row.querySelector("[data-target-model]").value])});
+    const comboChanges = bindDirtyAction(form, submit, comboSnapshot, () => form.checkValidity() && form.querySelectorAll(".combo-target-row").length > 0);
+    form.dataset.dirty = "false";
+    const syncDirty = () => { form.dataset.dirty = String(comboChanges.isDirty()); };
     if (catalogError) message.textContent = catalogError;
     targetList.addEventListener("change", event => {
       if (!event.target.matches("[data-target-provider]")) return;
@@ -912,21 +1120,21 @@ async function renderCombos(page, feedback = "") {
       const available = modelCatalog?.models.get(event.target.value) || new Map();
       const firstModel = available.keys().next().value || "";
       row.querySelector("[data-target-model]").innerHTML = modelOptions(event.target.value, firstModel);
-      form.dataset.dirty = "true";
+      syncDirty();
       message.textContent = "";
     });
     targetList.addEventListener("click", event => {
       const remove = event.target.closest("[data-remove-target]");
       if (!remove) return;
       remove.closest(".combo-target-row").remove();
-      form.dataset.dirty = "true";
+      syncDirty();
       message.textContent = "";
     });
     form.querySelector("#add-combo-target").addEventListener("click", () => {
       targetList.insertAdjacentHTML("beforeend", targetRowHTML({}));
       const rows = targetList.querySelectorAll(".combo-target-row");
       rows[rows.length - 1].querySelector("[data-target-provider]").focus();
-      form.dataset.dirty = "true";
+      syncDirty();
       message.textContent = "";
     });
     const validate = async value => {
@@ -944,28 +1152,32 @@ async function renderCombos(page, feedback = "") {
       catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t(error.code === "invalid_combo" ? "combo.invalid" : "combo.checkFailed"); }
       finally { validateButton.disabled = false; }
     });
-    form.addEventListener("input", () => { form.dataset.dirty = "true"; message.textContent = ""; });
+    form.addEventListener("input", () => { syncDirty(); message.textContent = ""; });
     form.elements.name.addEventListener("input", () => {
       const model = form.elements.model.value.trim() || comboModelID(form.elements.name.value) || "my-combo";
       form.querySelector("#combo-model-preview").textContent = t("combo.modelPreview").replace("{model}", model);
     });
-    form.addEventListener("change", () => { form.dataset.dirty = "true"; message.textContent = ""; });
+    form.addEventListener("change", () => { syncDirty(); message.textContent = ""; });
     form.addEventListener("submit", async event => {
       event.preventDefault();
       const value = values(form, message);
       if (!value) return;
-      const submit = form.querySelector('[type="submit"]');
-      submit.disabled = true;
+      if (!comboChanges.begin()) return;
       try {
         if (!await validate(value)) return;
-        if (value.id) await api(`/combos/${encodeURIComponent(value.id)}`, {method: "PATCH", body: JSON.stringify(value)});
-        else await api("/combos", {method: "POST", body: JSON.stringify(value)});
+        const saved = value.id
+          ? await api(`/combos/${encodeURIComponent(value.id)}`, {method: "PATCH", body: JSON.stringify(value)})
+          : await api("/combos", {method: "POST", body: JSON.stringify(value)});
+        if (!value.id && saved.item?.id) form.elements.id.value = saved.item.id;
+        comboChanges.accept({name: value.name, model: value.model, enabled: value.enabled, vision: value.vision, targets: value.targets.map(target => [target.provider, target.model])});
+        syncDirty();
+        if (comboChanges.isDirty()) { message.textContent = t("combo.savedEditsPending"); message.className = "form-message ok"; return; }
         dialog.close();
         await renderCombos(page, t("combo.savedMessage"));
       } catch (error) {
         if (error.message === "invalid_key") return logout();
         message.textContent = t(error.code === "combo_not_found" ? "combo.notFound" : "combo.saveFailed");
-      } finally { submit.disabled = false; }
+      } finally { comboChanges.finish(); }
     });
   };
   const closeDialog = () => {
@@ -1502,41 +1714,50 @@ async function renderSettings(page) {
     page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="settings-layout"><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("server")}</span><div><h2>${t("settings.connection")}</h2><p>${t("settings.connectionDescription")}</p></div></div><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("route")}</span><div><h2>${t("settings.routing")}</h2><p>${t("settings.routingDescription")}</p></div></div><label>${t("settings.routingStrategy")}<select class="text-input" name="routing_strategy"><option value="round-robin" ${settings.routing_strategy === "round-robin" ? "selected" : ""}>${t("settings.roundRobin")}</option><option value="weighted-round-robin" ${settings.routing_strategy === "weighted-round-robin" ? "selected" : ""}>${t("settings.weightedRoundRobin")}</option><option value="fill-first" ${settings.routing_strategy === "fill-first" ? "selected" : ""}>${t("settings.fillFirst")}</option></select></label><div class="settings-grid"><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" required value="${Number(settings.request_retry || 0)}"></label><label>${t("settings.maxRetryCredentials")}<input class="text-input" type="number" name="max_retry_credentials" min="0" required value="${Number(settings.max_retry_credentials || 0)}"></label><label>${t("settings.maxRetryInterval")}<input class="text-input" type="number" name="max_retry_interval" min="0" required value="${Number(settings.max_retry_interval || 0)}"></label></div><label class="settings-toggle"><input type="checkbox" name="force_model_prefix" ${settings.force_model_prefix ? "checked" : ""}> <span><strong>${t("settings.forceModelPrefix")}</strong><small>${t("settings.forceModelPrefixDescription")}</small></span></label></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("settings")}</span><div><h2>${t("settings.behavior")}</h2><p>${t("settings.behaviorDescription")}</p></div></div><div class="settings-toggles"><label class="settings-toggle"><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> <span><strong>${t("settings.logging")}</strong><small>${t("settings.loggingDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="request_log" ${settings.request_log ? "checked" : ""}> <span><strong>${t("settings.requestLog")}</strong><small>${t("settings.requestLogDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> <span><strong>${t("settings.usage")}</strong><small>${t("settings.usageDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="websocket_auth" ${settings.websocket_auth ? "checked" : ""}> <span><strong>${t("settings.websocketAuth")}</strong><small>${t("settings.websocketAuthDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="debug" ${settings.debug ? "checked" : ""}> <span><strong>${t("settings.debug")}</strong><small>${t("settings.debugDescription")}</small></span></label></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("terminal")}</span><div><h2>${t("settings.logRetention")}</h2><p>${t("settings.logRetentionDescription")}</p></div></div><div class="settings-grid"><label>${t("settings.maxLogSize")}<input class="text-input" type="number" name="logs_max_total_size_mb" min="0" required value="${Number(settings.logs_max_total_size_mb || 0)}"></label><label>${t("settings.maxErrorLogs")}<input class="text-input" type="number" name="error_logs_max_files" min="0" required value="${Number(settings.error_logs_max_files || 0)}"></label></div></section><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="settings-message" role="status" aria-live="polite"></span></div></form><section class="card settings-section settings-proxy"><div class="tool-title"><span class="feature-icon">${icon("globe")}</span><div><h2>${t("settings.proxy")}</h2><p>${t("settings.proxyDescription")}</p></div><span class="badge ${settings.proxy_url_configured ? "ready" : "partial"}" id="proxy-status">${t(settings.proxy_url_configured ? "settings.proxyConfigured" : "settings.proxyNotConfigured")}</span></div><form id="proxy-form"><label>${t("settings.proxyUrl")}<input class="text-input" name="proxy_url" type="password" autocomplete="new-password" placeholder="${t(settings.proxy_url_configured ? "settings.proxyReplacePlaceholder" : "settings.proxyPlaceholder")}"></label><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.proxySave")}</button><button class="danger-button" type="button" id="proxy-clear" ${settings.proxy_url_configured ? "" : "disabled"}>${icon("trash")}${t("settings.proxyClear")}</button><span class="form-message" id="proxy-message" role="status" aria-live="polite"></span></div><span class="hint">${t("settings.proxySecretHint")}</span></form></section>`;
     const load = () => renderSettings(page);
     document.getElementById("refresh").addEventListener("click", load);
-    document.getElementById("settings-form").addEventListener("input", () => { document.getElementById("settings-message").textContent = ""; });
-    document.getElementById("settings-form").addEventListener("submit", async event => {
+    const settingsForm = page.querySelector("#settings-form");
+    const settingsMessage = page.querySelector("#settings-message");
+    const settingsButton = settingsForm.querySelector('[type="submit"]');
+    const settingsPayload = () => ({debug: settingsForm.elements.debug.checked, logging_to_file: settingsForm.elements.logging_to_file.checked, request_log: settingsForm.elements.request_log.checked, websocket_auth: settingsForm.elements.websocket_auth.checked, usage_statistics_enabled: settingsForm.elements.usage_statistics_enabled.checked, force_model_prefix: settingsForm.elements.force_model_prefix.checked, routing_strategy: settingsForm.elements.routing_strategy.value, request_retry: Number(settingsForm.elements.request_retry.value), max_retry_credentials: Number(settingsForm.elements.max_retry_credentials.value), max_retry_interval: Number(settingsForm.elements.max_retry_interval.value), logs_max_total_size_mb: Number(settingsForm.elements.logs_max_total_size_mb.value), error_logs_max_files: Number(settingsForm.elements.error_logs_max_files.value)});
+    const settingsChanges = bindDirtyAction(settingsForm, settingsButton, settingsPayload, () => settingsForm.checkValidity());
+    settingsForm.addEventListener("input", () => { settingsMessage.textContent = ""; settingsMessage.className = "form-message"; });
+    settingsForm.addEventListener("change", () => { settingsMessage.textContent = ""; settingsMessage.className = "form-message"; });
+    settingsForm.addEventListener("submit", async event => {
       event.preventDefault();
       const form = event.currentTarget;
-      const message = document.getElementById("settings-message");
-      const button = form.querySelector('[type="submit"]');
-      button.disabled = true;
+      const message = settingsMessage;
+      if (!settingsChanges.begin()) return;
       message.textContent = t("settings.saving");
       try {
-        const body = {debug: form.elements.debug.checked, logging_to_file: form.elements.logging_to_file.checked, request_log: form.elements.request_log.checked, websocket_auth: form.elements.websocket_auth.checked, usage_statistics_enabled: form.elements.usage_statistics_enabled.checked, force_model_prefix: form.elements.force_model_prefix.checked, routing_strategy: form.elements.routing_strategy.value, request_retry: Number(form.elements.request_retry.value), max_retry_credentials: Number(form.elements.max_retry_credentials.value), max_retry_interval: Number(form.elements.max_retry_interval.value), logs_max_total_size_mb: Number(form.elements.logs_max_total_size_mb.value), error_logs_max_files: Number(form.elements.error_logs_max_files.value)};
+        const body = settingsPayload();
         await api("/system-settings", {method: "PATCH", body: JSON.stringify(body)});
+        settingsChanges.accept(body);
         message.textContent = t("settings.saved");
         message.className = "form-message ok";
       } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("common.error"); message.className = "form-message failed"; }
-      finally { button.disabled = false; }
+      finally { settingsChanges.finish(); }
     });
     const proxyForm = page.querySelector("#proxy-form");
     const proxyMessage = page.querySelector("#proxy-message");
+    const proxyButton = proxyForm.querySelector('[type="submit"]');
+    const proxyChanges = bindDirtyAction(proxyForm, proxyButton, () => Boolean(proxyForm.elements.proxy_url.value.trim()), () => Boolean(proxyForm.elements.proxy_url.value.trim()));
+    proxyForm.addEventListener("input", () => { proxyMessage.textContent = ""; proxyMessage.className = "form-message"; });
     proxyForm.addEventListener("submit", async event => {
       event.preventDefault();
       const input = proxyForm.elements.proxy_url;
-      if (!input.value.trim()) { proxyMessage.textContent = t("settings.proxyRequired"); proxyMessage.className = "form-message failed"; return; }
-      const button = proxyForm.querySelector('[type="submit"]');
-      button.disabled = true;
+      if (!proxyChanges.begin()) return;
+      const submittedProxyURL = input.value.trim();
       proxyMessage.textContent = t("settings.saving");
       try {
-        await api("/proxy-url", {method: "PUT", body: JSON.stringify({value: input.value.trim()})});
-        input.value = "";
+        await api("/proxy-url", {method: "PUT", body: JSON.stringify({value: submittedProxyURL})});
+        if (input.value.trim() === submittedProxyURL) input.value = "";
+        proxyChanges.accept(false);
         page.querySelector("#proxy-status").className = "badge ready";
         page.querySelector("#proxy-status").textContent = t("settings.proxyConfigured");
         page.querySelector("#proxy-clear").disabled = false;
         proxyMessage.textContent = t("settings.proxySaved");
         proxyMessage.className = "form-message ok";
       } catch (error) { if (error.message === "invalid_key") return logout(); proxyMessage.textContent = t("common.error"); proxyMessage.className = "form-message failed"; }
-      finally { button.disabled = false; }
+      finally { proxyChanges.finish(); }
     });
     page.querySelector("#proxy-clear").addEventListener("click", async event => {
       if (!confirm(t("settings.proxyConfirmClear"))) return;
@@ -1613,25 +1834,44 @@ async function renderPlugins(page) {
       const form = `<form class="card plugin-config-form" data-plugin-config-form="${escapeHTML(id)}"><div class="section-head"><h2>${t("plugins.configuration")}: ${escapeHTML(id)}</h2><button class="secondary" type="button" data-plugin-close>${icon("close")}${t("action.close")}</button></div>${fields.length ? fields.map(field => fieldHTML(field, config)).join("") : `<p class="hint">${t("plugins.noConfigFields")}</p>`}<div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>`;
       panel.innerHTML = form;
       panel.querySelector("[data-plugin-close]").addEventListener("click", () => { panel.innerHTML = ""; });
-      panel.querySelector("form").addEventListener("submit", async event => {
+      const configForm = panel.querySelector("form");
+      const submit = configForm.querySelector('[type="submit"]');
+      const configSnapshot = () => [...configForm.querySelectorAll("[data-plugin-field]")].map(input => {
+        if (input.dataset.pluginType === "boolean") return [input.dataset.pluginField, input.checked];
+        if (input.dataset.pluginType === "password") return [input.dataset.pluginField, Boolean(input.value)];
+        if (input.dataset.pluginType === "number" && input.value.trim()) return [input.dataset.pluginField, Number(input.value)];
+        return [input.dataset.pluginField, input.value];
+      });
+      const configChanges = bindDirtyAction(configForm, submit, configSnapshot, () => configForm.checkValidity());
+      configForm.addEventListener("submit", async event => {
         event.preventDefault();
         const currentForm = event.currentTarget;
         const message = currentForm.querySelector(".form-message");
-        const changes = {};
+        if (!configChanges.begin()) return;
+        const acceptedSnapshot = configSnapshot().map(([name, value]) => {
+          const field = currentForm.querySelector(`[data-plugin-field="${CSS.escape(name)}"]`);
+          return [name, field?.dataset.pluginType === "password" ? false : value];
+        });
+        const update = {};
         currentForm.querySelectorAll("[data-plugin-field]").forEach(input => {
           const name = input.dataset.pluginField;
           const type = input.dataset.pluginType;
-          if (type === "boolean") { changes[name] = input.checked; return; }
+          if (type === "boolean") { update[name] = input.checked; return; }
           if (type === "password" && !input.value) return;
-          if (type === "number" && input.value.trim()) changes[name] = Number(input.value);
-          else if (input.value !== "") changes[name] = input.value;
+          if (type === "number" && input.value.trim()) update[name] = Number(input.value);
+          else if (input.value !== "") update[name] = input.value;
         });
-        const submit = currentForm.querySelector("[type=submit]");
-        submit.disabled = true;
         message.textContent = t("plugins.saving");
-        try { await api(`/plugins/${encodeURIComponent(id)}/config`, {method: "PATCH", body: JSON.stringify(changes)}); message.textContent = t("plugins.saved"); message.className = "form-message ok"; }
+        try {
+          await api(`/plugins/${encodeURIComponent(id)}/config`, {method: "PATCH", body: JSON.stringify(update)});
+          currentForm.querySelectorAll('input[type="password"]').forEach(input => {
+            if (Object.hasOwn(update, input.dataset.pluginField) && input.value === update[input.dataset.pluginField]) input.value = "";
+          });
+          configChanges.accept(acceptedSnapshot);
+          message.textContent = t("plugins.saved"); message.className = "form-message ok";
+        }
         catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("plugins.saveFailed"); message.className = "form-message failed"; }
-        finally { submit.disabled = false; }
+        finally { configChanges.finish(); }
       });
       panel.scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "nearest"});
     } catch (error) { if (error.message === "invalid_key") return logout(); panel.innerHTML = `<div class="error">${t("plugins.configFailed")}</div>`; }
@@ -1688,12 +1928,13 @@ function renderSkills(page) {
   const instructions = t("skills.instructions").replaceAll("{baseURL}", baseURL);
   page.innerHTML = pageHeader("kicker.management", "skills.title", "skills.description") + `<section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("command")}</span><div><h2>${t("skills.gatewayTitle")}</h2><p>${t("skills.gatewayDescription")}</p></div></div><textarea class="text-input" id="skills-instructions" rows="12" readonly spellcheck="false">${escapeHTML(instructions)}</textarea><div class="actions"><button class="primary compact" id="copy-skills">${icon("copy")}${t("skills.copy")}</button><span class="form-message" id="skills-feedback" role="status" aria-live="polite"></span></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("route")}</span><div><h2>${t("skills.supportedTitle")}</h2><p>${t("skills.supportedDescription")}</p></div></div><div class="settings-grid"><label>${t("skills.modelsEndpoint")}<input class="text-input" readonly value="${escapeHTML(baseURL)}/models"></label><label>${t("skills.chatEndpoint")}<input class="text-input" readonly value="${escapeHTML(baseURL)}/chat/completions"></label></div></section>`;
   page.querySelector("#copy-skills").addEventListener("click", async event => {
+    const button = event.currentTarget;
     const feedback = page.querySelector("#skills-feedback");
     try {
       await copyText(instructions);
       feedback.textContent = t("skills.copied");
       feedback.className = "form-message ok";
-      flashAction(event.currentTarget, t("skills.copied"));
+      flashAction(button, t("skills.copied"));
     } catch {
       feedback.textContent = t("common.copyFailed");
       feedback.className = "form-message failed";
@@ -1717,9 +1958,9 @@ async function renderProxyPools(page) {
       const providers = providerResponse.items || [];
       if (!poolList.isConnected) return;
       poolList.className = "settings-layout";
-      poolList.innerHTML = pools.length ? pools.map(pool => `<section class="card settings-section" data-proxy-pool="${escapeHTML(pool.id)}"><div class="tool-title"><div><h2>${escapeHTML(pool.name)}</h2><p>${escapeHTML(pool.proxy_url_masked || t("proxyPools.urlHidden"))}</p></div><span class="badge ${pool.is_active ? "ready" : "partial"}">${t(pool.is_active ? "proxyPools.active" : "proxyPools.inactive")}</span></div><div class="settings-grid"><label>${t("proxyPools.name")}<input class="text-input" data-pool-name value="${escapeHTML(pool.name)}" maxlength="80"></label><label>${t("proxyPools.replaceURL")}<input class="text-input" data-pool-url type="password" autocomplete="new-password" placeholder="${t("proxyPools.keepURL")}"></label></div><div class="actions"><button class="primary compact" type="button" data-save-pool>${icon("save")}${t("proxyPools.save")}</button><button class="secondary compact" type="button" data-toggle-pool>${t(pool.is_active ? "proxyPools.disable" : "proxyPools.enable")}</button><button class="danger-button" type="button" data-delete-pool>${icon("trash")}${t("proxyPools.delete")}</button><span class="form-message" data-pool-message role="status" aria-live="polite"></span></div><p class="hint">${t("proxyPools.boundCount").replace("{count}", String(pool.bound_credentials || 0))}</p></section>`).join("") : `<div class="empty">${t("proxyPools.empty")}</div>`;
+      poolList.innerHTML = pools.length ? pools.map(pool => { const testState = pool.test_status === "active" ? "ready" : pool.test_status === "error" ? "failed" : "muted"; const testLabel = pool.test_status === "active" ? "proxyPools.testActive" : pool.test_status === "error" ? "proxyPools.testError" : "proxyPools.testUnknown"; return `<section class="card settings-section" data-proxy-pool="${escapeHTML(pool.id)}"><div class="tool-title"><div><h2>${escapeHTML(pool.name)}</h2><p>${escapeHTML(pool.proxy_url_masked || t("proxyPools.urlHidden"))}</p></div><div class="actions"><span class="badge ${pool.is_active ? "ready" : "partial"}">${t(pool.is_active ? "proxyPools.active" : "proxyPools.inactive")}</span><span class="badge ${testState}" data-pool-test-status>${t(testLabel)}${pool.test_latency_ms ? ` · ${Number(pool.test_latency_ms).toLocaleString(state.locale)} ms` : ""}</span></div></div><div class="settings-grid"><label>${t("proxyPools.name")}<input class="text-input" data-pool-name value="${escapeHTML(pool.name)}" maxlength="80"></label><label>${t("proxyPools.replaceURL")}<input class="text-input" data-pool-url type="password" autocomplete="new-password" placeholder="${t("proxyPools.keepURL")}"></label></div><div class="actions"><button class="primary compact" type="button" data-save-pool>${icon("save")}${t("proxyPools.save")}</button><button class="secondary compact" type="button" data-test-pool>${icon("check")}${t("proxyPools.test")}</button><button class="secondary compact" type="button" data-toggle-pool>${t(pool.is_active ? "proxyPools.disable" : "proxyPools.enable")}</button><button class="danger-button" type="button" data-delete-pool>${icon("trash")}${t("proxyPools.delete")}</button><span class="form-message" data-pool-message role="status" aria-live="polite"></span></div><p class="hint">${t("proxyPools.boundCount").replace("{count}", String(pool.bound_credentials || 0))}</p></section>`; }).join("") : `<div class="empty">${t("proxyPools.empty")}</div>`;
       assignments.className = "provider-connections";
-      assignments.innerHTML = providers.length ? providers.map(provider => `<label class="account-row"><span class="account-main"><strong>${escapeHTML(provider.label || provider.id)}</strong><small>${escapeHTML(provider.provider)}</small></span><select class="text-input" data-provider-pool="${escapeHTML(provider.id)}"><option value="">${t("proxyPools.noPool")}</option>${pools.map(pool => `<option value="${escapeHTML(pool.id)}" ${provider.proxy_pool_id === pool.id ? "selected" : ""}>${escapeHTML(pool.name)}${pool.is_active ? "" : ` · ${t("proxyPools.inactive")}`}</option>`).join("")}</select></label>`).join("") : `<div class="empty">${t("proxyPools.noProviders")}</div>`;
+      assignments.innerHTML = providers.length ? providers.map(provider => `<label class="account-row"><span class="account-main"><strong>${escapeHTML(provider.label || provider.id)}</strong><small>${escapeHTML(provider.provider)}</small></span><div class="proxy-pool-assignment"><select class="text-input" data-provider-pool="${escapeHTML(provider.id)}" data-current-pool="${escapeHTML(provider.proxy_pool_id || "")}"><option value="">${t("proxyPools.noPool")}</option>${pools.map(pool => `<option value="${escapeHTML(pool.id)}" ${provider.proxy_pool_id === pool.id ? "selected" : ""}>${escapeHTML(pool.name)}${pool.is_active ? "" : ` · ${t("proxyPools.inactive")}`}</option>`).join("")}</select><span class="form-message" data-assignment-message role="status" aria-live="polite"></span></div></label>`).join("") : `<div class="empty">${t("proxyPools.noProviders")}</div>`;
       bindPoolControls(pools);
     } catch (error) {
       if (error.message === "invalid_key") return logout();
@@ -1730,45 +1971,120 @@ async function renderProxyPools(page) {
     }
   };
   const bindPoolControls = pools => {
-    poolList.querySelectorAll("[data-save-pool]").forEach(button => button.addEventListener("click", async () => {
+    const hasUnsavedPoolEdits = () => [...poolList.querySelectorAll("[data-proxy-pool]")].some(card => card._poolChanges?.isDirty());
+    poolList.querySelectorAll("[data-save-pool]").forEach(button => {
       const card = button.closest("[data-proxy-pool]");
       const message = card.querySelector("[data-pool-message]");
-      const body = {name: card.querySelector("[data-pool-name]").value.trim()};
-      const proxyURL = card.querySelector("[data-pool-url]").value.trim();
-      if (proxyURL) body.proxy_url = proxyURL;
+      const nameInput = card.querySelector("[data-pool-name]");
+      const urlInput = card.querySelector("[data-pool-url]");
+      const poolChanges = bindDirtyAction(card, button, () => ({name: nameInput.value.trim(), has_proxy_url: Boolean(urlInput.value.trim())}), () => Boolean(nameInput.value.trim()));
+      card._poolChanges = poolChanges;
+      button.addEventListener("click", async () => {
+        if (!poolChanges.begin()) return;
+        const body = {name: nameInput.value.trim()};
+        const pool = pools.find(item => item.id === card.dataset.proxyPool);
+        const proxyURL = urlInput.value.trim();
+        if (proxyURL) body.proxy_url = proxyURL;
+        message.textContent = t("proxyPools.saving"); message.className = "form-message";
+        try {
+          const response = await api(`/proxy-pools/${encodeURIComponent(card.dataset.proxyPool)}`, {method: "PATCH", body: JSON.stringify(body)});
+          const saved = response.item || {name: body.name, proxy_url_masked: card.querySelector(".tool-title p")?.textContent || ""};
+          if (pool) Object.assign(pool, saved);
+          card.querySelector(".tool-title h2").textContent = saved.name;
+          card.querySelector(".tool-title p").textContent = saved.proxy_url_masked || t("proxyPools.urlHidden");
+          if (urlInput.value.trim() === proxyURL) urlInput.value = "";
+          poolChanges.accept({name: saved.name, has_proxy_url: false});
+          message.textContent = t("proxyPools.saved"); message.className = "form-message ok";
+        }
+        catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("proxyPools.saveFailed"); message.className = "form-message failed"; }
+        finally { poolChanges.finish(); }
+      });
+    });
+    poolList.querySelectorAll("[data-test-pool]").forEach(button => button.addEventListener("click", async () => {
+      const card = button.closest("[data-proxy-pool]");
+      const pool = pools.find(item => item.id === card.dataset.proxyPool);
+      const message = card.querySelector("[data-pool-message]");
+      if (card.querySelector("[data-pool-url]").value.trim()) { message.textContent = t("proxyPools.saveOrDiscardChanges"); message.className = "form-message failed"; return; }
       button.disabled = true;
-      try { await api(`/proxy-pools/${encodeURIComponent(card.dataset.proxyPool)}`, {method: "PATCH", body: JSON.stringify(body)}); await load(); }
-      catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("proxyPools.saveFailed"); message.className = "form-message failed"; button.disabled = false; }
+      message.textContent = t("proxyPools.testing"); message.className = "form-message";
+      try {
+        const result = await api(`/proxy-pools/${encodeURIComponent(pool.id)}/test`, {method: "POST", body: "{}"});
+        pool.test_status = result.ok ? "active" : "error";
+        pool.test_latency_ms = result.elapsed_ms;
+        const badge = card.querySelector("[data-pool-test-status]");
+        badge.className = `badge ${result.ok ? "ready" : "failed"}`;
+        badge.textContent = `${t(result.ok ? "proxyPools.testActive" : "proxyPools.testError")}${result.elapsed_ms ? ` · ${Number(result.elapsed_ms).toLocaleString(state.locale)} ms` : ""}`;
+        message.textContent = result.ok ? t("proxyPools.testSuccess").replace("{ms}", String(result.elapsed_ms || 0)) : t("proxyPools.testFailed");
+        message.className = `form-message ${result.ok ? "ok" : "failed"}`;
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        message.textContent = t("proxyPools.testFailed"); message.className = "form-message failed";
+      } finally { button.disabled = false; }
     }));
     poolList.querySelectorAll("[data-toggle-pool]").forEach(button => button.addEventListener("click", async () => {
       const card = button.closest("[data-proxy-pool]");
       const pool = pools.find(item => item.id === card.dataset.proxyPool);
+      const message = card.querySelector("[data-pool-message]");
+      if (hasUnsavedPoolEdits()) { message.textContent = t("proxyPools.saveOrDiscardChanges"); message.className = "form-message failed"; return; }
+      button.disabled = true; message.textContent = t("proxyPools.saving"); message.className = "form-message";
       try { await api(`/proxy-pools/${encodeURIComponent(pool.id)}`, {method: "PATCH", body: JSON.stringify({is_active: !pool.is_active})}); await load(); }
-      catch (error) { if (error.message === "invalid_key") return logout(); card.querySelector("[data-pool-message]").textContent = t("proxyPools.saveFailed"); }
+      catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("proxyPools.saveFailed"); message.className = "form-message failed"; button.disabled = false; }
     }));
     poolList.querySelectorAll("[data-delete-pool]").forEach(button => button.addEventListener("click", async () => {
       const card = button.closest("[data-proxy-pool]");
       const pool = pools.find(item => item.id === card.dataset.proxyPool);
+      if (hasUnsavedPoolEdits()) { const message = card.querySelector("[data-pool-message]"); message.textContent = t("proxyPools.saveOrDiscardChanges"); message.className = "form-message failed"; return; }
       if (!confirm(t("proxyPools.confirmDelete").replace("{name}", pool.name))) return;
       try { await api(`/proxy-pools/${encodeURIComponent(pool.id)}`, {method: "DELETE"}); await load(); }
       catch (error) { if (error.message === "invalid_key") return logout(); card.querySelector("[data-pool-message]").textContent = t(error.code === "proxy_pool_in_use" ? "proxyPools.inUse" : "proxyPools.deleteFailed"); card.querySelector("[data-pool-message]").className = "form-message failed"; }
     }));
     assignments.querySelectorAll("[data-provider-pool]").forEach(select => select.addEventListener("change", async () => {
+      const message = select.parentElement.querySelector("[data-assignment-message]");
+      if (hasUnsavedPoolEdits()) { select.value = select.dataset.currentPool; message.textContent = t("proxyPools.saveOrDiscardChanges"); message.className = "form-message failed"; return; }
+      const previous = select.dataset.currentPool;
       select.disabled = true;
-      try { await api(`/providers/${encodeURIComponent(select.dataset.providerPool)}`, {method: "PATCH", body: JSON.stringify({proxy_pool_id: select.value})}); await load(); }
-      catch (error) { if (error.message === "invalid_key") return logout(); select.disabled = false; alert(t("proxyPools.assignFailed")); await load(); }
+      message.textContent = t("proxyPools.saving"); message.className = "form-message";
+      try {
+        const result = await api(`/providers/${encodeURIComponent(select.dataset.providerPool)}`, {method: "PATCH", body: JSON.stringify({proxy_pool_id: select.value})});
+        select.dataset.currentPool = result.item.proxy_pool_id || "";
+        const provider = providers.find(item => item.id === select.dataset.providerPool);
+        if (provider) provider.proxy_pool_id = select.dataset.currentPool;
+        message.textContent = t("proxyPools.assigned"); message.className = "form-message ok";
+      }
+      catch (error) { if (error.message === "invalid_key") return logout(); select.value = previous; message.textContent = t("proxyPools.assignFailed"); message.className = "form-message failed"; }
+      finally { select.disabled = false; }
     }));
   };
-  page.querySelector("#proxy-pool-create").addEventListener("submit", async event => {
+  const createForm = page.querySelector("#proxy-pool-create");
+  const createButton = createForm.querySelector('[type="submit"]');
+  const createChanges = bindDirtyAction(createForm, createButton, () => ({name: createForm.elements.name.value.trim(), has_proxy_url: Boolean(createForm.elements.proxy_url.value.trim())}), () => createForm.checkValidity());
+  createForm.addEventListener("input", () => { createMessage.textContent = ""; createMessage.className = "form-message"; });
+  createForm.addEventListener("submit", async event => {
     event.preventDefault();
     const form = event.currentTarget;
-    const button = form.querySelector('[type="submit"]');
-    button.disabled = true;
-    try { await api("/proxy-pools", {method: "POST", body: JSON.stringify({name: form.elements.name.value.trim(), proxy_url: form.elements.proxy_url.value.trim()})}); form.reset(); createMessage.textContent = t("proxyPools.created"); createMessage.className = "form-message ok"; await load(); }
+    if ([...poolList.querySelectorAll("[data-proxy-pool]")].some(card => card._poolChanges?.isDirty())) {
+      createMessage.textContent = t("proxyPools.saveOrDiscardChanges"); createMessage.className = "form-message failed"; return;
+    }
+    if (!createChanges.begin()) return;
+    const submittedName = form.elements.name.value.trim();
+    const submittedProxyURL = form.elements.proxy_url.value.trim();
+    createMessage.textContent = t("proxyPools.saving"); createMessage.className = "form-message";
+    try {
+      await api("/proxy-pools", {method: "POST", body: JSON.stringify({name: submittedName, proxy_url: submittedProxyURL})});
+      if (form.elements.name.value.trim() === submittedName) form.elements.name.value = "";
+      if (form.elements.proxy_url.value.trim() === submittedProxyURL) form.elements.proxy_url.value = "";
+      createChanges.accept({name: "", has_proxy_url: false});
+      createMessage.textContent = t("proxyPools.created"); createMessage.className = "form-message ok";
+      await load();
+    }
     catch (error) { if (error.message === "invalid_key") return logout(); createMessage.textContent = t("proxyPools.createFailed"); createMessage.className = "form-message failed"; }
-    finally { button.disabled = false; }
+    finally { createChanges.finish(); }
   });
-  page.querySelector("#refresh").addEventListener("click", load);
+  page.querySelector("#refresh").addEventListener("click", () => {
+    const hasUnsaved = [...poolList.querySelectorAll("[data-proxy-pool]")].some(card => card._poolChanges?.isDirty());
+    if (hasUnsaved && !confirm(t("proxyPools.confirmDiscardEdits"))) return;
+    load();
+  });
   await load();
 }
 

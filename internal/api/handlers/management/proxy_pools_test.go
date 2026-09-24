@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
@@ -22,12 +23,97 @@ func proxyPoolRequest(t *testing.T, handler func(*gin.Context), method, path, bo
 	ctx.Request.Header.Set("Content-Type", "application/json")
 	for _, prefix := range []string{"/proxy-pools/", "/providers/"} {
 		if index := strings.LastIndex(path, prefix); index >= 0 {
-			ctx.Params = gin.Params{{Key: "id", Value: path[index+len(prefix):]}}
+			id := path[index+len(prefix):]
+			id = strings.TrimSuffix(id, "/test")
+			ctx.Params = gin.Params{{Key: "id", Value: id}}
 			break
 		}
 	}
 	handler(ctx)
 	return response
+}
+
+func TestProbeProxyPoolUsesProxyAndReportsHTTPStatus(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var requestMethod, requestHost string
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestMethod = r.Method
+		requestHost = r.URL.Host
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer proxy.Close()
+
+	ok, status, _, reason := probeProxyPool(context.Background(), proxy.URL, "http://probe.example/")
+	if !ok || status != http.StatusNoContent || reason != "" {
+		t.Fatalf("probeProxyPool() = (%v, %d, %q), want success", ok, status, reason)
+	}
+	if requestMethod != http.MethodHead || requestHost != "probe.example" {
+		t.Fatalf("proxy received %s %s, want HEAD probe.example", requestMethod, requestHost)
+	}
+}
+
+func TestTestProxyPoolPersistsFailureWithoutDisablingPoolOrLeakingSecret(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	root := t.TempDir()
+	now := time.Now().UTC()
+	h := NewHandler(&config.Config{AuthDir: root}, filepath.Join(root, "config.yaml"), nil)
+	pool := proxyPoolRecord{ID: "test-pool", Name: "Local", ProxyURL: "http://proxy-user:proxy-secret@127.0.0.1:1", IsActive: true, TestStatus: "unknown", CreatedAt: now, UpdatedAt: now}
+	if errSave := h.proxyPools.save(pool); errSave != nil {
+		t.Fatalf("save test pool: %v", errSave)
+	}
+
+	response := proxyPoolRequest(t, h.TestProxyPool, http.MethodPost, "/v0/management/proxy-pools/test-pool/test", "")
+	if response.Code != http.StatusOK {
+		t.Fatalf("test status = %d body=%s", response.Code, response.Body.String())
+	}
+	if strings.Contains(response.Body.String(), "proxy-secret") || !strings.Contains(response.Body.String(), `"error_code":"proxy_unreachable"`) {
+		t.Fatalf("unsafe or unexpected test response: %s", response.Body.String())
+	}
+	items, errList := h.proxyPools.list()
+	if errList != nil || len(items) != 1 {
+		t.Fatalf("pool list = %#v error=%v", items, errList)
+	}
+	if items[0].TestStatus != "error" || items[0].LastTestedAt == nil || !items[0].IsActive {
+		t.Fatalf("test result = %+v, want recorded error without changing active state", items[0])
+	}
+}
+
+func TestRecordProxyPoolTestResultPreservesConcurrentChanges(t *testing.T) {
+	store := newProxyPoolStore(filepath.Join(t.TempDir(), "config.yaml"))
+	now := time.Now().UTC()
+	original := proxyPoolRecord{ID: "pool", Name: "before", ProxyURL: "http://proxy.example:8080", IsActive: true, CreatedAt: now, UpdatedAt: now}
+	if errSave := store.save(original); errSave != nil {
+		t.Fatalf("save initial pool: %v", errSave)
+	}
+	changed := original
+	changed.Name = "renamed"
+	changed.IsActive = false
+	changed.UpdatedAt = now.Add(time.Minute)
+	if errSave := store.save(changed); errSave != nil {
+		t.Fatalf("save concurrent update: %v", errSave)
+	}
+
+	testedAt := now.Add(2 * time.Minute)
+	found, unchanged, errRecord := store.recordTestResult(original.ID, original.ProxyURL, "active", 14, testedAt)
+	if errRecord != nil || !found || !unchanged {
+		t.Fatalf("recordTestResult() = (%v, %v, %v), want (true, true, nil)", found, unchanged, errRecord)
+	}
+	items, errList := store.list()
+	if errList != nil || len(items) != 1 {
+		t.Fatalf("pool list = %#v error=%v", items, errList)
+	}
+	if items[0].Name != "renamed" || items[0].IsActive || items[0].TestStatus != "active" || items[0].TestLatencyMS != 14 {
+		t.Fatalf("recorded pool = %+v, want concurrent fields and test result preserved", items[0])
+	}
+
+	found, unchanged, errRecord = store.recordTestResult(original.ID, "http://new-proxy.example:8080", "active", 1, testedAt)
+	if errRecord != nil || !found || unchanged {
+		t.Fatalf("stale result = (%v, %v, %v), want (true, false, nil)", found, unchanged, errRecord)
+	}
+	items, errList = store.list()
+	if errList != nil || items[0].ProxyURL != original.ProxyURL || items[0].TestLatencyMS != 14 {
+		t.Fatalf("stale test mutated pool: items=%+v error=%v", items, errList)
+	}
 }
 
 func TestProxyPoolAssignmentUpdatesRuntimeAndKeepsSecretsMasked(t *testing.T) {

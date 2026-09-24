@@ -2,6 +2,7 @@ package management
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -22,12 +23,47 @@ type compatibleProviderItem struct {
 }
 
 type compatibleProviderMutation struct {
-	Name     string                             `json:"name"`
-	BaseURL  string                             `json:"base_url"`
-	Prefix   *string                            `json:"prefix"`
-	APIKey   string                             `json:"api_key"`
-	Disabled *bool                              `json:"disabled"`
-	Models   *[]config.OpenAICompatibilityModel `json:"models"`
+	Name         string                             `json:"name"`
+	BaseURL      string                             `json:"base_url"`
+	Prefix       *string                            `json:"prefix"`
+	APIKey       string                             `json:"api_key"`
+	APIKeyAction string                             `json:"api_key_action"`
+	APIKeyIndex  *int                               `json:"api_key_index"`
+	Disabled     *bool                              `json:"disabled"`
+	Models       *[]config.OpenAICompatibilityModel `json:"models"`
+}
+
+func mutateCompatibleProviderAPIKey(entry *config.OpenAICompatibility, action string, index *int, key string) error {
+	action = strings.ToLower(strings.TrimSpace(action))
+	key = strings.TrimSpace(key)
+	if action == "" && key != "" && index == nil {
+		action = "append"
+	}
+	switch action {
+	case "":
+		if index != nil || key != "" {
+			return errors.New("invalid API key operation")
+		}
+		return nil
+	case "append":
+		if index != nil || key == "" {
+			return errors.New("invalid API key operation")
+		}
+		entry.APIKeyEntries = append(entry.APIKeyEntries, config.OpenAICompatibilityAPIKey{APIKey: key})
+	case "replace":
+		if index == nil || *index < 0 || *index >= len(entry.APIKeyEntries) || key == "" {
+			return errors.New("invalid API key operation")
+		}
+		entry.APIKeyEntries[*index].APIKey = key
+	case "delete":
+		if index == nil || *index < 0 || *index >= len(entry.APIKeyEntries) || key != "" {
+			return errors.New("invalid API key operation")
+		}
+		entry.APIKeyEntries = append(entry.APIKeyEntries[:*index], entry.APIKeyEntries[*index+1:]...)
+	default:
+		return errors.New("invalid API key operation")
+	}
+	return nil
 }
 
 func compatibleProviderID(name string) string {
@@ -234,6 +270,7 @@ func (h *Handler) PatchCompatibleProvider(c *gin.Context) {
 		return
 	}
 	entry := h.cfg.OpenAICompatibility[index]
+	entry.APIKeyEntries = append([]config.OpenAICompatibilityAPIKey(nil), entry.APIKeyEntries...)
 	if body.BaseURL != "" {
 		if !validCompatibleProviderURL(body.BaseURL) {
 			h.mu.Unlock()
@@ -256,8 +293,10 @@ func (h *Handler) PatchCompatibleProvider(c *gin.Context) {
 		}
 		entry.Models = models
 	}
-	if key := strings.TrimSpace(body.APIKey); key != "" {
-		entry.APIKeyEntries = append(entry.APIKeyEntries, config.OpenAICompatibilityAPIKey{APIKey: key})
+	if err := mutateCompatibleProviderAPIKey(&entry, body.APIKeyAction, body.APIKeyIndex, body.APIKey); err != nil {
+		h.mu.Unlock()
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_api_key_operation", "message": "Select a saved API key to replace or delete, or choose to add a new key"}})
+		return
 	}
 	h.cfg.OpenAICompatibility[index] = entry
 	h.cfg.SanitizeOpenAICompatibility()

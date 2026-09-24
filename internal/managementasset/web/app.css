@@ -488,6 +488,14 @@ body { background-color: #1a1a1a; background-image: linear-gradient(#ffffff08 1p
 .compatible-provider-card details summary { color: #ff9a7e; font-size: 11px; cursor: pointer; }
 .compatible-provider-card .actions { gap: 6px; }
 .compatible-provider-card .actions button { min-height: 32px; padding: 6px 8px; font-size: 11px; }
+.proxy-pool-assignment { display: grid; flex: 0 1 320px; min-width: min(320px, 50%); gap: 4px; }
+.compatible-key-editor { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-subtle); border-radius: 8px; background: #1e1e1e; }
+.compatible-key-list { display: grid; gap: 6px; }
+.compatible-key-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; padding: 7px 9px; border: 1px solid var(--line-subtle); border-radius: 7px; background: #232323; }
+.compatible-key-row > code { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+.compatible-key-row .actions { flex-shrink: 0; }
+.compatible-key-row .actions button { min-height: 30px; padding: 5px 8px; font-size: 11px; }
+.compatible-key-row [aria-pressed="true"] { border-color: var(--accent); color: #ff9a7e; }
 .compatible-empty { padding: 20px; }
 .log-tabs { display: flex; gap: 5px; margin: -8px 0 18px; padding: 4px; width: fit-content; border: 1px solid var(--line); border-radius: 9px; background: #222; }
 .log-tabs button { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 12px; }

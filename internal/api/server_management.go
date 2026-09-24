@@ -221,6 +221,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/proxy-pools", s.mgmt.GetProxyPools)
 		mgmt.POST("/proxy-pools", s.mgmt.PostProxyPool)
 		mgmt.PATCH("/proxy-pools/:id", s.mgmt.PatchProxyPool)
+		mgmt.POST("/proxy-pools/:id/test", s.mgmt.TestProxyPool)
 		mgmt.DELETE("/proxy-pools/:id", s.mgmt.DeleteProxyPool)
 		mgmt.GET("/combos", s.mgmt.GetCombos)
 		mgmt.POST("/combos", s.mgmt.PutCombo)

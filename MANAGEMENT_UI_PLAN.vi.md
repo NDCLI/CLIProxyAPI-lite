@@ -35,7 +35,7 @@ Trạng thái 23/09/2026: các mục giao diện 1–3 đã triển khai. Nút v
 
 ## 5. Đợt tối ưu tương tác — kế hoạch ngày 24/09/2026
 
-Trạng thái: **chỉ lập kế hoạch, chưa triển khai**. Theo yêu cầu mới nhất, dừng build/test; mục này thay thế yêu cầu chạy build/test ở mục 4 cho đợt công việc hiện tại. Không khởi động server, MITM hoặc tác động DNS/chứng chỉ để khảo sát giao diện.
+Trạng thái: **đã triển khai các thay đổi chính theo yêu cầu rà soát ngày 24/09/2026**. Kiểm tra cú pháp JavaScript, khóa dịch Việt/Anh, toàn bộ Go test và build đều qua. Trình duyệt xác nhận sửa API key của Custom Provider không tạo provider mới, nút Lưu bật/tắt theo thay đổi và MITM giữ bản nháp qua refresh. Chưa kiểm tra trên điện thoại hoặc mô phỏng lỗi mạng/clipboard; không bật DNS hay thay đổi chứng chỉ.
 
 ### 5.1. Những điểm đã thấy trong mã nguồn
 
@@ -84,4 +84,4 @@ Trạng thái: **chỉ lập kế hoạch, chưa triển khai**. Theo yêu cầu
 - MITM: mở lần đầu, đổi công cụ nhanh, refresh, model tải chậm/lỗi; không nháy trắng toàn trang, không mất bản nháp/focus, phản hồi cũ không ghi đè lựa chọn mới.
 - Lưu: chưa sửa, sửa rồi hoàn tác, thêm/xóa mapping, bấm liên tiếp, lỗi API, sửa tiếp khi đang lưu; trạng thái nút đúng bảng trên và không gửi trùng.
 - Copy: thành công, bấm lại, clipboard bị từ chối và rời trang trong lúc chờ; phản hồi đúng, tồn tại khoảng 2,2 giây, không làm xê dịch bố cục.
-- Ưu tiên kiểm tra giao diện với API giả lập hoặc bản đang có khi được người dùng cho phép; không dùng DNS/CA thật để thử hiệu ứng. **Hiện tại không chạy build, test, tạo/chạy EXE mới hoặc tuyên bố các tiêu chí này đã đạt.**
+- Kiểm tra giao diện với API hiện có, chạy kiểm tra JavaScript, test Go liên quan và build server. Không dùng DNS/CA thật để thử hiệu ứng; ghi rõ các kiểm tra trực quan còn chờ nếu không thể xác nhận an toàn.

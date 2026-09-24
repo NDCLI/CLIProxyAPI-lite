@@ -89,7 +89,7 @@ This plan tracks incremental implementation in the current checkout. Every compl
 - ~~Add Basic Chat with credential-scoped model discovery and streamed chat completions; keep the endpoint key in tab memory only.~~
 - ~~Add a Skills page that copies supported text-chat gateway instructions; leave media APIs out.~~
 - ~~Add standard HTTP/HTTPS/SOCKS5 proxy pools with credential assignment, active-state propagation, secret masking, and delete protection for assigned pools.~~
-- Continue the remaining Proxy Pool features: relay deployment, per-pool bypass rules, and connection testing. Media Providers are excluded at the user's request.
+- Continue the remaining Proxy Pool features: relay deployment and per-pool bypass rules. ~~Connection testing~~ is implemented with a masked result and does not alter the pool's active state. Media Providers are excluded at the user's request.
 - Reuse the shared shell, localization, permissions, and error handling from earlier phases.
 - Mark a page unavailable until its backend behavior is complete and tested.
 
@@ -143,6 +143,7 @@ This plan tracks incremental implementation in the current checkout. Every compl
 | 2026-09-24 | System Information page added | `c51de723` | Authenticated API reports only build and Go runtime metadata; browser verified the Vietnamese page and API response; focused handler/assets tests and build pass |
 | 2026-09-24 | Text-chat Skills page added | `250fba1c` | Source-owned page copies localized model-discovery and streaming instructions using the current server URL; browser confirmed copy feedback after clipboard fallback; media endpoints are omitted; tests and build pass |
 | 2026-09-24 | Standard Proxy Pools added | `cf4d9dea` | Authenticated CRUD stores proxy URLs with masked responses; provider assignments update credential runtime proxy routing and preserve the prior proxy when disabled or unassigned; tests and isolated UI verification pass |
+| 2026-09-24 | Proxy Pool connection test added | `WORKTREE` | Tests each saved proxy with a fixed HTTPS HEAD probe, stores status/latency without exposing the URL or changing active state; handler tests cover reachable and unreachable proxies |
 
 ## Update convention
 
