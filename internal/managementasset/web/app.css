@@ -454,6 +454,13 @@ body { background-color: #1a1a1a; background-image: linear-gradient(#ffffff08 1p
 .settings-proxy > .tool-title > .badge { margin-left: auto; }
 .settings-proxy form { display: grid; gap: 12px; }
 .settings-proxy { width: min(820px, 100%); }
+.token-saver-layout > form.settings-layout { margin-bottom: 0; }
+.token-saver-layout .tool-title > .badge { margin-left: auto; }
+.token-saver-layout code { overflow-wrap: anywhere; }
+.token-saver-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 8px; }
+.token-saver-stats > div { display: grid; gap: 3px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: #202020; }
+.token-saver-stats strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.token-saver-stats span { color: var(--muted); font-size: 11px; }
 .auth-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
 .auth-toolbar .auth-actions { flex: 1 1 auto; gap: 8px; margin-bottom: 0; }
 .auth-toolbar .auth-actions .secondary { padding: 8px 10px; font-size: 11px; }

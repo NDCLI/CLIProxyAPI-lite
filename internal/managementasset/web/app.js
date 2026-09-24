@@ -297,10 +297,66 @@ async function renderQuickStart(page) {
   updateCount("#quick-start-credential-count", authFiles, value => (value.files || []).filter(file => !file.disabled).length);
 }
 
-function renderStatusPage(page, capabilityID, titleKey) {
-  const item = capability(capabilityID);
-  const nextSteps = capabilityID === "token_saver" ? `<div class="section-head"><h2>${t("tokenSaver.availableNow")}</h2></div><section class="grid"><a class="card capability-card" href="#/usage"><span class="feature-icon">${icon("chart")}</span><h2>${t("nav.usage")}</h2><p>${t("tokenSaver.stepUsage")}</p><span class="card-arrow">${icon("arrow")}</span></a><a class="card capability-card" href="#/combo"><span class="feature-icon">${icon("route")}</span><h2>${t("nav.combo")}</h2><p>${t("tokenSaver.stepCombo")}</p><span class="card-arrow">${icon("arrow")}</span></a></section>` : "";
-  page.innerHTML = pageHeader("kicker.management", titleKey, "partial.description") + `<section class="status-panel unavailable-panel"><span class="unavailable-icon">${icon("zap")}</span><div class="card-title"><h2>${t(titleKey)}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><p>${escapeHTML(reasonLabel(item.reason_code) || t("partial.description"))}</p></section>${nextSteps}`;
+async function renderTokenSaver(page) {
+  page.innerHTML = pageHeader("kicker.management", "page.tokenSaver", "tokenSaver.description", true) + `<div class="loading">${t("common.loading")}</div>`;
+  try {
+    const response = await api("/token-saver");
+    if (!page.isConnected || page.dataset.page !== "token-saver") return;
+    const item = response.item || {};
+    const stats = item.statistics || {};
+    const count = value => Number(value || 0).toLocaleString(state.locale);
+    const statusLabel = status => status === "ready" ? t("tokenSaver.connected") : status === "unknown" ? t("tokenSaver.notChecked") : status === "timeout" ? t("tokenSaver.timeout") : /^http_\d+$/.test(status || "") ? `HTTP ${status.slice(5)}` : t("tokenSaver.unreachable");
+    const statusClass = status => status === "ready" ? "ready" : status === "unknown" ? "muted" : "failed";
+    page.innerHTML = pageHeader("kicker.management", "page.tokenSaver", "tokenSaver.description", true) + `<div class="settings-layout token-saver-layout"><form id="token-saver-form" class="settings-layout"><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("zap")}</span><div><h2>RTK</h2><p>${t("tokenSaver.rtkDescription")}</p></div></div><label class="settings-toggle"><input type="checkbox" name="rtk_enabled" ${item.rtk_enabled ? "checked" : ""}><span><strong>${t("tokenSaver.rtkToggle")}</strong><small>${t("tokenSaver.rtkHint")}</small></span></label></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("route")}</span><div><h2>Headroom</h2><p>${t("tokenSaver.headroomDescription")}</p></div><span class="badge ${statusClass(item.headroom_status)}" id="headroom-status">${statusLabel(item.headroom_status)}</span></div><label class="settings-toggle"><input type="checkbox" name="headroom_enabled" ${item.headroom_enabled ? "checked" : ""}><span><strong>${t("tokenSaver.headroomToggle")}</strong><small>${t("tokenSaver.headroomHint")}</small></span></label><div class="settings-grid"><label>${t("tokenSaver.headroomURL")}<input class="text-input" type="url" name="headroom_url" required value="${escapeHTML(item.headroom_url || "http://127.0.0.1:8787")}" placeholder="http://127.0.0.1:8787"></label><label>${t("tokenSaver.headroomTimeout")}<input class="text-input" type="number" name="headroom_timeout_ms" min="500" max="15000" required value="${Number(item.headroom_timeout_ms || 3000)}"></label></div><div class="actions"><button class="secondary" type="button" id="test-headroom">${icon("check")}${t("tokenSaver.testConnection")}</button><span class="form-message" id="headroom-message" role="status" aria-live="polite"></span></div><p class="hint">${t("tokenSaver.headroomSetup")} <code>pip install "headroom-ai[proxy]"</code> · <code>headroom proxy --port 8787</code></p><p class="hint">${t("tokenSaver.headroomPrivacy")}</p></section><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="token-saver-message" role="status" aria-live="polite"></span></div></form><section class="card settings-section"><div class="section-head"><div><h2>${t("tokenSaver.sessionStats")}</h2><p class="hint">${t("tokenSaver.statsHint")}</p></div></div><div class="token-saver-stats"><div><strong>${count(stats.rtk_requests)}</strong><span>${t("tokenSaver.rtkRequests")}</span></div><div><strong>${count(stats.rtk_hits)}</strong><span>${t("tokenSaver.rtkHits")}</span></div><div><strong>${count(stats.rtk_bytes_saved)} B</strong><span>${t("tokenSaver.rtkBytesSaved")}</span></div><div><strong>${count(stats.headroom_bytes_saved)} B</strong><span>${t("tokenSaver.headroomBytesSaved")}</span></div><div><strong>${count(stats.headroom_applied)}</strong><span>${t("tokenSaver.headroomApplied")}</span></div><div><strong>${count(stats.headroom_failures)}</strong><span>${t("tokenSaver.headroomFailures")}</span></div></div><p class="hint">${t("tokenSaver.bypassHint")} <code>X-CLIProxy-Token-Saver: off</code></p></section></div>`;
+    const form = page.querySelector("#token-saver-form");
+    const message = page.querySelector("#token-saver-message");
+    const status = page.querySelector("#headroom-status");
+    const headroomMessage = page.querySelector("#headroom-message");
+    const payload = () => ({rtk_enabled: form.elements.rtk_enabled.checked, headroom_enabled: form.elements.headroom_enabled.checked, headroom_url: form.elements.headroom_url.value.trim(), headroom_timeout_ms: Number(form.elements.headroom_timeout_ms.value)});
+    const changes = bindDirtyAction(form, form.querySelector('[type="submit"]'), payload, () => form.checkValidity());
+    let savedHeadroomURL = item.headroom_url;
+    let savedHeadroomTimeout = Number(item.headroom_timeout_ms);
+    const checkHeadroom = async () => {
+      if (form.elements.headroom_url.value.trim() !== savedHeadroomURL || Number(form.elements.headroom_timeout_ms.value) !== savedHeadroomTimeout) {
+        headroomMessage.textContent = t("tokenSaver.saveBeforeTest"); headroomMessage.className = "form-message failed"; return;
+      }
+      const button = page.querySelector("#test-headroom");
+      button.disabled = true; headroomMessage.textContent = t("tokenSaver.testing"); headroomMessage.className = "form-message";
+      try {
+        const result = (await api("/token-saver/headroom/test", {method: "POST", body: "{}"})).item || {};
+        if (!button.isConnected) return;
+        status.className = `badge ${statusClass(result.status)}`;
+        status.textContent = statusLabel(result.status);
+        headroomMessage.textContent = result.ok ? t("tokenSaver.testPassed").replace("{ms}", String(result.latency_ms || 0)) : t("tokenSaver.testFailed");
+        headroomMessage.className = `form-message ${result.ok ? "ok" : "failed"}`;
+      } catch (error) { if (error.message === "invalid_key") return logout(); headroomMessage.textContent = t("tokenSaver.testFailed"); headroomMessage.className = "form-message failed"; }
+      finally { button.disabled = false; }
+    };
+    page.querySelector("#test-headroom").addEventListener("click", checkHeadroom);
+    form.addEventListener("submit", async event => {
+      event.preventDefault();
+      if (!changes.begin()) return;
+      const sent = payload();
+      message.textContent = t("settings.saving"); message.className = "form-message";
+      try {
+        const saved = (await api("/token-saver", {method: "PATCH", body: JSON.stringify(sent)})).item || {};
+        savedHeadroomURL = saved.headroom_url || sent.headroom_url;
+        savedHeadroomTimeout = Number(saved.headroom_timeout_ms || sent.headroom_timeout_ms);
+        changes.accept(sent);
+        status.className = `badge ${statusClass(saved.headroom_status)}`;
+        status.textContent = statusLabel(saved.headroom_status);
+        message.textContent = t(changes.isDirty() ? "tokenSaver.savedEditsPending" : "tokenSaver.saved"); message.className = "form-message ok";
+        if (saved.headroom_enabled && !changes.isDirty()) void checkHeadroom();
+      } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("tokenSaver.saveFailed"); message.className = "form-message failed"; }
+      finally { changes.finish(); }
+    });
+    page.querySelector("#refresh").addEventListener("click", () => { if (!changes.isDirty() || confirm(t("tokenSaver.confirmDiscard"))) renderTokenSaver(page); });
+    if (item.headroom_enabled) void checkHeadroom();
+  } catch (error) {
+    if (error.message === "invalid_key") return logout();
+    page.innerHTML = pageHeader("kicker.management", "page.tokenSaver", "tokenSaver.description", true) + `<div class="error">${t("tokenSaver.loadFailed")}</div>`;
+    page.querySelector("#refresh").addEventListener("click", () => renderTokenSaver(page));
+  }
 }
 
 async function copyText(value) {
@@ -2104,7 +2160,7 @@ function renderPage(name) {
     case "system-info": renderSystemInfo(page); break;
     case "plugins": renderPlugins(page); break;
     case "skills": renderSkills(page); break;
-    case "token-saver": renderStatusPage(page, "token_saver", "page.tokenSaver"); break;
+    case "token-saver": renderTokenSaver(page); break;
     case "cli-tools": window.ManagementTools.render(page, cliToolRouteID()); break;
     default: renderOverview(page);
   }

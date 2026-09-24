@@ -37,7 +37,7 @@ func TestGetCapabilitiesContract(t *testing.T) {
 		"combos":          "ready",
 		"usage":           "ready",
 		"quota":           "ready",
-		"token_saver":     "unavailable",
+		"token_saver":     "ready",
 		"cli_tools":       "ready",
 		"logs":            "ready",
 		"system_settings": "ready",

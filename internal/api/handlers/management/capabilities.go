@@ -29,7 +29,7 @@ func (h *Handler) GetCapabilities(c *gin.Context) {
 			{ID: "combos", State: "ready"},
 			{ID: "usage", State: "ready"},
 			{ID: "quota", State: "ready"},
-			{ID: "token_saver", State: "unavailable", ReasonCode: "backend_not_implemented"},
+			{ID: "token_saver", State: "ready"},
 			{ID: "cli_tools", State: "ready"},
 			{ID: "logs", State: "ready"},
 			{ID: "system_settings", State: "ready"},

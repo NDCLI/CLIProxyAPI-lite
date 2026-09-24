@@ -73,8 +73,9 @@ This plan tracks incremental implementation in the current checkout. Every compl
 
 ### Phase 7 — Token Saver
 
-- Implement the real token-saver capabilities represented by 9router (RTK, Headroom, Caveman, Ponytail, and PXPIPE where supported by the backend).
-- Expose status, configuration, start/stop/restart, and diagnostics through authenticated management APIs.
+- ~~Implement the selected RTK tool-output filters and Headroom context compression in the Go request pipeline, with per-request bypass and fail-open behavior.~~
+- ~~Expose RTK/Headroom settings, live savings, and a Headroom health check through authenticated management APIs.~~
+- Headroom installation and process start/stop/restart remain external; Caveman, Ponytail, and PXPIPE were excluded from the selected RTK + Headroom scope.
 - ~~Show an explicit unavailable state for a capability that has no safe Go implementation; do not expose a working-looking toggle.~~
 
 ### Phase 8 — CLI Tools
@@ -144,6 +145,7 @@ This plan tracks incremental implementation in the current checkout. Every compl
 | 2026-09-24 | Text-chat Skills page added | `250fba1c` | Source-owned page copies localized model-discovery and streaming instructions using the current server URL; browser confirmed copy feedback after clipboard fallback; media endpoints are omitted; tests and build pass |
 | 2026-09-24 | Standard Proxy Pools added | `cf4d9dea` | Authenticated CRUD stores proxy URLs with masked responses; provider assignments update credential runtime proxy routing and preserve the prior proxy when disabled or unassigned; tests and isolated UI verification pass |
 | 2026-09-24 | Proxy Pool connection test added | `WORKTREE` | Tests each saved proxy with a fixed HTTPS HEAD probe, stores status/latency without exposing the URL or changing active state; handler tests cover reachable and unreachable proxies |
+| 2026-09-24 | RTK + Headroom Token Saver added | `WORKTREE` | Opt-in middleware compresses supported tool outputs locally and uses a configured Headroom service for chat context; authenticated settings and health APIs, fail-open tests, `go test ./...`, build, and local browser UI verified; the external Headroom service was not running locally |
 
 ## Update convention
 

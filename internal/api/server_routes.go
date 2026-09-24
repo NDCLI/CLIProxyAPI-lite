@@ -66,7 +66,7 @@ func (s *Server) setupRoutes() {
 	v1.Use(AuthMiddleware(s.accessManager))
 	{
 		v1.GET("/models", s.unifiedModelsHandler(openaiHandlers, claudeCodeHandlers))
-		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
+		v1.POST("/chat/completions", s.tokenSaver.Middleware(), openaiHandlers.ChatCompletions)
 		v1.POST("/completions", openaiHandlers.Completions)
 		v1.POST("/images/generations", openaiHandlers.ImagesGenerations)
 		v1.POST("/images/edits", openaiHandlers.ImagesEdits)
@@ -75,10 +75,10 @@ func (s *Server) setupRoutes() {
 		v1.POST("/videos/edits", openaiHandlers.XAIVideosEdits)
 		v1.POST("/videos/extensions", openaiHandlers.XAIVideosExtensions)
 		v1.GET("/videos/:request_id", openaiHandlers.XAIVideosRetrieve)
-		v1.POST("/messages", claudeCodeHandlers.ClaudeMessages)
-		v1.POST("/messages/count_tokens", claudeCodeHandlers.ClaudeCountTokens)
+		v1.POST("/messages", s.tokenSaver.Middleware(), claudeCodeHandlers.ClaudeMessages)
+		v1.POST("/messages/count_tokens", s.tokenSaver.Middleware(), claudeCodeHandlers.ClaudeCountTokens)
 		v1.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
-		v1.POST("/responses", openaiResponsesHandlers.Responses)
+		v1.POST("/responses", s.tokenSaver.Middleware(), openaiResponsesHandlers.Responses)
 		v1.POST("/responses/compact", openaiResponsesHandlers.Compact)
 		v1.POST("/alpha/search", s.codexAlphaSearch)
 		v1.POST("/live", s.codexLiveHandler.Handle)
@@ -115,7 +115,7 @@ func (s *Server) setupRoutes() {
 	codexDirect.Use(AuthMiddleware(s.accessManager))
 	{
 		codexDirect.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
-		codexDirect.POST("/responses", openaiResponsesHandlers.Responses)
+		codexDirect.POST("/responses", s.tokenSaver.Middleware(), openaiResponsesHandlers.Responses)
 		codexDirect.POST("/responses/compact", openaiResponsesHandlers.Compact)
 		codexDirect.POST("/alpha/search", s.codexAlphaSearch)
 	}
@@ -126,7 +126,7 @@ func (s *Server) setupRoutes() {
 	{
 		v1beta.GET("/models", s.geminiModelsHandler(geminiHandlers))
 		v1beta.POST("/interactions", geminiHandlers.Interactions)
-		v1beta.POST("/models/*action", geminiHandlers.GeminiHandler)
+		v1beta.POST("/models/*action", s.tokenSaver.Middleware(), geminiHandlers.GeminiHandler)
 		v1beta.GET("/models/*action", s.geminiGetHandler(geminiHandlers))
 	}
 

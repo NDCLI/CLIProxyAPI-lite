@@ -60,6 +60,9 @@ type Config struct {
 	// UsageStatisticsEnabled toggles in-memory usage aggregation; when false, usage data is discarded.
 	UsageStatisticsEnabled bool `yaml:"usage-statistics-enabled" json:"usage-statistics-enabled"`
 
+	// TokenSaver configures opt-in request compression before provider routing.
+	TokenSaver TokenSaverConfig `yaml:"token-saver,omitempty" json:"token-saver,omitempty"`
+
 	// RedisUsageQueueRetentionSeconds controls how long usage queue items are retained
 	// in memory for Management API consumers.
 	// Default: 60. Max: 3600.

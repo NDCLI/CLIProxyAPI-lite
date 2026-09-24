@@ -19,6 +19,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginstore"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/tokensaver"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v7/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
@@ -65,6 +66,7 @@ type Handler struct {
 	mitm                    *mitmRuntime
 	combos                  *combo.Store
 	proxyPools              *proxyPoolStore
+	tokenSaver              *tokensaver.Service
 }
 
 type configReloadSnapshot struct {
@@ -155,6 +157,16 @@ func (h *Handler) SetPluginHost(host *pluginhost.Host) {
 	}
 	h.mu.Lock()
 	h.pluginHost = host
+	h.mu.Unlock()
+}
+
+// SetTokenSaver shares the live request compressor with management controls.
+func (h *Handler) SetTokenSaver(service *tokensaver.Service) {
+	if h == nil {
+		return
+	}
+	h.mu.Lock()
+	h.tokenSaver = service
 	h.mu.Unlock()
 }
 
