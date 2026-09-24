@@ -136,7 +136,7 @@ This plan tracks incremental implementation in the current checkout. Every compl
 | 2026-09-22 | Credential quota details completed | `d8aaf2ab` | Quota page lists only backend-supported credentials, renders normalized buckets/remaining capacity/reset time, and exposes reset only where the provider supports it |
 | 2026-09-22 | Quick Start page completed | `WORKTREE` | Source-owned Quick Start page uses live endpoint-key and auth-file APIs, copies the real `/v1` endpoint, and links to key management; unsupported 9router domains remain unavailable rather than fabricated |
 | 2026-09-22 | CLI/Token Saver verification gates completed | `b9ea29fe` | Supported CLI status/configuration and explicit Token Saver unavailable state are covered by focused tests; full `go test ./...` and `go build -o test-output.exe ./cmd/server` pass on `test` |
-| 2026-09-24 | Basic Chat added | `WORKTREE` | Source-owned page discovers models with the endpoint key and streams `/v1/chat/completions`; browser verified login, localized empty state, and zero-model handling on an isolated server; `go test ./...`, build, and JavaScript syntax checks pass |
+| 2026-09-24 | Basic Chat added | `79b5e9e4` | Source-owned page discovers models with the endpoint key and streams `/v1/chat/completions`; browser verified login, localized empty state, and zero-model handling on an isolated server; `go test ./...`, build, and JavaScript syntax checks pass |
 
 ## Update convention
 
