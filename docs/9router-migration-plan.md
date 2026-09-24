@@ -138,7 +138,7 @@ This plan tracks incremental implementation in the current checkout. Every compl
 | 2026-09-22 | Quick Start page completed | `WORKTREE` | Source-owned Quick Start page uses live endpoint-key and auth-file APIs, copies the real `/v1` endpoint, and links to key management; unsupported 9router domains remain unavailable rather than fabricated |
 | 2026-09-22 | CLI/Token Saver verification gates completed | `b9ea29fe` | Supported CLI status/configuration and explicit Token Saver unavailable state are covered by focused tests; full `go test ./...` and `go build -o test-output.exe ./cmd/server` pass on `test` |
 | 2026-09-24 | Basic Chat added | `79b5e9e4` | Source-owned page discovers models with the endpoint key and streams `/v1/chat/completions`; browser verified login, localized empty state, and zero-model handling on an isolated server; `go test ./...`, build, and JavaScript syntax checks pass |
-| 2026-09-24 | System Information page added | `WORKTREE` | Authenticated API reports only build and Go runtime metadata; browser verified the Vietnamese page and API response; focused handler/assets tests and build pass |
+| 2026-09-24 | System Information page added | `c51de723` | Authenticated API reports only build and Go runtime metadata; browser verified the Vietnamese page and API response; focused handler/assets tests and build pass |
 
 ## Update convention
 
