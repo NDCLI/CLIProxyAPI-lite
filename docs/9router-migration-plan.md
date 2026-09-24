@@ -146,7 +146,7 @@ This plan tracks incremental implementation in the current checkout. Every compl
 | 2026-09-24 | Standard Proxy Pools added | `cf4d9dea` | Authenticated CRUD stores proxy URLs with masked responses; provider assignments update credential runtime proxy routing and preserve the prior proxy when disabled or unassigned; tests and isolated UI verification pass |
 | 2026-09-24 | Proxy Pool connection test added | `WORKTREE` | Tests each saved proxy with a fixed HTTPS HEAD probe, stores status/latency without exposing the URL or changing active state; handler tests cover reachable and unreachable proxies |
 | 2026-09-24 | RTK + Headroom Token Saver added | `3f141bdf` | Opt-in middleware compresses supported tool outputs locally and uses a configured Headroom service for chat context; authenticated settings and health APIs, fail-open tests, `go test ./...`, build, and local browser UI verified; the external Headroom service was not running locally |
-| 2026-09-24 | Usage recent list and provider labels updated | `WORKTREE` | Recent requests now scroll inside the overview card; custom provider names come from `/provider-configs` while raw provider IDs remain in filters. Focused asset test, build, and local browser checks of `xpiki` and inner scrolling pass |
+| 2026-09-24 | Usage recent list and provider labels updated | `f5f6b2f0` | Recent requests now scroll inside the overview card; custom provider names come from `/provider-configs` while raw provider IDs remain in filters. Focused asset test, build, and local browser checks of `xpiki` and inner scrolling pass |
 
 ## Update convention
 
