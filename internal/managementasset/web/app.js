@@ -20,6 +20,7 @@ const routes = [
   ["settings", "nav.settings", "settings", "system_settings"],
   ["system-info", "nav.systemInfo", "server", "system_info"],
   ["plugins", "nav.plugins", "puzzle", "plugins"],
+  ["skills", "nav.skills", "command"],
   ["token-saver", "nav.tokenSaver", "zap", "token_saver"]
 ];
 
@@ -302,15 +303,25 @@ function renderStatusPage(page, capabilityID, titleKey) {
 }
 
 async function copyText(value) {
-  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(value);
   const input = document.createElement("textarea");
   input.value = value;
+  input.style.position = "fixed";
+  input.style.left = "-10000px";
+  input.style.top = "0";
   document.body.appendChild(input);
   input.select();
   let copied;
   try { copied = document.execCommand("copy"); }
+  catch (_) { copied = false; }
   finally { input.remove(); }
-  if (!copied) throw new Error(t("common.copyFailed"));
+  if (copied) return;
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(value);
+      return;
+    } catch (_) {}
+  }
+  throw new Error(t("common.copyFailed"));
 }
 
 function flashAction(button, label) {
@@ -1671,6 +1682,24 @@ async function renderPlugins(page) {
   await load();
 }
 
+function renderSkills(page) {
+  const baseURL = `${location.origin}/v1`;
+  const instructions = t("skills.instructions").replaceAll("{baseURL}", baseURL);
+  page.innerHTML = pageHeader("kicker.management", "skills.title", "skills.description") + `<section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("command")}</span><div><h2>${t("skills.gatewayTitle")}</h2><p>${t("skills.gatewayDescription")}</p></div></div><textarea class="text-input" id="skills-instructions" rows="12" readonly spellcheck="false">${escapeHTML(instructions)}</textarea><div class="actions"><button class="primary compact" id="copy-skills">${icon("copy")}${t("skills.copy")}</button><span class="form-message" id="skills-feedback" role="status" aria-live="polite"></span></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("route")}</span><div><h2>${t("skills.supportedTitle")}</h2><p>${t("skills.supportedDescription")}</p></div></div><div class="settings-grid"><label>${t("skills.modelsEndpoint")}<input class="text-input" readonly value="${escapeHTML(baseURL)}/models"></label><label>${t("skills.chatEndpoint")}<input class="text-input" readonly value="${escapeHTML(baseURL)}/chat/completions"></label></div></section>`;
+  page.querySelector("#copy-skills").addEventListener("click", async event => {
+    const feedback = page.querySelector("#skills-feedback");
+    try {
+      await copyText(instructions);
+      feedback.textContent = t("skills.copied");
+      feedback.className = "form-message ok";
+      flashAction(event.currentTarget, t("skills.copied"));
+    } catch {
+      feedback.textContent = t("common.copyFailed");
+      feedback.className = "form-message failed";
+    }
+  });
+}
+
 function renderPage(name) {
   const page = document.getElementById("page");
   switch (name) {
@@ -1685,6 +1714,7 @@ function renderPage(name) {
     case "settings": renderSettings(page); break;
     case "system-info": renderSystemInfo(page); break;
     case "plugins": renderPlugins(page); break;
+    case "skills": renderSkills(page); break;
     case "token-saver": renderStatusPage(page, "token_saver", "page.tokenSaver"); break;
     case "cli-tools": window.ManagementTools.render(page, cliToolRouteID()); break;
     default: renderOverview(page);
