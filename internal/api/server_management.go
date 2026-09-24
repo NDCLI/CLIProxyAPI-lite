@@ -28,6 +28,7 @@ func (s *Server) registerManagementRoutes() {
 	mgmt.Use(s.managementAvailabilityMiddleware(), s.mgmt.Middleware())
 	{
 		mgmt.GET("/capabilities", s.mgmt.GetCapabilities)
+		mgmt.GET("/system-info", s.mgmt.GetSystemInfo)
 		mgmt.GET("/endpoint-keys", s.mgmt.GetEndpointKeys)
 		mgmt.GET("/endpoint-keys/:id/secret", s.mgmt.GetEndpointKeySecret)
 		mgmt.POST("/endpoint-keys", s.mgmt.PostEndpointKey)

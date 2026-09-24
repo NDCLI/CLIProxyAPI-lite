@@ -33,6 +33,7 @@ func (h *Handler) GetCapabilities(c *gin.Context) {
 			{ID: "cli_tools", State: "ready"},
 			{ID: "logs", State: "ready"},
 			{ID: "system_settings", State: "ready"},
+			{ID: "system_info", State: "ready"},
 		},
 	})
 }

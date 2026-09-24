@@ -18,6 +18,7 @@ const routes = [
   ["quota", "nav.quota", "gauge", "quota"],
   ["logs", "nav.logs", "terminal", "logs"],
   ["settings", "nav.settings", "settings", "system_settings"],
+  ["system-info", "nav.systemInfo", "server", "system_info"],
   ["plugins", "nav.plugins", "puzzle", "plugins"],
   ["token-saver", "nav.tokenSaver", "zap", "token_saver"]
 ];
@@ -1545,6 +1546,28 @@ async function renderSettings(page) {
   }
 }
 
+async function renderSystemInfo(page) {
+  page.innerHTML = pageHeader("kicker.management", "systemInfo.title", "systemInfo.description", true) + `<div id="system-info-data" class="loading">${t("common.loading")}</div>`;
+  const container = page.querySelector("#system-info-data");
+  const load = async () => {
+    container.className = "loading";
+    container.textContent = t("common.loading");
+    try {
+      const {item} = await api("/system-info");
+      if (!container.isConnected) return;
+      container.className = "settings-layout";
+      container.innerHTML = `<section class="card settings-section"><div class="settings-grid"><label>${t("systemInfo.version")}<input class="text-input" readonly value="${escapeHTML(item.version)}"></label><label>${t("systemInfo.commit")}<input class="text-input" readonly value="${escapeHTML(item.commit)}"></label><label>${t("systemInfo.buildDate")}<input class="text-input" readonly value="${escapeHTML(item.build_date)}"></label><label>${t("systemInfo.goVersion")}<input class="text-input" readonly value="${escapeHTML(item.go_version)}"></label><label>${t("systemInfo.operatingSystem")}<input class="text-input" readonly value="${escapeHTML(item.operating_system)}"></label><label>${t("systemInfo.architecture")}<input class="text-input" readonly value="${escapeHTML(item.architecture)}"></label></div></section>`;
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      if (!container.isConnected) return;
+      container.className = "error";
+      container.textContent = t("systemInfo.loadFailed");
+    }
+  };
+  page.querySelector("#refresh").addEventListener("click", load);
+  await load();
+}
+
 async function renderPlugins(page) {
   let tab = "installed";
   let run = 0;
@@ -1660,6 +1683,7 @@ function renderPage(name) {
     case "quota": renderQuota(page); break;
     case "logs": renderLogs(page); break;
     case "settings": renderSettings(page); break;
+    case "system-info": renderSystemInfo(page); break;
     case "plugins": renderPlugins(page); break;
     case "token-saver": renderStatusPage(page, "token_saver", "page.tokenSaver"); break;
     case "cli-tools": window.ManagementTools.render(page, cliToolRouteID()); break;
