@@ -298,6 +298,7 @@ tbody tr:hover { background: #79b2ff0a; }
 .login-card { width: min(440px, 100%); padding: 36px; background: linear-gradient(150deg, #203452, #142238); border: 1px solid #50698b; border-radius: 16px; box-shadow: 0 24px 80px #0005; }
 .login-card h1 { margin: 32px 0 8px; font-size: 25px; letter-spacing: -.5px; }
 .login-card p { color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+.login-default-password { display: block; margin-top: 10px; padding: 8px 10px; border: 1px solid #e56a4a55; border-radius: 8px; background: #e56a4a18; color: #ffb49d; font-size: 12px; font-weight: 600; }
 @media (hover: hover) {
   :where(.primary, .secondary, .danger-button, .refresh, .top-button, .nav-link, .sidebar-action, .text-link, .card-arrow, .search-field, .text-input, .field input) { transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, color .16s ease, transform .16s ease; }
   :where(.card, .status-panel, .provider-group) { transition: border-color .18s ease, box-shadow .18s ease, background-color .18s ease; }

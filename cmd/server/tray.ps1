@@ -6,6 +6,8 @@ if (-not $mutex.WaitOne(0)) {
   return
 }
 $notify = $null
+$icon = $null
+$iconStream = $null
 $menu = $null
 $context = $null
 try {
@@ -16,7 +18,9 @@ try {
   $openItem = $menu.Items.Add('Mở giao diện quản lý')
   $quitItem = $menu.Items.Add('Thoát máy chủ')
   $notify = [System.Windows.Forms.NotifyIcon]::new()
-  $notify.Icon = [System.Drawing.SystemIcons]::Application
+  $iconStream = [System.IO.MemoryStream]::new([Convert]::FromBase64String($env:CLIPROXY_TRAY_ICON))
+  $icon = [System.Drawing.Icon]::new($iconStream)
+  $notify.Icon = $icon
   $notify.Text = 'CLIProxyAPI - Server đang chạy'
   $notify.ContextMenuStrip = $menu
   $notify.add_DoubleClick({ [Console]::Out.WriteLine('open') })
@@ -33,6 +37,8 @@ try {
     $notify.Visible = $false
     $notify.Dispose()
   }
+  if ($icon) { $icon.Dispose() }
+  if ($iconStream) { $iconStream.Dispose() }
   if ($menu) { $menu.Dispose() }
   if ($context) { $context.Dispose() }
   $mutex.ReleaseMutex()

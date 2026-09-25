@@ -10,6 +10,7 @@ config.yaml
 # Generated content
 bin/*
 /logs
+/backups/
 conv/*
 temp/*
 refs/*

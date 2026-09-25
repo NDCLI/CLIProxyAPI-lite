@@ -60,6 +60,7 @@ const iconPaths = {
   filter: '<path d="M4 5h16l-6 7v6l-4 2v-8L4 5Z"/>',
   pause: '<path d="M8 5v14M16 5v14"/>',
   download: '<path d="M12 3v12m0 0 4-4m-4 4-4-4M4 20h16"/>',
+  upload: '<path d="M12 17V5m0 0 4 4m-4-4L8 9M4 20h16"/>',
   close: '<path d="M5 5 19 19M19 5 5 19"/>'
 };
 const icon = (name, className = "") => `<svg class="icon ${className}" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name] || ""}</svg>`;
@@ -174,7 +175,7 @@ function renderLogin(error = "") {
     <div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
     <h1>${t("auth.title")}</h1><p>${t("auth.description")}</p>
     <form id="login-form"><div class="field"><label for="management-key">${t("auth.key")}</label><input id="management-key" type="password" autocomplete="current-password" placeholder="${t("auth.keyPlaceholder")}" value="${escapeHTML(state.key)}" required /></div>
-    <span class="hint">${t("auth.sessionOnly")}</span><button class="primary" type="submit">${icon("key")}${t("action.login")}</button><div class="form-error">${escapeHTML(error)}</div></form>
+    <span class="login-default-password">${t("auth.defaultPassword")}</span><span class="hint">${t("auth.sessionOnly")}</span><button class="primary" type="submit">${icon("key")}${t("action.login")}</button><div class="form-error">${escapeHTML(error)}</div></form>
   </section></main>`;
   document.getElementById("login-form").addEventListener("submit", async event => {
     event.preventDefault();
@@ -1752,6 +1753,8 @@ async function renderSettings(page) {
     const settings = (await api("/system-settings")).item || {};
     if (!page.isConnected || page.dataset.page !== "settings") return;
     page.innerHTML = pageHeader("kicker.management", "settings.title", "settings.description", true) + `<form id="settings-form" class="settings-layout"><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("server")}</span><div><h2>${t("settings.connection")}</h2><p>${t("settings.connectionDescription")}</p></div></div><div class="settings-grid"><label>${t("settings.host")}<input class="text-input" value="${escapeHTML(settings.host || "")}" readonly></label><label>${t("settings.port")}<input class="text-input" value="${Number(settings.port || 0)}" readonly></label></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("route")}</span><div><h2>${t("settings.routing")}</h2><p>${t("settings.routingDescription")}</p></div></div><label>${t("settings.routingStrategy")}<select class="text-input" name="routing_strategy"><option value="round-robin" ${settings.routing_strategy === "round-robin" ? "selected" : ""}>${t("settings.roundRobin")}</option><option value="weighted-round-robin" ${settings.routing_strategy === "weighted-round-robin" ? "selected" : ""}>${t("settings.weightedRoundRobin")}</option><option value="fill-first" ${settings.routing_strategy === "fill-first" ? "selected" : ""}>${t("settings.fillFirst")}</option></select></label><div class="settings-grid"><label>${t("settings.requestRetry")}<input class="text-input" type="number" name="request_retry" min="0" required value="${Number(settings.request_retry || 0)}"></label><label>${t("settings.maxRetryCredentials")}<input class="text-input" type="number" name="max_retry_credentials" min="0" required value="${Number(settings.max_retry_credentials || 0)}"></label><label>${t("settings.maxRetryInterval")}<input class="text-input" type="number" name="max_retry_interval" min="0" required value="${Number(settings.max_retry_interval || 0)}"></label></div><label class="settings-toggle"><input type="checkbox" name="force_model_prefix" ${settings.force_model_prefix ? "checked" : ""}> <span><strong>${t("settings.forceModelPrefix")}</strong><small>${t("settings.forceModelPrefixDescription")}</small></span></label></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("settings")}</span><div><h2>${t("settings.behavior")}</h2><p>${t("settings.behaviorDescription")}</p></div></div><div class="settings-toggles"><label class="settings-toggle"><input type="checkbox" name="logging_to_file" ${settings.logging_to_file ? "checked" : ""}> <span><strong>${t("settings.logging")}</strong><small>${t("settings.loggingDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="request_log" ${settings.request_log ? "checked" : ""}> <span><strong>${t("settings.requestLog")}</strong><small>${t("settings.requestLogDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="usage_statistics_enabled" ${settings.usage_statistics_enabled ? "checked" : ""}> <span><strong>${t("settings.usage")}</strong><small>${t("settings.usageDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="websocket_auth" ${settings.websocket_auth ? "checked" : ""}> <span><strong>${t("settings.websocketAuth")}</strong><small>${t("settings.websocketAuthDescription")}</small></span></label><label class="settings-toggle"><input type="checkbox" name="debug" ${settings.debug ? "checked" : ""}> <span><strong>${t("settings.debug")}</strong><small>${t("settings.debugDescription")}</small></span></label></div></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("terminal")}</span><div><h2>${t("settings.logRetention")}</h2><p>${t("settings.logRetentionDescription")}</p></div></div><div class="settings-grid"><label>${t("settings.maxLogSize")}<input class="text-input" type="number" name="logs_max_total_size_mb" min="0" required value="${Number(settings.logs_max_total_size_mb || 0)}"></label><label>${t("settings.maxErrorLogs")}<input class="text-input" type="number" name="error_logs_max_files" min="0" required value="${Number(settings.error_logs_max_files || 0)}"></label></div></section><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="settings-message" role="status" aria-live="polite"></span></div></form><section class="card settings-section settings-proxy"><div class="tool-title"><span class="feature-icon">${icon("globe")}</span><div><h2>${t("settings.proxy")}</h2><p>${t("settings.proxyDescription")}</p></div><span class="badge ${settings.proxy_url_configured ? "ready" : "partial"}" id="proxy-status">${t(settings.proxy_url_configured ? "settings.proxyConfigured" : "settings.proxyNotConfigured")}</span></div><form id="proxy-form"><label>${t("settings.proxyUrl")}<input class="text-input" name="proxy_url" type="password" autocomplete="new-password" placeholder="${t(settings.proxy_url_configured ? "settings.proxyReplacePlaceholder" : "settings.proxyPlaceholder")}"></label><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.proxySave")}</button><button class="danger-button" type="button" id="proxy-clear" ${settings.proxy_url_configured ? "" : "disabled"}>${icon("trash")}${t("settings.proxyClear")}</button><span class="form-message" id="proxy-message" role="status" aria-live="polite"></span></div><span class="hint">${t("settings.proxySecretHint")}</span></form></section>`;
+    page.insertAdjacentHTML("beforeend", `<section class="card settings-section settings-proxy"><div class="tool-title"><span class="feature-icon">${icon("key")}</span><div><h2>${t("settings.passwordTitle")}</h2><p>${t("settings.passwordDescription")}</p></div></div><form id="management-password-form"><div class="settings-grid"><label>${t("settings.currentPassword")}<input class="text-input" name="current_password" type="password" autocomplete="current-password" required></label><label>${t("settings.newPassword")}<input class="text-input" name="new_password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required></label><label>${t("settings.confirmPassword")}<input class="text-input" name="confirm_password" type="password" autocomplete="new-password" minlength="6" maxlength="128" required></label></div><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.changePassword")}</button><span class="form-message" id="password-message" role="status" aria-live="polite"></span></div></form></section><section class="card settings-section settings-proxy"><div class="tool-title"><span class="feature-icon">${icon("download")}</span><div><h2>${t("settings.backupTitle")}</h2><p>${t("settings.backupDescription")}</p></div></div><p class="hint">${t("settings.backupSecretWarning")}</p><div class="actions"><button class="secondary" type="button" id="export-local-backup">${icon("download")}${t("settings.exportBackup")}</button><button class="secondary" type="button" id="choose-local-backup">${icon("upload")}${t("settings.importBackup")}</button><input id="local-backup-file" type="file" accept=".json,application/json" hidden><span class="form-message" id="backup-message" role="status" aria-live="polite"></span></div></section>`);
+    page.querySelector("#backup-message").closest("section").insertAdjacentHTML("beforeend", `<label class="settings-toggle"><input id="backup-restore-password" type="checkbox"><span><strong>${t("settings.restoreBackupPassword")}</strong><small>${t("settings.restoreBackupPasswordDescription")}</small></span></label><label id="backup-password-field" hidden>${t("settings.backupPassword")}<input id="backup-password" class="text-input" type="password" autocomplete="off"></label>`);
     const load = () => renderSettings(page);
     document.getElementById("refresh").addEventListener("click", load);
     const settingsForm = page.querySelector("#settings-form");
@@ -1811,6 +1814,88 @@ async function renderSettings(page) {
         proxyMessage.textContent = t("settings.proxyCleared");
         proxyMessage.className = "form-message ok";
       } catch (error) { if (error.message === "invalid_key") return logout(); proxyMessage.textContent = t("common.error"); proxyMessage.className = "form-message failed"; button.disabled = false; }
+    });
+    const passwordForm = page.querySelector("#management-password-form");
+    const passwordMessage = page.querySelector("#password-message");
+    passwordForm.addEventListener("submit", async event => {
+      event.preventDefault();
+      const current = passwordForm.elements.current_password.value;
+      const next = passwordForm.elements.new_password.value;
+      if (next !== passwordForm.elements.confirm_password.value) {
+        passwordMessage.textContent = t("settings.passwordMismatch");
+        passwordMessage.className = "form-message failed";
+        return;
+      }
+      const button = passwordForm.querySelector('[type="submit"]');
+      button.disabled = true;
+      passwordMessage.textContent = t("settings.saving");
+      try {
+        await api("/management-password", {method: "PATCH", body: JSON.stringify({current_password: current, new_password: next})});
+        state.key = next;
+        sessionStorage.setItem("cliproxy-next-management-key", next);
+        passwordForm.reset();
+        passwordMessage.textContent = t("settings.passwordChanged");
+        passwordMessage.className = "form-message ok";
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        passwordMessage.textContent = t(error.code === "wrong_current_password" ? "settings.currentPasswordWrong" : error.code === "password_override" ? "settings.passwordOverride" : "settings.passwordChangeFailed");
+        passwordMessage.className = "form-message failed";
+      } finally { button.disabled = false; }
+    });
+    const backupMessage = page.querySelector("#backup-message");
+    const exportButton = page.querySelector("#export-local-backup");
+    exportButton.addEventListener("click", async () => {
+      exportButton.disabled = true;
+      backupMessage.textContent = t("settings.exportingBackup");
+      try {
+        const response = await fetch("/v0/management/local-backup", {headers: {Authorization: `Bearer ${state.key}`}, cache: "no-store"});
+        if (response.status === 401) return logout();
+        if (!response.ok) throw new Error("export_failed");
+        const url = URL.createObjectURL(await response.blob());
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `cliproxy-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        backupMessage.textContent = t("settings.backupDownloaded");
+        backupMessage.className = "form-message ok";
+      } catch {
+        backupMessage.textContent = t("settings.backupExportFailed");
+        backupMessage.className = "form-message failed";
+      } finally { exportButton.disabled = false; }
+    });
+    const importButton = page.querySelector("#choose-local-backup");
+    const backupInput = page.querySelector("#local-backup-file");
+    const restorePassword = page.querySelector("#backup-restore-password");
+    const backupPasswordField = page.querySelector("#backup-password-field");
+    const backupPasswordInput = page.querySelector("#backup-password");
+    restorePassword.addEventListener("change", () => { backupPasswordField.hidden = !restorePassword.checked; backupPasswordInput.required = restorePassword.checked; if (!restorePassword.checked) backupPasswordInput.value = ""; });
+    importButton.addEventListener("click", () => backupInput.click());
+    backupInput.addEventListener("change", async () => {
+      const file = backupInput.files?.[0];
+      if (!file) return;
+      importButton.disabled = true;
+      try {
+        if (file.size > 32 * 1024 * 1024) throw new Error("invalid_backup");
+        let backup;
+        try { backup = JSON.parse(await file.text()); } catch { throw new Error("invalid_backup"); }
+        if (backup.format !== "cliproxy-local-backup" || backup.version !== 1 || !backup.files || typeof backup.config_yaml !== "string") throw new Error("invalid_backup");
+        const count = Object.keys(backup.files).filter(name => name.startsWith("auth/")).length;
+        const restore = restorePassword.checked;
+        if (restore && !backupPasswordInput.value) throw new Error("backup_password_required");
+        const confirmKey = restore ? "settings.backupConfirmImportPassword" : "settings.backupConfirmImport";
+        if (!confirm(`${file.name}\n\n${t(confirmKey).replace("{count}", String(count))}`)) return;
+        backup.restore_password = restore;
+        backup.backup_password = restore ? backupPasswordInput.value : "";
+        backupMessage.textContent = t("settings.importingBackup");
+        const result = await api("/local-backup", {method: "POST", body: JSON.stringify(backup)});
+        alert(t(restore ? "settings.backupImportedWithPassword" : "settings.backupImported").replace("{path}", result.safety_backup || ""));
+        logout();
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        backupMessage.textContent = t(error.code === "mitm_running" ? "settings.backupStopMITM" : error.code === "password_override" ? "settings.passwordOverride" : error.code === "backup_password_wrong" ? "settings.backupPasswordWrong" : error.message === "backup_password_required" ? "settings.backupPasswordRequired" : error.message === "invalid_backup" || ["invalid_backup", "unsupported_backup"].includes(error.code) ? "settings.backupInvalid" : "settings.backupImportFailed");
+        backupMessage.className = "form-message failed";
+      } finally { backupInput.value = ""; backupPasswordInput.value = ""; importButton.disabled = false; }
     });
   } catch (error) {
     if (error.message === "invalid_key") return logout();

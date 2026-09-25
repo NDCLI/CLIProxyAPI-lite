@@ -31,6 +31,9 @@ import (
 //go:embed tray.ps1
 var trayPowerShellScript string
 
+//go:embed tray.ico
+var trayIcon []byte
+
 func acquireTrayInstance() (func(), bool, error) {
 	name, err := windows.UTF16PtrFromString(`Local\CLIProxyAPI-Tray`)
 	if err != nil {
@@ -137,6 +140,7 @@ func startTrayController() (*exec.Cmd, <-chan string, func() error, error) {
 	}
 
 	command := exec.Command(powershell, "-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-EncodedCommand", encodePowerShell(trayPowerShellScript))
+	command.Env = append(os.Environ(), "CLIPROXY_TRAY_ICON="+base64.StdEncoding.EncodeToString(trayIcon))
 	command.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	command.Stderr = log.StandardLogger().Out
 	stdout, err := command.StdoutPipe()
