@@ -5,5 +5,5 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("The cliproxy tray launcher is available only on Windows release packages.")
+	fmt.Println("The Lumina tray launcher is available only on Windows release packages.")
 }

@@ -21,7 +21,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const mitmCAName = "CLIProxyAPI Root CA"
+const mitmCAName = "Lumina Root CA"
 
 var errUnsupportedCertStore = errors.New("automatic certificate installation is not supported on this operating system")
 
@@ -31,7 +31,7 @@ func (h *Handler) DownloadMITMCA(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": errEnsure.Error()})
 		return
 	}
-	c.FileAttachment(certPath, "CLIProxyAPI-Root-CA.crt")
+	c.FileAttachment(certPath, "Lumina-Root-CA.crt")
 }
 
 func (h *Handler) InstallMITMCert(c *gin.Context) {
@@ -48,14 +48,14 @@ func (h *Handler) InstallMITMCert(c *gin.Context) {
 		c.JSON(status, gin.H{"error": errInstall.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "CLIProxyAPI Root CA installed in the current user's trusted root store"})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Lumina Root CA installed in the current user's trusted root store"})
 }
 
 func (h *Handler) UninstallMITMCert(c *gin.Context) {
 	certPath, _ := h.mitmCAPaths()
 	cert, errLoad := loadMITMCertificate(certPath)
 	if errors.Is(errLoad, os.ErrNotExist) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "CLIProxyAPI Root CA has not been generated"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Lumina Root CA has not been generated"})
 		return
 	}
 	if errLoad != nil {
@@ -70,7 +70,7 @@ func (h *Handler) UninstallMITMCert(c *gin.Context) {
 		c.JSON(status, gin.H{"error": errUninstall.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "CLIProxyAPI Root CA removed from the current user's trusted root store"})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "Lumina Root CA removed from the current user's trusted root store"})
 }
 
 func (h *Handler) mitmCAPaths() (string, string) {
@@ -110,7 +110,7 @@ func (h *Handler) ensureMITMCA() (string, string, error) {
 		SerialNumber: serial,
 		Subject: pkix.Name{
 			CommonName:   mitmCAName,
-			Organization: []string{"CLIProxyAPI-lite"},
+			Organization: []string{"Lumina"},
 		},
 		NotBefore:             now.Add(-5 * time.Minute),
 		NotAfter:              now.AddDate(10, 0, 0),

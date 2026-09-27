@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$mutex = [System.Threading.Mutex]::new($false, 'Local\CLIProxyAPI-Tray')
+$mutex = [System.Threading.Mutex]::new($false, 'Local\Lumina-Tray')
 if (-not $mutex.WaitOne(0)) {
   [Console]::Out.WriteLine('already-running')
   $mutex.Dispose()
@@ -21,7 +21,7 @@ try {
   $iconStream = [System.IO.MemoryStream]::new([Convert]::FromBase64String($env:CLIPROXY_TRAY_ICON))
   $icon = [System.Drawing.Icon]::new($iconStream)
   $notify.Icon = $icon
-  $notify.Text = 'CLIProxyAPI - Server đang chạy'
+  $notify.Text = 'Lumina - Server đang chạy'
   $notify.ContextMenuStrip = $menu
   $notify.add_DoubleClick({ [Console]::Out.WriteLine('open') })
   $openItem.add_Click({ [Console]::Out.WriteLine('open') })

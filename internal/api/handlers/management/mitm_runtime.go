@@ -661,7 +661,7 @@ func generateMITMLeafCertificate(host string, root *x509.Certificate, rootKey *r
 	now := time.Now()
 	template := &x509.Certificate{
 		SerialNumber: serial,
-		Subject:      pkix.Name{CommonName: host, Organization: []string{"CLIProxyAPI-lite"}},
+		Subject:      pkix.Name{CommonName: host, Organization: []string{"Lumina"}},
 		DNSNames:     []string{host},
 		NotBefore:    now.Add(-5 * time.Minute),
 		NotAfter:     now.AddDate(1, 0, 0),

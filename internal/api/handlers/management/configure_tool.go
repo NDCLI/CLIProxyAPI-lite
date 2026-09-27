@@ -231,7 +231,7 @@ func buildCLIToolConfig(req configureToolRequest, config map[string]any) (map[st
 		if errMap != nil {
 			return nil, errMap
 		}
-		provider["name"], provider["base_url"], provider["wire_api"] = "CLIProxyAPI-lite", req.BaseURL, "responses"
+		provider["name"], provider["base_url"], provider["wire_api"] = "Lumina", req.BaseURL, "responses"
 		headers, errMap := extraToolObject(provider, "http_headers")
 		if errMap != nil {
 			return nil, errMap
@@ -353,7 +353,7 @@ func configureCLITool(item cliToolItem, req configureToolRequest) (configureTool
 		backupPath := cliToolBackupPath(item.ConfigPath)
 		data, errRead := os.ReadFile(backupPath)
 		if errors.Is(errRead, os.ErrNotExist) {
-			return configureToolResponse{Status: "ok", Tool: item.ID, Message: "No saved CLIProxyAPI configuration to reset"}, nil
+			return configureToolResponse{Status: "ok", Tool: item.ID, Message: "No saved Lumina configuration to reset"}, nil
 		}
 		if errRead != nil {
 			return configureToolResponse{}, errRead
@@ -373,7 +373,7 @@ func configureCLITool(item cliToolItem, req configureToolRequest) (configureTool
 				}
 			} else {
 				_ = os.Remove(backupPath)
-				return configureToolResponse{Status: "ok", Tool: item.ID, Message: "CLIProxyAPI settings removed"}, nil
+				return configureToolResponse{Status: "ok", Tool: item.ID, Message: "Lumina settings removed"}, nil
 			}
 		} else {
 			original := map[string]any{}
@@ -397,7 +397,7 @@ func configureCLITool(item cliToolItem, req configureToolRequest) (configureTool
 		if errRemove := os.Remove(backupPath); errRemove != nil && !errors.Is(errRemove, os.ErrNotExist) {
 			return configureToolResponse{}, errRemove
 		}
-		return configureToolResponse{Status: "ok", Tool: item.ID, Message: "CLIProxyAPI settings removed", Path: item.ConfigPath}, nil
+		return configureToolResponse{Status: "ok", Tool: item.ID, Message: "Lumina settings removed", Path: item.ConfigPath}, nil
 	}
 	current, errRead := readToolConfig(item)
 	if errRead != nil {

@@ -83,7 +83,7 @@
     "error_timeout": "Kết nối quá thời gian, máy chủ không phản hồi",
     "error_unauthorized": "Xác thực thất bại, thiếu hoặc không đúng management key",
     "error_forbidden": "Từ chối truy cập, quản lý từ xa đã bị vô hiệu hóa, chưa cấu hình management key hoặc IP này tạm thời bị cấm",
-    "error_not_found": "Không tìm thấy Management API, hãy đảm bảo địa chỉ máy chủ trỏ đến backend CLIProxyAPI",
+    "error_not_found": "Không tìm thấy Management API, hãy đảm bảo địa chỉ máy chủ trỏ đến backend Lumina",
     "error_server": "Backend gặp lỗi khi xử lý request quản lý, hãy kiểm tra nhật ký máy chủ",
     "error_cors": "Request CORS bị chặn, vui lòng kiểm tra cấu hình máy chủ",
     "error_ssl": "Xác minh chứng chỉ SSL/TLS thất bại"
@@ -1400,7 +1400,7 @@
     "description_show_more": "Xem thêm",
     "description_show_less": "Thu gọn",
     "source_name": "Nguồn: {{source}}",
-    "cli_proxy_api_source": "Nguồn CLIProxyAPI",
+    "cli_proxy_api_source": "Nguồn Lumina",
     "refresh": "Làm mới",
     "retry": "Thử lại",
     "load_failed": "Không thể tải kho plugin",

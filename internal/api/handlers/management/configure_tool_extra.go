@@ -37,7 +37,7 @@ func extraToolConfig(tool, baseURL, apiKey, model, subagentModel string, existin
 			return nil, errMap
 		}
 		provider["npm"] = "@ai-sdk/openai-compatible"
-		provider["name"] = "CLIProxyAPI-lite"
+		provider["name"] = "Lumina"
 		options, errMap := extraToolObject(provider, "options")
 		if errMap != nil {
 			return nil, errMap
@@ -159,7 +159,7 @@ func extraToolConfig(tool, baseURL, apiKey, model, subagentModel string, existin
 			return nil, errMap
 		}
 		settings["model"], settings["base_url"], settings["api_key"] = model, baseURL, apiKey
-		settings["name"], settings["api_backend"] = "CLIProxyAPI-lite", "chat_completions"
+		settings["name"], settings["api_backend"] = "Lumina", "chat_completions"
 		models, errMap := extraToolObject(existing, "models")
 		if errMap != nil {
 			return nil, errMap
@@ -177,7 +177,7 @@ func extraToolConfig(tool, baseURL, apiKey, model, subagentModel string, existin
 					return nil, errMap
 				}
 				subModel["model"], subModel["base_url"], subModel["api_key"] = subagentModel, baseURL, apiKey
-				subModel["name"], subModel["api_backend"] = "CLIProxyAPI-lite "+role, "chat_completions"
+				subModel["name"], subModel["api_backend"] = "Lumina "+role, "chat_completions"
 				subagents[role] = slot
 			}
 		}

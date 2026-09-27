@@ -1,4 +1,4 @@
-# CLIProxyAPI-lite — Roadmap
+# Lumina — Roadmap
 
 Lightweight, local-only AI gateway forked from [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 One binary, one machine, web UI, no cloud infrastructure.

@@ -132,7 +132,7 @@
   function guideSnippet(id, url, key, model) {
     const apiKey = key || "YOUR_API_KEY";
     const selectedModel = model || "provider/model-id";
-    if (id === "continue" || id === "continue-dev") return JSON.stringify({models: [{title: "CLIProxyAPI", provider: "openai", model: selectedModel, apiBase: url, apiKey}]}, null, 2);
+    if (id === "continue" || id === "continue-dev") return JSON.stringify({models: [{title: "Lumina", provider: "openai", model: selectedModel, apiBase: url, apiKey}]}, null, 2);
     if (id === "qwen-code") return JSON.stringify({security: {auth: {selectedType: "openai", apiKey, baseUrl: url}}, model: {name: selectedModel}}, null, 2);
     if (id === "amp") return `OPENAI_BASE_URL=${url} OPENAI_API_KEY=${apiKey} amp --model ${selectedModel}`;
     return `Base URL: ${url}\nAPI key: ${apiKey}\nModel: ${selectedModel}`;
@@ -243,7 +243,7 @@
     if (response.status === 401) return logout();
     if (!response.ok) throw new Error("download_failed");
     const link = document.createElement("a"); const url = URL.createObjectURL(await response.blob());
-    link.href = url; link.download = "CLIProxyAPI-Root-CA.crt"; link.click(); URL.revokeObjectURL(url);
+    link.href = url; link.download = "Lumina-Root-CA.crt"; link.click(); URL.revokeObjectURL(url);
   }
 
   async function renderMITM(page, selectedTool = "", options = {}) {

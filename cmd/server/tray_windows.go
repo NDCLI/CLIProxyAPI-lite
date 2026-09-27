@@ -35,7 +35,7 @@ var trayPowerShellScript string
 var trayIcon []byte
 
 func acquireTrayInstance() (func(), bool, error) {
-	name, err := windows.UTF16PtrFromString(`Local\CLIProxyAPI-Tray`)
+	name, err := windows.UTF16PtrFromString(`Local\Lumina-Tray`)
 	if err != nil {
 		return nil, false, fmt.Errorf("encode tray lock name: %w", err)
 	}
