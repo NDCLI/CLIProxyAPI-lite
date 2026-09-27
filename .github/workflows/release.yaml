@@ -735,14 +735,14 @@ jobs:
         run: |
           set -euo pipefail
           for package in npm-release-packages/ndcli-lumina-{darwin,linux,win32}-*.tgz; do
-            npm publish "$package" --access public --tag "$([[ "$GITHUB_REF_NAME" == *-* ]] && printf next || printf latest)"
+            npm publish "./$package" --access public --tag "$([[ "$GITHUB_REF_NAME" == *-* ]] && printf next || printf latest)"
           done
       - name: Publish main package
         if: success() && env.NPM_PUBLISH_ENABLED == 'true'
         shell: bash
         run: |
           set -euo pipefail
-          npm publish "npm-release-packages/ndcli-lumina-${GITHUB_REF_NAME#v}.tgz" --access public --tag "$([[ "$GITHUB_REF_NAME" == *-* ]] && printf next || printf latest)"
+          npm publish "./npm-release-packages/ndcli-lumina-${GITHUB_REF_NAME#v}.tgz" --access public --tag "$([[ "$GITHUB_REF_NAME" == *-* ]] && printf next || printf latest)"
 
   publish-checksums:
     runs-on: ubuntu-latest
