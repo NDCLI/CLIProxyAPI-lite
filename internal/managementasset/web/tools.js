@@ -6,14 +6,14 @@
   const mappingRequests = new Map();
   const mappingGenerations = new Map();
   const logos = {
-    "claude-code": "claude", "codex-cli": "codex", opencode: "opencode", openclaw: "openclaw",
+    "claude-code": "claude", "claude-cowork": "claude", "codex-cli": "codex", opencode: "opencode", openclaw: "openclaw",
     droid: "droid", hermes: "hermes", kilo: "kilocode", "deepseek-tui": "deepseek-tui",
     "grok-build": "grok-cli", copilot: "copilot", cursor: "cursor", cline: "cline",
     continue: "continue", "continue-dev": "continue", roo: "roo", amp: "amp",
     "qwen-code": "qwen", opendesign: "opendesign", antigravity: "antigravity", kiro: "kiro"
   };
   const toolTitle = {
-    "claude-code": "Claude Code", "codex-cli": "OpenAI Codex", opencode: "OpenCode", openclaw: "OpenClaw",
+    "claude-code": "Claude Code", "claude-cowork": "Claude Cowork", "codex-cli": "OpenAI Codex", opencode: "OpenCode", openclaw: "OpenClaw",
     droid: "Factory Droid", hermes: "Hermes Agent", kilo: "Kilo Code", "deepseek-tui": "DeepSeek TUI",
     "grok-build": "Grok Build", copilot: "GitHub Copilot", cursor: "Cursor", cline: "Cline",
     continue: "Continue", "continue-dev": "Continue", roo: "Roo Code", amp: "Amp CLI",
@@ -102,13 +102,12 @@
     return `<label>${t("tools.apiKey")}<select class="text-input" name="api_key_id"><option value="">${t("tools.customKey")}</option>${keys.map(item => `<option value="${escapeHTML(item.id)}" ${selected === item.id ? "selected" : ""}>${escapeHTML(item.label)} · ${escapeHTML(item.mask)}</option>`).join("")}</select><input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("tools.customKeyPlaceholder")}" ${selected ? "disabled" : ""}><small class="hint">${t("tools.apiKeyHint")}</small></label>`;
   }
 
-  function endpointField(value, id = "tool-endpoint", inputName = "base_url") {
-    const local = `${location.origin}/v1`;
-    const isLocal = !value || value === local;
-    return `<label>${t("tools.endpoint")}<select class="text-input" id="${id}-preset"><option value="local" ${isLocal ? "selected" : ""}>${t("tools.localEndpoint")} · ${escapeHTML(local)}</option>${!isLocal ? `<option value="saved" selected>${t("tools.currentEndpoint")} · ${escapeHTML(value)}</option>` : ""}<option value="custom">${t("tools.customEndpoint")}</option></select><input class="text-input" name="${inputName}" type="url" required value="${escapeHTML(value || local)}" ${isLocal ? "readonly" : ""}><small class="hint">${t("tools.endpointHint")}</small></label>`;
+  function endpointField(value, id = "tool-endpoint", inputName = "base_url", local = `${location.origin}/v1`, hintKey = "tools.endpointHint") {
+    const isLocal = !value || value.replace(/\/+$/, "") === local.replace(/\/+$/, "");
+    return `<label>${t("tools.endpoint")}<select class="text-input" id="${id}-preset"><option value="local" ${isLocal ? "selected" : ""}>${t("tools.localEndpoint")} · ${escapeHTML(local)}</option>${!isLocal ? `<option value="saved" selected>${t("tools.currentEndpoint")} · ${escapeHTML(value)}</option>` : ""}<option value="custom">${t("tools.customEndpoint")}</option></select><input class="text-input" name="${inputName}" type="url" required value="${escapeHTML(value || local)}" ${isLocal ? "readonly" : ""}><small class="hint">${t(hintKey)}</small></label>`;
   }
 
-  function bindEndpointField(container, id = "tool-endpoint", inputName = "base_url") {
+  function bindEndpointField(container, id = "tool-endpoint", inputName = "base_url", local = `${location.origin}/v1`) {
     const preset = container.querySelector(`#${id}-preset`);
     const input = container.querySelector(`[name="${inputName}"]`);
     if (!preset || !input) return;
@@ -121,7 +120,7 @@
     };
     selectKey();
     preset.addEventListener("change", () => {
-      if (preset.value === "local") { input.value = `${location.origin}/v1`; input.readOnly = true; }
+      if (preset.value === "local") { input.value = local; input.readOnly = true; }
       else if (preset.value === "saved") input.readOnly = false;
       else { input.readOnly = false; input.focus(); }
       selectKey();
@@ -149,9 +148,11 @@
       const item = toolResponse.item;
       const name = toolTitle[id] || item.label;
       const current = item.current || {};
-      const url = current.base_url || `${location.origin}/v1`;
+      const isCowork = item.capabilities?.includes("cowork");
+      const localEndpoint = isCowork ? location.origin : `${location.origin}/v1`;
+      const url = current.base_url || localEndpoint;
       const selectedKey = references.keys[0]?.id || "";
-      const fields = `<div class="tool-form-grid">${endpointField(url)}${apiKeyField(references.keys, selectedKey)}<label>${t("tools.model")}<input class="text-input" name="model" list="cli-models" required value="${escapeHTML(current.model || "")}" placeholder="provider/model-id">${modelListMarkup("cli-models", references.models, current.model || "")}<small class="hint">${t("tools.modelHint")}</small></label>${item.capabilities?.includes("subagent") ? `<label>${t("tools.subagentModel")}<input class="text-input" name="subagent_model" list="cli-models" value="${escapeHTML(current.subagent_model || "")}" placeholder="${t("tools.sameAsMainModel")}"></label>` : ""}${item.capabilities?.includes("models") ? `<div class="tool-slot-grid">${["fable", "opus", "sonnet", "haiku"].map(slot => `<label>${t(`tools.slot.${slot}`)}<input class="text-input" name="model_${slot}" list="cli-models" value="${escapeHTML(current.models?.[slot] || "")}" placeholder="provider/model-id"></label>`).join("")}</div>` : ""}${item.capabilities?.includes("auto_compact") ? `<label>${t("tools.autoCompact")}<select class="text-input" name="auto_compact_window"><option value="0" ${!current.auto_compact_window ? "selected" : ""}>${t("tools.default")}</option><option value="200000" ${current.auto_compact_window === 200000 ? "selected" : ""}>200,000</option><option value="1000000" ${current.auto_compact_window === 1000000 ? "selected" : ""}>1,000,000</option></select></label>` : ""}</div>`;
+      const fields = `<div class="tool-form-grid">${endpointField(url, "tool-endpoint", "base_url", localEndpoint, isCowork ? "tools.coworkEndpointHint" : "tools.endpointHint")}${apiKeyField(references.keys, selectedKey)}${isCowork ? `<p class="hint">${t("tools.coworkModelHint")}</p>` : `<label>${t("tools.model")}<input class="text-input" name="model" list="cli-models" required value="${escapeHTML(current.model || "")}" placeholder="provider/model-id">${modelListMarkup("cli-models", references.models, current.model || "")}<small class="hint">${t("tools.modelHint")}</small></label>`}${item.capabilities?.includes("subagent") ? `<label>${t("tools.subagentModel")}<input class="text-input" name="subagent_model" list="cli-models" value="${escapeHTML(current.subagent_model || "")}" placeholder="${t("tools.sameAsMainModel")}"></label>` : ""}${item.capabilities?.includes("models") ? `<div class="tool-slot-grid">${["fable", "opus", "sonnet", "haiku"].map(slot => `<label>${t(`tools.slot.${slot}`)}<input class="text-input" name="model_${slot}" list="cli-models" value="${escapeHTML(current.models?.[slot] || "")}" placeholder="provider/model-id"></label>`).join("")}</div>` : ""}${item.capabilities?.includes("auto_compact") ? `<label>${t("tools.autoCompact")}<select class="text-input" name="auto_compact_window"><option value="0" ${!current.auto_compact_window ? "selected" : ""}>${t("tools.default")}</option><option value="200000" ${current.auto_compact_window === 200000 ? "selected" : ""}>200,000</option><option value="1000000" ${current.auto_compact_window === 1000000 ? "selected" : ""}>1,000,000</option></select></label>` : ""}</div>`;
       const common = `<a class="text-link" href="#/cli-tools">${icon("arrow")}${t("tools.back")}</a><header class="tool-detail-heading"><span class="tool-detail-logo">${iconImage(id)}</span><div><h1>${escapeHTML(name)}</h1><p>${escapeHTML(item.description || t("tools.detailDescription"))}</p></div><span class="badge ${item.configured ? "ready" : item.config_error ? "failed" : "partial"}">${t(item.config_error ? "tools.status.invalid" : item.configured ? "tools.status.connected" : "tools.status.notConfigured")}</span></header>`;
       if (item.category === "guide") {
         page.innerHTML = header() + `<section class="tool-detail">${common}<article class="card tool-config-card"><div class="section-head"><div><h2>${t("tools.guideTitle")}</h2><p class="hint">${t(`tools.guide.${id}`)}</p></div>${stateBadge(t("tools.status.guide"), "guide")}</div>${fields}<div class="actions"><button class="primary compact" type="button" id="copy-guide">${icon("copy")}${t("tools.copyGuide")}</button><span id="tool-message" class="form-message" role="status" aria-live="polite"></span></div><pre class="tool-preview" id="guide-preview"></pre><p class="hint">${t("tools.guideSecretHint")}</p></article></section>`;
@@ -173,13 +174,14 @@
       page.innerHTML = header() + `<section class="tool-detail">${common}<form id="tool-config" class="card tool-config-card"><div class="tool-config-meta"><span>${t("tools.installation")}: <strong>${t(item.installed ? "tools.installed" : "tools.notInstalled")}</strong></span><code>${escapeHTML(item.config_path || item.configPath || t("tools.localConfig"))}</code></div>${item.config_error ? `<div class="form-message failed">${t("tools.configInvalid")}</div>` : ""}${fields}<div class="actions"><button class="secondary" id="preview-tool" type="button">${icon("terminal")}${t("tools.preview")}</button><button class="primary compact" type="submit">${icon("save")}${t("tools.apply")}</button><button class="secondary" id="copy-preview" type="button" disabled>${icon("copy")}${t("tools.copyConfig")}</button><button class="danger-button" id="reset-tool" type="button" ${item.can_reset ? "" : "disabled"}>${icon("refresh")}${t("tools.reset")}</button><span id="tool-message" class="form-message" role="status" aria-live="polite"></span></div><pre class="tool-preview" id="tool-preview" hidden></pre></form></section>`;
       page.querySelector("#refresh").addEventListener("click", () => renderToolDetail(page, id, true));
       const form = page.querySelector("#tool-config");
-      bindEndpointField(form);
+      bindEndpointField(form, "tool-endpoint", "base_url", localEndpoint);
       const keySelect = form.elements.api_key_id;
       const keyInput = form.elements.api_key;
       keySelect.addEventListener("change", () => { keyInput.disabled = Boolean(keySelect.value); if (keySelect.value) keyInput.value = ""; });
       const message = form.querySelector("#tool-message");
       const bodyFromForm = action => {
-        const body = {tool: id, action, base_url: form.elements.base_url.value.trim(), api_key_id: keySelect.value, api_key: keyInput.value.trim(), model: form.elements.model.value.trim()};
+        const body = {tool: id, action, base_url: form.elements.base_url.value.trim(), api_key_id: keySelect.value, api_key: keyInput.value.trim()};
+        if (form.elements.model) body.model = form.elements.model.value.trim();
         if (form.elements.subagent_model) body.subagent_model = form.elements.subagent_model.value.trim();
         const slots = ["fable", "opus", "sonnet", "haiku"].filter(slot => form.elements[`model_${slot}`]).map(slot => [slot, form.elements[`model_${slot}`].value.trim()]);
         if (slots.length) body.models = Object.fromEntries(slots);
@@ -220,7 +222,7 @@
           applyChanges.accept(acceptedSnapshot);
           const status = form.closest(".tool-detail")?.querySelector(".tool-detail-heading .badge");
           if (status) { status.className = "badge ready"; status.textContent = t("tools.status.connected"); }
-          message.textContent = t(applyChanges.isDirty() ? "tools.appliedWithUnsavedChanges" : "tools.applied"); message.className = "form-message ok";
+          message.textContent = t(isCowork ? "tools.coworkAppliedRestart" : applyChanges.isDirty() ? "tools.appliedWithUnsavedChanges" : "tools.applied"); message.className = "form-message ok";
           form.querySelector("#tool-preview").hidden = true; form.querySelector("#copy-preview").disabled = true;
         } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t(error.code === "" ? "tools.applyFailed" : "tools.invalidSettings"); message.className = "form-message failed"; }
         finally { applyChanges.finish(); }
@@ -228,7 +230,12 @@
       form.querySelector("#reset-tool").addEventListener("click", async event => {
         if (!confirm(t("tools.confirmReset").replace("{name}", name))) return;
         const button = event.currentTarget; button.disabled = true; message.textContent = t("tools.resetting");
-        try { await api("/configure-tool", {method: "POST", body: JSON.stringify({tool: id, action: "reset"})}); message.textContent = t("tools.resetDone"); message.className = "form-message ok"; await renderToolDetail(page, id); }
+        try {
+          await api("/configure-tool", {method: "POST", body: JSON.stringify({tool: id, action: "reset"})});
+          await renderToolDetail(page, id);
+          const refreshedMessage = page.querySelector("#tool-message");
+          if (refreshedMessage) { refreshedMessage.textContent = t(isCowork ? "tools.coworkResetRestart" : "tools.resetDone"); refreshedMessage.className = "form-message ok"; }
+        }
         catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("tools.resetFailed"); message.className = "form-message failed"; button.disabled = false; }
       });
     } catch (error) {

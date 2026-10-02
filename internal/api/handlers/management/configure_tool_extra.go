@@ -11,6 +11,7 @@ const extraToolProvider = "cliproxyapi-lite"
 func extraCLITools() []cliToolItem {
 	home := homeDir()
 	return []cliToolItem{
+		{ID: "claude-cowork", Label: "Claude Cowork", Category: "auto", Format: "claude-cowork", ConfigPath: claudeCoworkDesktopConfigPath(), Capabilities: []string{"cowork", "reset"}},
 		{ID: "opencode", Label: "OpenCode", ConfigPath: filepath.Join(home, ".config", "opencode", "opencode.json"), Format: "json", Command: "opencode", ModelRequired: true, CanReset: true, Capabilities: []string{"subagent"}},
 		{ID: "openclaw", Label: "OpenClaw", ConfigPath: filepath.Join(home, ".openclaw", "openclaw.json"), Format: "json", Command: "openclaw", ModelRequired: true, CanReset: true},
 		{ID: "droid", Label: "Factory Droid", ConfigPath: filepath.Join(home, ".factory", "settings.json"), Format: "json", Command: "droid", ModelRequired: true, CanReset: true},

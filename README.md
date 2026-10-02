@@ -1,8 +1,8 @@
 # Lumina
 
-A local AI gateway and management app for Windows. It brings provider sign-in, API keys, model routing, request monitoring, and optional MITM tools into one interface, while keeping the server bound to your own computer by default.
+A local AI gateway and management app. It brings provider sign-in, API keys, model routing, request monitoring, and optional MITM tools into one interface, while keeping the server bound to your own computer by default.
 
-This private app is based on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) and includes a Windows system-tray launcher and a bundled management panel.
+This app is based on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) and includes a Windows system-tray launcher and a bundled management panel.
 
 ## Features
 
@@ -22,7 +22,7 @@ npm install -g @ndcli/lumina
 lumina
 ```
 
-Requires Node.js 20 or newer. The npm package includes native binaries for Windows, macOS, and Linux on x64 and ARM64. It does not download from this private repository or require a GitHub login. Windows starts in the system tray by default; macOS and Linux run in the terminal. Pass server flags directly, for example `lumina --tui --standalone` or `lumina --config ./config.yaml`.
+Requires Node.js 20 or newer. The npm package includes native binaries for Windows, macOS, and Linux on x64 and ARM64. It does not download from this repository or require a GitHub login. Windows starts in the system tray by default; macOS and Linux run in the terminal. Pass server flags directly, for example `lumina --tui --standalone` or `lumina --config ./config.yaml`.
 
 Update with `npm install -g @ndcli/lumina@latest`. Exit the running server first, especially on Windows. Remove the command with `npm uninstall -g @ndcli/lumina`; application data is preserved.
 
@@ -32,7 +32,53 @@ The default configuration and runtime files are stored in `%LOCALAPPDATA%\Lumina
 
 The release workflow builds the six platform packages, then the `@ndcli/lumina` command package. Package versions match the release tag without its leading `v`; prerelease versions use the npm `next` tag. Only packaged executables, the example config, the CLI files, and the license are distributed; local credentials and source code are not included.
 
-Before the first publication, create or obtain publishing access to the `@ndcli` npm scope and configure the repository's `NPM_TOKEN` Actions secret with publish permissions for all seven packages. Without this secret, CI produces npm package artifacts but skips publishing. This repository remains private; the npm packages are public. Do not run `npm install -g @ndcli/lumina` until a version has actually been published.
+Before the first publication, create or obtain publishing access to the `@ndcli` npm scope and configure the repository's `NPM_TOKEN` Actions secret with publish permissions for all seven packages. Without this secret, CI produces npm package artifacts but skips publishing. The repository is public; the npm packages are public. Do not run `npm install -g @ndcli/lumina` until a version has actually been published.
+
+## Run in Ubuntu on Termux (Android)
+
+Lumina runs in Ubuntu under Termux as a terminal service on Linux ARM64. No APK or desktop tray is required. The Android browser can open the management page at `http://127.0.0.1:8317/` while the server is running. Termux mode runs the foreground server; Windows tray controls and automatic MITM certificate or DNS setup are unavailable there.
+
+In Termux, install and enter Ubuntu:
+
+```bash
+pkg update
+pkg install proot-distro
+proot-distro install ubuntu
+proot-distro login ubuntu
+```
+
+Inside Ubuntu, install the small runtime tools and download the static `no-plugin` release. Replace `v0.2.3` with the version you want:
+
+```bash
+apt update
+apt install -y ca-certificates curl tar
+VERSION=v0.2.3
+mkdir -p "$HOME/lumina"
+curl -fL -o /tmp/lumina.tar.gz \
+  "https://github.com/NDCLI/CLIProxyAPI-lite/releases/download/${VERSION}/CLIProxyAPI_${VERSION#v}_linux_aarch64_no-plugin.tar.gz"
+tar -xzf /tmp/lumina.tar.gz -C "$HOME/lumina"
+cd "$HOME/lumina"
+chmod +x cli-proxy-api
+cp -n config.example.yaml config.yaml
+./cli-proxy-api --config "$HOME/lumina/config.yaml"
+```
+
+The release is public, so no GitHub login is needed. The `no-plugin` binary is self-contained and does not load dynamic plugins, which keeps it suitable for the Ubuntu Termux environment.
+
+For a source build instead of a release archive:
+
+```bash
+apt update
+apt install -y ca-certificates git
+git clone https://github.com/NDCLI/CLIProxyAPI-lite.git
+cd CLIProxyAPI-lite
+go version  # requires Go 1.26 or newer
+go build -trimpath -buildvcs=false -o cli-proxy-api ./cmd/server
+cp config.example.yaml config.yaml
+./cli-proxy-api --config ./config.yaml
+```
+
+Keep `host: 127.0.0.1` for Android-only access. If the server should stay alive after closing the terminal view, install `tmux` with `apt install -y tmux`, start it with `tmux new -s lumina`, and detach with `Ctrl-b` then `d`. OAuth commands should use `--no-browser`; open the printed URL in the Android browser and return to the terminal for the callback.
 
 ## Download and install on Windows
 

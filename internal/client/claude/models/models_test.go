@@ -75,6 +75,26 @@ func TestBuildResponseWithCloakingDisabled(t *testing.T) {
 	}
 }
 
+func TestBuildResponseWithProvidersLabelsDuplicateNames(t *testing.T) {
+	availableModels := []map[string]any{{"id": "codex/gpt-5.4", "display_name": "GPT-5.4"}, {"id": "openai/gpt-5.4", "display_name": "GPT-5.4"}}
+	providers := func(id string) []string {
+		if id == "codex/gpt-5.4" {
+			return []string{"codex"}
+		}
+		return []string{"openai"}
+	}
+	models, _ := BuildResponseWithProviders(availableModels, providers, true)["data"].([]map[string]any)
+	got := map[string]string{}
+	for _, model := range models {
+		id, _ := model["id"].(string)
+		name, _ := model["display_name"].(string)
+		got[id] = name
+	}
+	if got["codex/gpt-5.4"] != "GPT-5.4 (codex)" || got["openai/gpt-5.4"] != "GPT-5.4 (openai)" {
+		t.Fatalf("duplicate labels = %#v", got)
+	}
+}
+
 func TestBuildResponseEmpty(t *testing.T) {
 	response := BuildResponse(nil, false)
 	models, ok := response["data"].([]map[string]any)

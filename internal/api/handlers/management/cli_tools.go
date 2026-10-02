@@ -76,6 +76,10 @@ func inspectCLITool(item *cliToolItem) {
 	if item == nil {
 		return
 	}
+	if item.ID == "claude-cowork" {
+		inspectClaudeCoworkTool(item)
+		return
+	}
 	if item.Command != "" {
 		_, errLookPath := exec.LookPath(item.Command)
 		item.Installed = errLookPath == nil

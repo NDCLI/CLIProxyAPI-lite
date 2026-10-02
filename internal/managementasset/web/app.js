@@ -564,7 +564,7 @@ function updateCompatibleProviderCard(card, item) {
 
 function compatibleProviderSection(items) {
   const cards = items.map(compatibleProviderCard).join("");
-  return `<section class="compatible-provider-section"><div class="section-head"><div><h2>${t("providers.category.custom")}</h2><p class="hint">${t("providers.compatibleDescription")}</p></div><button class="primary compact" type="button" id="show-custom-provider">${icon("plus")}${t("providers.addCompatible")}</button></div><form id="custom-provider-form" class="card compatible-provider-form" hidden><input type="hidden" name="id"><input type="hidden" name="api_key_action"><input type="hidden" name="api_key_index"><div class="settings-grid"><label>${t("providers.compatibleName")}<input class="text-input" name="name" required></label><label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.example.com/v1" required></label></div><section id="compatible-key-editor" class="compatible-key-editor" hidden><strong>${t("providers.savedApiKeys")}</strong><div id="compatible-key-list" class="compatible-key-list"></div><div class="actions"><button class="secondary" id="add-provider-api-key" type="button">${icon("plus")}${t("providers.addApiKey")}</button><span class="hint">${t("providers.apiKeyEditHint")}</span></div></section><div class="settings-grid"><label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("providers.apiKeyOptional")}"></label><label>${t("providers.prefix")}<input class="text-input" name="prefix"></label></div><div class="actions"><button class="secondary" id="cancel-provider-key-edit" type="button" hidden>${icon("close")}${t("providers.cancelApiKeyEdit")}</button></div><label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="4" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label><div class="actions"><button class="secondary" id="discover-provider-models" type="button">${icon("refresh")}${t("providers.discoverModels")}</button><button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button><button class="secondary" id="cancel-custom-provider" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>${items.length ? `<section class="grid compatible-provider-grid">${cards}</section>` : `<div class="empty compatible-empty">${t("providers.compatibleEmpty")}</div>`}</section>`;
+  return `<section class="compatible-provider-section"><div class="section-head"><div><h2>${t("providers.category.custom")}</h2><p class="hint">${t("providers.compatibleDescription")}</p></div><button class="primary compact" type="button" id="show-custom-provider">${icon("plus")}${t("providers.addCompatible")}</button></div><form id="custom-provider-form" class="card compatible-provider-form" hidden><input type="hidden" name="id"><input type="hidden" name="api_key_action"><input type="hidden" name="api_key_index"><div class="settings-grid"><label>${t("providers.compatibleName")}<input class="text-input" name="name" required></label><label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.example.com/v1" required></label></div><section id="compatible-key-editor" class="compatible-key-editor" hidden><strong>${t("providers.savedApiKeys")}</strong><div id="compatible-key-list" class="compatible-key-list"></div><div class="actions"><button class="secondary" id="add-provider-api-key" type="button">${icon("plus")}${t("providers.addApiKey")}</button><span class="hint">${t("providers.apiKeyEditHint")}</span></div></section><div class="settings-grid"><label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("providers.apiKeyOptional")}"></label><label>${t("providers.prefix")}<input class="text-input" name="prefix"></label></div><div class="actions"><button class="secondary" id="test-provider-api-key" type="button">${icon("check")}${t("providers.testApiKey")}</button><span class="form-message" id="provider-api-key-test-result" role="status" aria-live="polite"></span><button class="secondary" id="cancel-provider-key-edit" type="button" hidden>${icon("close")}${t("providers.cancelApiKeyEdit")}</button></div><label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="4" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label><div class="actions"><button class="secondary" id="discover-provider-models" type="button">${icon("refresh")}${t("providers.discoverModels")}</button><button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button><button class="secondary" id="cancel-custom-provider" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>${items.length ? `<section class="grid compatible-provider-grid">${cards}</section>` : `<div class="empty compatible-empty">${t("providers.compatibleEmpty")}</div>`}</section>`;
 }
 
 function bindCompatibleProviderControls(container, items, reload) {
@@ -589,6 +589,7 @@ function bindCompatibleProviderControls(container, items, reload) {
     apiKeyInput.placeholder = form.elements.id.value ? t("providers.apiKeySelectPrompt") : t("providers.apiKeyOptional");
     form.querySelector("#cancel-provider-key-edit").hidden = !form.elements.api_key_action.value;
     keyList.querySelectorAll("[data-provider-api-key-action]").forEach(button => button.setAttribute("aria-pressed", "false"));
+    updateTestCurrentKey();
     providerChanges.update();
   };
   const selectKeyAction = (action, index = "") => {
@@ -600,6 +601,7 @@ function bindCompatibleProviderControls(container, items, reload) {
     apiKeyInput.disabled = action === "delete";
     apiKeyInput.placeholder = action === "delete" ? t("providers.apiKeyDeletePrompt") : t("providers.apiKeyEnterReplacement");
     form.querySelector("#cancel-provider-key-edit").hidden = false;
+    updateTestCurrentKey();
     keyList.querySelectorAll("[data-provider-api-key-action]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.providerApiKeyAction === action && button.dataset.providerApiKeyIndex === String(index))));
     const keyNumber = index === "" ? "" : String(Number(index) + 1);
     message.textContent = action === "append" ? t("providers.apiKeyAppendPrompt") : (action === "delete" ? t("providers.apiKeyDeletePrompt") : t("providers.apiKeyReplacePrompt").replace("{index}", keyNumber));
@@ -607,9 +609,32 @@ function bindCompatibleProviderControls(container, items, reload) {
     providerChanges.update();
   };
   const renderKeyList = item => {
-    keyList.innerHTML = (item.api_key_masks || []).map((mask, index) => `<div class="compatible-key-row"><code>${escapeHTML(mask)}</code><div class="actions"><button class="secondary" type="button" data-provider-api-key-action="replace" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "replace" && form.elements.api_key_index.value === String(index)}">${icon("edit")}${t("providers.replaceApiKey")}</button><button class="danger-button" type="button" data-provider-api-key-action="delete" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "delete" && form.elements.api_key_index.value === String(index)}">${icon("trash")}${t("providers.deleteApiKey")}</button></div></div>`).join("") || `<p class="hint">${t("providers.noSavedApiKeys")}</p>`;
+    keyList.innerHTML = (item.api_key_masks || []).map((mask, index) => `<div class="compatible-key-row"><div class="compatible-key-details"><code>${escapeHTML(mask)}</code><span class="form-message" data-provider-api-key-result role="status" aria-live="polite"></span></div><div class="actions"><button class="secondary" type="button" data-provider-api-key-test="${index}">${icon("check")}${t("providers.testApiKey")}</button><button class="secondary" type="button" data-provider-api-key-action="replace" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "replace" && form.elements.api_key_index.value === String(index)}">${icon("edit")}${t("providers.replaceApiKey")}</button><button class="danger-button" type="button" data-provider-api-key-action="delete" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "delete" && form.elements.api_key_index.value === String(index)}">${icon("trash")}${t("providers.deleteApiKey")}</button></div></div>`).join("") || `<p class="hint">${t("providers.noSavedApiKeys")}</p>`;
   };
-  apiKeyInput.addEventListener("input", () => { keyEditVersion++; });
+  const testAPIKey = async (button, body, result) => {
+    const original = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = icon("refresh") + t("providers.testingApiKey");
+    result.textContent = "";
+    try {
+      const response = await api("/provider-configs/test-api-key", {method: "POST", body: JSON.stringify(body)});
+      result.textContent = response.ok
+        ? t("providers.apiKeyTestPassed").replace("{models}", Number(response.model_count || 0).toLocaleString(state.locale)).replace("{latency}", Number(response.latency_ms || 0).toLocaleString(state.locale))
+        : t("providers.apiKeyTestFailed");
+      result.className = "form-message " + (response.ok ? "ok" : "failed");
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      result.textContent = t("providers.apiKeyTestFailed");
+      result.className = "form-message failed";
+    } finally {
+      button.disabled = false;
+      button.innerHTML = original;
+    }
+  };
+  const testCurrentKeyButton = section.querySelector("#test-provider-api-key");
+  const updateTestCurrentKey = () => { testCurrentKeyButton.disabled = !apiKeyInput.value.trim(); };
+  apiKeyInput.addEventListener("input", () => { keyEditVersion++; updateTestCurrentKey(); });
+  updateTestCurrentKey();
   section.querySelector("#show-custom-provider").addEventListener("click", () => {
     form.reset();
     form.elements.id.value = "";
@@ -625,7 +650,16 @@ function bindCompatibleProviderControls(container, items, reload) {
   section.querySelector("#cancel-custom-provider").addEventListener("click", () => { form.reset(); form.hidden = true; message.textContent = ""; providerChanges.accept(); });
   section.querySelector("#cancel-provider-key-edit").addEventListener("click", () => { keyEditVersion++; providerFormVersion++; resetKeyEdit(); message.textContent = ""; });
   section.querySelector("#add-provider-api-key").addEventListener("click", () => selectKeyAction("append"));
+  testCurrentKeyButton.addEventListener("click", () => {
+    const result = form.querySelector("#provider-api-key-test-result");
+    testAPIKey(testCurrentKeyButton, {base_url: form.elements.base_url.value.trim(), api_key: apiKeyInput.value.trim()}, result);
+  });
   keyList.addEventListener("click", event => {
+    const testButton = event.target.closest("[data-provider-api-key-test]");
+    if (testButton) {
+      testAPIKey(testButton, {id: form.elements.id.value, base_url: form.elements.base_url.value.trim(), api_key_index: Number(testButton.dataset.providerApiKeyTest)}, testButton.closest(".compatible-key-row").querySelector("[data-provider-api-key-result]"));
+      return;
+    }
     const button = event.target.closest("[data-provider-api-key-action]");
     if (button) selectKeyAction(button.dataset.providerApiKeyAction, button.dataset.providerApiKeyIndex);
   });

@@ -500,8 +500,9 @@ body { background-color: #1a1a1a; background-image: linear-gradient(#ffffff08 1p
 .compatible-key-editor { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-subtle); border-radius: 8px; background: #1e1e1e; }
 .compatible-key-list { display: grid; gap: 6px; }
 .compatible-key-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; padding: 7px 9px; border: 1px solid var(--line-subtle); border-radius: 7px; background: #232323; }
-.compatible-key-row > code { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
-.compatible-key-row .actions { flex-shrink: 0; }
+.compatible-key-details { display: grid; flex: 1 1 160px; min-width: 0; gap: 3px; }
+.compatible-key-details > code { min-width: 0; overflow-wrap: anywhere; color: var(--muted); font-size: 11px; }
+.compatible-key-row .actions { flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; }
 .compatible-key-row .actions button { min-height: 30px; padding: 5px 8px; font-size: 11px; }
 .compatible-key-row [aria-pressed="true"] { border-color: var(--accent); color: #ff9a7e; }
 .compatible-empty { padding: 20px; }

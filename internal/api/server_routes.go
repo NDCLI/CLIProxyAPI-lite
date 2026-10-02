@@ -777,7 +777,13 @@ func (s *Server) handleHomeModels(c *gin.Context) {
 
 	if isClaude {
 		disableCloaking := s.cfg != nil && s.cfg.ClaudeCode.DisableCloakingModelList
-		s.writeModelListResponse(c, "claude", claudemodels.BuildResponse(formatHomeClaudeModels(entries), disableCloaking))
+		providersByModelID := make(map[string][]string, len(entries))
+		for _, entry := range entries {
+			providersByModelID[entry.id] = entry.providers
+		}
+		s.writeModelListResponse(c, "claude", claudemodels.BuildResponseWithProviders(formatHomeClaudeModels(entries), func(id string) []string {
+			return providersByModelID[id]
+		}, disableCloaking))
 		return
 	}
 

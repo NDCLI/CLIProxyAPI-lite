@@ -215,6 +215,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/provider-configs", s.mgmt.GetCompatibleProviders)
 		mgmt.POST("/provider-configs", s.mgmt.PostCompatibleProvider)
 		mgmt.POST("/provider-configs/discover-models", s.mgmt.DiscoverCompatibleProviderModels)
+		mgmt.POST("/provider-configs/test-api-key", s.mgmt.TestCompatibleProviderAPIKey)
 		mgmt.PATCH("/provider-configs/:id", s.mgmt.PatchCompatibleProvider)
 		mgmt.DELETE("/provider-configs/:id", s.mgmt.DeleteCompatibleProvider)
 		mgmt.GET("/providers/:id", s.mgmt.GetProvider)

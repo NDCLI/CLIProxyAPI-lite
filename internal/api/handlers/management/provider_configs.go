@@ -1,12 +1,15 @@
 package management
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
@@ -156,10 +159,75 @@ func (h *Handler) DiscoverCompatibleProviderModels(c *gin.Context) {
 		}
 		h.mu.Unlock()
 	}
-	request, errRequest := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, baseURL+"/models", nil)
-	if errRequest != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid provider URL"})
+	models, errModels := fetchCompatibleProviderModels(c.Request.Context(), baseURL, apiKey)
+	if errModels != nil {
+		c.JSON(http.StatusBadGateway, gin.H{"error": errModels.Error()})
 		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": models})
+}
+
+func (h *Handler) TestCompatibleProviderAPIKey(c *gin.Context) {
+	var body struct {
+		ID          string `json:"id"`
+		BaseURL     string `json:"base_url"`
+		APIKey      string `json:"api_key"`
+		APIKeyIndex *int   `json:"api_key_index"`
+	}
+	if errBind := c.ShouldBindJSON(&body); errBind != nil || !validCompatibleProviderURL(body.BaseURL) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "valid provider URL required"})
+		return
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(body.BaseURL), "/")
+	apiKey := strings.TrimSpace(body.APIKey)
+	if body.APIKeyIndex != nil {
+		if body.ID == "" || apiKey != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "select a saved API key or provide a new API key"})
+			return
+		}
+		h.mu.Lock()
+		if h.cfg != nil {
+			for _, entry := range h.cfg.OpenAICompatibility {
+				if compatibleProviderID(entry.Name) != body.ID {
+					continue
+				}
+				if strings.TrimRight(strings.TrimSpace(entry.BaseURL), "/") != baseURL {
+					h.mu.Unlock()
+					c.JSON(http.StatusConflict, gin.H{"error": "save the provider URL before testing this key"})
+					return
+				}
+				if *body.APIKeyIndex < 0 || *body.APIKeyIndex >= len(entry.APIKeyEntries) {
+					h.mu.Unlock()
+					c.JSON(http.StatusNotFound, gin.H{"error": "saved API key not found"})
+					return
+				}
+				apiKey = strings.TrimSpace(entry.APIKeyEntries[*body.APIKeyIndex].APIKey)
+				break
+			}
+		}
+		h.mu.Unlock()
+		if apiKey == "" {
+			c.JSON(http.StatusNotFound, gin.H{"error": "provider or saved API key not found"})
+			return
+		}
+	}
+	if apiKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "API key required"})
+		return
+	}
+	start := time.Now()
+	models, errModels := fetchCompatibleProviderModels(c.Request.Context(), baseURL, apiKey)
+	if errModels != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "latency_ms": time.Since(start).Milliseconds(), "error": "API key or provider connection failed"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "latency_ms": time.Since(start).Milliseconds(), "model_count": len(models)})
+}
+
+func fetchCompatibleProviderModels(ctx context.Context, baseURL, apiKey string) ([]string, error) {
+	request, errRequest := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+"/models", nil)
+	if errRequest != nil {
+		return nil, errors.New("invalid provider URL")
 	}
 	if apiKey != "" {
 		request.Header.Set("Authorization", "Bearer "+apiKey)
@@ -167,13 +235,11 @@ func (h *Handler) DiscoverCompatibleProviderModels(c *gin.Context) {
 	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	response, errDo := client.Do(request)
 	if errDo != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "provider model request failed"})
-		return
+		return nil, errors.New("provider model request failed")
 	}
 	defer response.Body.Close()
 	if response.StatusCode != http.StatusOK {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "provider returned HTTP " + http.StatusText(response.StatusCode)})
-		return
+		return nil, fmt.Errorf("provider returned HTTP %s", http.StatusText(response.StatusCode))
 	}
 	var result struct {
 		Data []struct {
@@ -181,8 +247,7 @@ func (h *Handler) DiscoverCompatibleProviderModels(c *gin.Context) {
 		} `json:"data"`
 	}
 	if errDecode := json.NewDecoder(io.LimitReader(response.Body, 4<<20)).Decode(&result); errDecode != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": "provider returned an invalid model list"})
-		return
+		return nil, errors.New("provider returned an invalid model list")
 	}
 	models := make([]string, 0, len(result.Data))
 	for _, model := range result.Data {
@@ -190,7 +255,7 @@ func (h *Handler) DiscoverCompatibleProviderModels(c *gin.Context) {
 			models = append(models, id)
 		}
 	}
-	c.JSON(http.StatusOK, gin.H{"items": models})
+	return models, nil
 }
 
 func (h *Handler) PostCompatibleProvider(c *gin.Context) {

@@ -71,6 +71,9 @@ func (h *Handler) ConfigureTool(c *gin.Context) {
 			h.mu.Unlock()
 		}
 		baseURL, errURL := normalizeCLIBaseURL(req.BaseURL)
+		if req.Tool == "claude-cowork" {
+			baseURL, errURL = normalizeClaudeCoworkBaseURL(req.BaseURL)
+		}
 		if errURL != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": errURL.Error()})
 			return
@@ -93,7 +96,13 @@ func (h *Handler) ConfigureTool(c *gin.Context) {
 	}
 	cliConfigMu.Lock()
 	defer cliConfigMu.Unlock()
-	response, errConfigure := configureCLITool(item, req)
+	var response configureToolResponse
+	var errConfigure error
+	if req.Tool == "claude-cowork" {
+		response, errConfigure = configureClaudeCowork(item, req)
+	} else {
+		response, errConfigure = configureCLITool(item, req)
+	}
 	if errConfigure != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": errConfigure.Error()})
 		return

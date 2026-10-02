@@ -10,11 +10,21 @@ const claudeDDModelPrefix = "claude-fable-5-dd-"
 
 // BuildResponse builds an Anthropic model response from available models.
 func BuildResponse(availableModels []map[string]any, disableCloaking bool) map[string]any {
+	return BuildResponseWithProviders(availableModels, nil, disableCloaking)
+}
+
+// BuildResponseWithProviders builds an Anthropic model response and labels duplicate display names with their providers.
+func BuildResponseWithProviders(availableModels []map[string]any, providersForModel func(string) []string, disableCloaking bool) map[string]any {
 	models := make([]map[string]any, len(availableModels))
 	for i, model := range availableModels {
 		models[i] = cloneModel(model)
-		if id, ok := models[i]["id"].(string); ok && !disableCloaking {
-			models[i]["id"] = EnsureClaudeModelIDPrefix(id)
+	}
+	addProviderLabelsToDuplicateNames(models, providersForModel)
+	if !disableCloaking {
+		for i := range models {
+			if id, ok := models[i]["id"].(string); ok {
+				models[i]["id"] = EnsureClaudeModelIDPrefix(id)
+			}
 		}
 	}
 
@@ -41,6 +51,50 @@ func BuildResponse(availableModels []map[string]any, disableCloaking bool) map[s
 		"has_more": false,
 		"first_id": firstID,
 		"last_id":  lastID,
+	}
+}
+
+func addProviderLabelsToDuplicateNames(models []map[string]any, providersForModel func(string) []string) {
+	if providersForModel == nil {
+		return
+	}
+	type modelLabel struct{ id, displayName, key, provider string }
+	labels := make([]modelLabel, len(models))
+	nameCounts := map[string]int{}
+	providerCounts := map[string]map[string]int{}
+	for i, model := range models {
+		id, _ := model["id"].(string)
+		displayName, _ := model["display_name"].(string)
+		displayName = strings.TrimSpace(displayName)
+		if id == "" || displayName == "" {
+			continue
+		}
+		key := strings.ToLower(displayName)
+		provider := strings.Join(providersForModel(id), ", ")
+		labels[i] = modelLabel{id: id, displayName: displayName, key: key, provider: provider}
+		nameCounts[key]++
+		if provider != "" {
+			if providerCounts[key] == nil {
+				providerCounts[key] = map[string]int{}
+			}
+			providerCounts[key][provider]++
+		}
+	}
+	for i, label := range labels {
+		if label.id == "" || nameCounts[label.key] < 2 {
+			continue
+		}
+		provider := label.provider
+		if provider == "" {
+			provider = label.id
+		} else if providerCounts[label.key][provider] > 1 {
+			if prefix, _, ok := strings.Cut(label.id, "/"); ok && prefix != "" {
+				provider += " / " + prefix
+			} else {
+				provider += " / " + label.id
+			}
+		}
+		models[i]["display_name"] = label.displayName + " (" + provider + ")"
 	}
 }
 
