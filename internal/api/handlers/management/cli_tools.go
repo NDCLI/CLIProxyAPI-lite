@@ -50,7 +50,6 @@ func cliTools() []cliToolItem {
 	items := []cliToolItem{
 		{ID: "claude-code", Label: "Claude Code", Category: "auto", Format: "json", Command: "claude", ConfigPath: filepath.Join(home, ".claude", "settings.json"), Capabilities: []string{"models", "auto_compact", "reset"}},
 		{ID: "codex-cli", Label: "OpenAI Codex", Category: "auto", Format: "toml", Command: "codex", ConfigPath: filepath.Join(home, ".codex", "config.toml"), ModelRequired: true, Capabilities: []string{"subagent", "reset"}},
-		{ID: "copilot", Label: "GitHub Copilot", Category: "guide", Command: "code"},
 		{ID: "cursor", Label: "Cursor", Category: "guide", Command: "cursor"},
 		{ID: "cline", Label: "Cline", Category: "guide", Command: "code"},
 		{ID: "continue", Label: "Continue", Category: "guide", Command: "code"},

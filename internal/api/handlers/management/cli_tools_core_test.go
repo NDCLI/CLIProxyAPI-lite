@@ -13,6 +13,22 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
 )
 
+func TestCLIToolCatalogCoworkAndMITMOnlyCopilot(t *testing.T) {
+	item, ok := findCLITool("claude-cowork")
+	if !ok || item.Format != "claude-cowork" || item.ModelRequired {
+		t.Fatalf("Cowork must be configurable without a required model: %#v", item)
+	}
+	if _, ok := findCLITool("copilot"); ok {
+		t.Fatal("Copilot must not appear in the regular CLI catalog")
+	}
+	for _, item := range mitmTools() {
+		if item.ID == "copilot" {
+			return
+		}
+	}
+	t.Fatal("Copilot must remain in the MITM catalog")
+}
+
 func TestCLIToolPreviewHidesKeyAndDoesNotWrite(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
