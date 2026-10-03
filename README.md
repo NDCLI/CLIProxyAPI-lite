@@ -36,6 +36,8 @@ Before the first publication, create or obtain publishing access to the `@ndcli`
 
 ## Run in Ubuntu on Termux (Android)
 
+Vietnamese instructions: [Run Lumina on Android with Termux](docs/android-termux-vi.md).
+
 Lumina runs in Ubuntu under Termux as a terminal service on Linux ARM64. No APK or desktop tray is required. The Android browser can open the management page at `http://127.0.0.1:8317/` while the server is running. Termux mode runs the foreground server; Windows tray controls and automatic MITM certificate or DNS setup are unavailable there.
 
 In Termux, install and enter Ubuntu:
