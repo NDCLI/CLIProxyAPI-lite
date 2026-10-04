@@ -1,6 +1,10 @@
 package management
 
 import (
+	"encoding/json"
+	"net/http"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
@@ -53,6 +57,10 @@ func TestMutateCompatibleProviderAPIKey(t *testing.T) {
 				{APIKey: "second"},
 			},
 		},
+		{name: "disable first key only", action: "disable", index: intPointer(0), wantKeys: []config.OpenAICompatibilityAPIKey{{APIKey: "first", Weight: &weight, ProxyURL: "http://proxy.local", Disabled: true}, {APIKey: "second"}}},
+		{name: "enable selected key", action: "enable", index: intPointer(1), wantKeys: []config.OpenAICompatibilityAPIKey{{APIKey: "first", Weight: &weight, ProxyURL: "http://proxy.local"}, {APIKey: "second"}}},
+		{name: "reject toggle with secret", action: "disable", index: intPointer(0), key: "secret", wantError: true},
+		{name: "reject toggle without index", action: "disable", wantError: true},
 		{name: "reject replace without a key", action: "replace", index: intPointer(0), wantError: true},
 		{name: "reject invalid index", action: "delete", index: intPointer(2), wantError: true},
 		{name: "reject unknown action", action: "rotate", index: intPointer(0), key: "new", wantError: true},
@@ -75,7 +83,7 @@ func TestMutateCompatibleProviderAPIKey(t *testing.T) {
 			}
 			for index := range test.wantKeys {
 				got, want := entry.APIKeyEntries[index], test.wantKeys[index]
-				if got.APIKey != want.APIKey || got.ProxyURL != want.ProxyURL {
+				if got.APIKey != want.APIKey || got.ProxyURL != want.ProxyURL || got.Disabled != want.Disabled {
 					t.Errorf("APIKeyEntries[%d] = %+v, want %+v", index, got, want)
 				}
 				if (got.Weight == nil) != (want.Weight == nil) || (got.Weight != nil && *got.Weight != *want.Weight) {
@@ -87,3 +95,39 @@ func TestMutateCompatibleProviderAPIKey(t *testing.T) {
 }
 
 func intPointer(value int) *int { return &value }
+
+func TestCompatibleProviderKeyTogglePersistsWithoutChangingSiblings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	if err := os.WriteFile(path, []byte("openai-compatibility: []\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg := &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{Name: "test", BaseURL: "https://example.test/v1", APIKeyEntries: []config.OpenAICompatibilityAPIKey{{APIKey: "first"}, {APIKey: "second"}}}}}
+	h := NewHandler(cfg, path, nil)
+	for _, action := range []string{"disable", "enable"} {
+		response := endpointKeyRequest(t, h.PatchCompatibleProvider, http.MethodPatch, "/provider-configs/test", `{"api_key_action":"`+action+`","api_key_index":0}`, compatibleProviderID("test"))
+		if response.Code != http.StatusOK {
+			t.Fatalf("toggle status = %d: %s", response.Code, response.Body.String())
+		}
+		var result struct {
+			Item compatibleProviderItem `json:"item"`
+		}
+		if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Item.APIKeyEnabled) != 2 || result.Item.APIKeyEnabled[0] != (action == "enable") || !result.Item.APIKeyEnabled[1] {
+			t.Fatalf("wrong key states: %v", result.Item.APIKeyEnabled)
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		loaded, err := config.ParseConfigBytes(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		keys := loaded.OpenAICompatibility[0].APIKeyEntries
+		if len(keys) != 2 || keys[0].Disabled != (action == "disable") || keys[1].Disabled || keys[0].APIKey != "first" || keys[1].APIKey != "second" {
+			t.Fatal("saved toggle changed keys or sibling state")
+		}
+	}
+}

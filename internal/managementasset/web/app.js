@@ -272,7 +272,7 @@ async function renderOverview(page) {
 }
 
 async function renderQuickStart(page) {
-  page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><h2>${t("quickStart.stepOne")}</h2><label>${t("endpoint.baseUrl")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><div class="actions"><button class="secondary" id="quick-start-copy">${icon("copy")}${t("endpoint.copy")}</button><button class="primary compact" id="quick-start-keys">${icon("key")}${t("quickStart.manageKeys")}</button><span class="form-message" id="quick-start-copy-status" role="status" aria-live="polite"></span></div></section><section class="grid"><article class="card"><span class="feature-icon">${icon("key")}</span><h3>${t("quickStart.stepTwo")}</h3><p>${t("quickStart.keys")}</p><div class="metric" id="quick-start-key-count" aria-live="polite">–</div></article><article class="card"><span class="feature-icon">${icon("shield")}</span><h3>${t("quickStart.credentials")}</h3><div class="metric" id="quick-start-credential-count" aria-live="polite">–</div><a class="text-link" href="#/providers">${t("quickStart.manageAccounts")}${icon("arrow")}</a></article><article class="card"><span class="feature-icon">${icon("terminal")}</span><h3>${t("quickStart.stepThree")}</h3><p>${t("cli.description")}</p><a class="text-link" href="#/cli-tools">${t("quickStart.connectTools")}${icon("arrow")}</a></article></section>`;
+  page.innerHTML = pageHeader("kicker.openai", "quickStart.title", "quickStart.description", true) + `<section class="status-panel"><h2>${t("quickStart.stepOne")}</h2><div class="settings-grid"><label>${t("endpoint.localEndpoint")}<input class="text-input" id="quick-start-url" readonly value="${escapeHTML(`${location.origin}/v1`)}"></label><label>${t("endpoint.tailscaleEndpoint")}<input class="text-input" id="quick-start-tailscale-url" readonly placeholder="${escapeHTML(t("endpoint.tailscaleNotConfigured"))}"></label></div><div class="actions"><button class="secondary" id="quick-start-copy">${icon("copy")}${t("endpoint.copy")}</button><button class="secondary" id="quick-start-copy-tailscale" hidden>${icon("copy")}${t("endpoint.copy")} (Tailscale)</button><button class="secondary" id="quick-start-tailscale-toggle">${icon("refresh")}${t("endpoint.tailscaleEnable")}</button><a class="secondary button-link" id="quick-start-tailscale-login" target="_blank" rel="noreferrer" hidden>${icon("arrow")}${t("endpoint.tailscaleLoginUrl")}</a><button class="primary compact" id="quick-start-keys">${icon("key")}${t("quickStart.manageKeys")}</button><span class="form-message" id="quick-start-copy-status" role="status" aria-live="polite"></span></div></section><section class="grid"><article class="card"><span class="feature-icon">${icon("key")}</span><h3>${t("quickStart.stepTwo")}</h3><p>${t("quickStart.keys")}</p><div class="metric" id="quick-start-key-count" aria-live="polite">–</div></article><article class="card"><span class="feature-icon">${icon("shield")}</span><h3>${t("quickStart.credentials")}</h3><div class="metric" id="quick-start-credential-count" aria-live="polite">–</div><a class="text-link" href="#/providers">${t("quickStart.manageAccounts")}${icon("arrow")}</a></article><article class="card"><span class="feature-icon">${icon("terminal")}</span><h3>${t("quickStart.stepThree")}</h3><p>${t("cli.description")}</p><a class="text-link" href="#/cli-tools">${t("quickStart.connectTools")}${icon("arrow")}</a></article></section>`;
   document.getElementById("quick-start-copy").addEventListener("click", async event => {
     const button = event.currentTarget;
     button.disabled = true;
@@ -284,11 +284,69 @@ async function renderQuickStart(page) {
       document.getElementById("quick-start-copy-status").textContent = t("common.copyFailed");
     } finally { button.disabled = false; }
   });
+  document.getElementById("quick-start-copy-tailscale").addEventListener("click", async event => {
+    const val = document.getElementById("quick-start-tailscale-url").value;
+    if (!val) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await copyText(val);
+      document.getElementById("quick-start-copy-status").textContent = t("quickStart.copied");
+      flashAction(button, t("quickStart.copied"));
+    } catch {
+      document.getElementById("quick-start-copy-status").textContent = t("common.copyFailed");
+    } finally { button.disabled = false; }
+  });
   document.getElementById("quick-start-keys").addEventListener("click", () => { location.hash = "#/endpoint"; });
   document.getElementById("refresh").addEventListener("click", () => renderQuickStart(page));
-  const [keys, authFiles] = await Promise.allSettled([api("/endpoint-keys"), api("/auth-files")]);
-  if ([keys, authFiles].some(result => result.status === "rejected" && result.reason?.message === "invalid_key")) return logout();
+  const [keys, authFiles, tsRes] = await Promise.allSettled([api("/endpoint-keys"), api("/auth-files"), api("/tailscale")]);
+  if ([keys, authFiles, tsRes].some(result => result.status === "rejected" && result.reason?.message === "invalid_key")) return logout();
   if (!page.isConnected || page.dataset.page !== "quick-start") return;
+
+  if (tsRes.status === "fulfilled" && tsRes.value) {
+    const tsData = tsRes.value;
+    const tsStatus = tsData.status || {};
+    const tsCfg = tsData.config || {};
+    const tsInput = document.getElementById("quick-start-tailscale-url");
+    const tsToggle = document.getElementById("quick-start-tailscale-toggle");
+    const tsLogin = document.getElementById("quick-start-tailscale-login");
+    const tsCopy = document.getElementById("quick-start-copy-tailscale");
+    const isRunning = Boolean(tsStatus.running);
+
+    if (isRunning) {
+      tsToggle.textContent = t("endpoint.tailscaleDisable");
+      const urls = (tsStatus.urls || []).map(u => `${u}/v1`);
+      if (urls.length > 0) {
+        tsInput.value = urls[0];
+        tsCopy.hidden = false;
+      } else if (tsStatus.dns_name) {
+        tsInput.value = `http://${tsStatus.dns_name}/v1`;
+        tsCopy.hidden = false;
+      } else {
+        tsInput.placeholder = tsStatus.state || t("endpoint.tailscaleRunning");
+      }
+    } else {
+      tsToggle.textContent = t("endpoint.tailscaleEnable");
+      tsInput.placeholder = t("endpoint.tailscaleStopped");
+    }
+
+    if (tsStatus.auth_url) {
+      tsLogin.href = tsStatus.auth_url;
+      tsLogin.hidden = false;
+    }
+
+    tsToggle.onclick = async () => {
+      tsToggle.disabled = true;
+      try {
+        await api(isRunning ? "/tailscale/stop" : "/tailscale/start", {method: "POST"});
+        renderQuickStart(page);
+      } catch (err) {
+        document.getElementById("quick-start-copy-status").textContent = err.message || t("common.error");
+        tsToggle.disabled = false;
+      }
+    };
+  }
+
   const updateCount = (id, result, count) => {
     const element = page.querySelector(id);
     element.className = result.status === "fulfilled" ? "metric" : "form-message";
@@ -436,7 +494,7 @@ function endpointKeyTable(items) {
 
 async function renderEndpoint(page, secret = "", feedback = "") {
   const item = capability("endpoint_keys");
-  page.innerHTML = pageHeader("kicker.openai", "endpoint.title", "endpoint.description", true) + `<section class="status-panel"><div class="card-title"><h2>${t("endpoint.baseUrl")}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><div class="endpoint-value">${escapeHTML(`${location.origin}/v1`)}</div></section>${secret ? `<section class="secret-notice"><strong>${t("endpoint.secretOnce")}</strong><div class="secret-row"><input class="text-input" id="created-secret" readonly value="${escapeHTML(secret)}"><button class="secondary" id="copy-secret">${icon("copy")}${t("endpoint.copy")}</button></div></section>` : ""}<div class="section-head"><h2>${t("endpoint.keys")}</h2><button class="primary compact" id="create-key">${icon("plus")}${t("endpoint.create")}</button></div><div class="form-message" id="endpoint-feedback" role="status" aria-live="polite">${escapeHTML(feedback)}</div><div id="endpoint-keys"><div class="loading">${t("common.loading")}</div></div>`;
+  page.innerHTML = pageHeader("kicker.openai", "endpoint.title", "endpoint.description", true) + `<section class="status-panel"><div class="card-title"><h2>${t("endpoint.baseUrl")}</h2><span class="badge ${item.state}">${statusLabel(item.state)}</span></div><div class="settings-grid"><label>${t("endpoint.localEndpoint")}<div class="endpoint-value">${escapeHTML(`${location.origin}/v1`)}</div></label><label>${t("endpoint.tailscaleEndpoint")}<div class="endpoint-value" id="endpoint-tailscale-val">–</div></label></div><div class="actions" id="endpoint-ts-actions"><button class="secondary" id="endpoint-ts-toggle" type="button">${icon("refresh")}${t("endpoint.tailscaleEnable")}</button><a class="secondary button-link" id="endpoint-ts-login" target="_blank" rel="noreferrer" hidden>${icon("arrow")}${t("endpoint.tailscaleLoginUrl")}</a></div></section>${secret ? `<section class="secret-notice"><strong>${t("endpoint.secretOnce")}</strong><div class="secret-row"><input class="text-input" id="created-secret" readonly value="${escapeHTML(secret)}"><button class="secondary" id="copy-secret">${icon("copy")}${t("endpoint.copy")}</button></div></section>` : ""}<div class="section-head"><h2>${t("endpoint.keys")}</h2><button class="primary compact" id="create-key">${icon("plus")}${t("endpoint.create")}</button></div><div class="form-message" id="endpoint-feedback" role="status" aria-live="polite">${escapeHTML(feedback)}</div><div id="endpoint-keys"><div class="loading">${t("common.loading")}</div></div>`;
   document.getElementById("create-key").insertAdjacentHTML("afterend", `<button class="secondary" type="button" id="show-add-key">${icon("key")}${t("endpoint.addExisting")}</button>`);
   document.getElementById("endpoint-keys").insertAdjacentHTML("beforebegin", `<form id="add-endpoint-key" class="card endpoint-add-form" hidden><label>${t("endpoint.existingKey")}<input class="text-input" name="value" type="password" autocomplete="new-password" required></label><div class="actions"><button class="primary compact" type="submit">${icon("plus")}${t("endpoint.addExisting")}</button><button class="secondary" id="cancel-add-key" type="button">${icon("close")}${t("action.cancel")}</button><span class="form-message" role="status" aria-live="polite"></span></div></form>`);
   const showFeedback = message => { document.getElementById("endpoint-feedback").textContent = message; };
@@ -527,6 +585,47 @@ async function renderEndpoint(page, secret = "", feedback = "") {
     if (error.message === "invalid_key") return logout();
     document.getElementById("endpoint-keys").innerHTML = `<div class="error">${t("common.error")}</div>`;
   }
+
+  try {
+    const tsData = await api("/tailscale");
+    if (!page.isConnected || page.dataset.page !== "endpoint") return;
+    const tsStatus = tsData.status || {};
+    const tsVal = document.getElementById("endpoint-tailscale-val");
+    const tsToggle = document.getElementById("endpoint-ts-toggle");
+    const tsLogin = document.getElementById("endpoint-ts-login");
+    const isRunning = Boolean(tsStatus.running);
+
+    if (isRunning) {
+      tsToggle.textContent = t("endpoint.tailscaleDisable");
+      const urls = (tsStatus.urls || []).map(u => `${u}/v1`);
+      if (urls.length > 0) {
+        tsVal.textContent = urls[0];
+      } else if (tsStatus.dns_name) {
+        tsVal.textContent = `http://${tsStatus.dns_name}/v1`;
+      } else {
+        tsVal.textContent = tsStatus.state || t("endpoint.tailscaleRunning");
+      }
+    } else {
+      tsToggle.textContent = t("endpoint.tailscaleEnable");
+      tsVal.textContent = t("endpoint.tailscaleStopped");
+    }
+
+    if (tsStatus.auth_url) {
+      tsLogin.href = tsStatus.auth_url;
+      tsLogin.hidden = false;
+    }
+
+    tsToggle.onclick = async () => {
+      tsToggle.disabled = true;
+      try {
+        await api(isRunning ? "/tailscale/stop" : "/tailscale/start", {method: "POST"});
+        renderEndpoint(page, secret);
+      } catch (err) {
+        showFeedback(err.message || t("common.error"));
+        tsToggle.disabled = false;
+      }
+    };
+  } catch (_) {}
 }
 
 function compatibleProviderCard(item) {
@@ -576,6 +675,8 @@ function bindCompatibleProviderControls(container, items, reload) {
   const apiKeyInput = form.elements.api_key;
   let keyEditVersion = 0;
   let providerFormVersion = 0;
+  let keyTogglePending = false;
+  let providerSavePending = false;
   form.addEventListener("input", () => { providerFormVersion++; });
   form.addEventListener("change", () => { providerFormVersion++; });
   const submitButton = form.querySelector('[type="submit"]');
@@ -609,7 +710,7 @@ function bindCompatibleProviderControls(container, items, reload) {
     providerChanges.update();
   };
   const renderKeyList = item => {
-    keyList.innerHTML = (item.api_key_masks || []).map((mask, index) => `<div class="compatible-key-row"><div class="compatible-key-details"><code>${escapeHTML(mask)}</code><span class="form-message" data-provider-api-key-result role="status" aria-live="polite"></span></div><div class="actions"><button class="secondary" type="button" data-provider-api-key-test="${index}">${icon("check")}${t("providers.testApiKey")}</button><button class="secondary" type="button" data-provider-api-key-action="replace" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "replace" && form.elements.api_key_index.value === String(index)}">${icon("edit")}${t("providers.replaceApiKey")}</button><button class="danger-button" type="button" data-provider-api-key-action="delete" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "delete" && form.elements.api_key_index.value === String(index)}">${icon("trash")}${t("providers.deleteApiKey")}</button></div></div>`).join("") || `<p class="hint">${t("providers.noSavedApiKeys")}</p>`;
+    keyList.innerHTML = (item.api_key_masks || []).map((mask, index) => `<div class="compatible-key-row"><div class="compatible-key-details"><code>${escapeHTML(mask)}</code><span class="badge ${item.api_key_enabled?.[index] === false ? "partial" : "ready"}">${t(item.api_key_enabled?.[index] === false ? "providers.disabled" : "providers.active")}</span><span class="form-message" data-provider-api-key-result role="status" aria-live="polite"></span></div><div class="actions"><button class="secondary" type="button" data-provider-api-key-toggle="${index}" data-enabled="${item.api_key_enabled?.[index] !== false}">${icon(item.api_key_enabled?.[index] === false ? "check" : "pause")}${t(item.api_key_enabled?.[index] === false ? "providers.enableApiKey" : "providers.disableApiKey")}</button><button class="secondary" type="button" data-provider-api-key-test="${index}">${icon("check")}${t("providers.testApiKey")}</button><button class="secondary" type="button" data-provider-api-key-action="replace" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "replace" && form.elements.api_key_index.value === String(index)}">${icon("edit")}${t("providers.replaceApiKey")}</button><button class="danger-button" type="button" data-provider-api-key-action="delete" data-provider-api-key-index="${index}" aria-pressed="${form.elements.api_key_action.value === "delete" && form.elements.api_key_index.value === String(index)}">${icon("trash")}${t("providers.deleteApiKey")}</button></div></div>`).join("") || `<p class="hint">${t("providers.noSavedApiKeys")}</p>`;
   };
   const testAPIKey = async (button, body, result) => {
     const original = button.innerHTML;
@@ -654,7 +755,27 @@ function bindCompatibleProviderControls(container, items, reload) {
     const result = form.querySelector("#provider-api-key-test-result");
     testAPIKey(testCurrentKeyButton, {base_url: form.elements.base_url.value.trim(), api_key: apiKeyInput.value.trim()}, result);
   });
-  keyList.addEventListener("click", event => {
+  keyList.addEventListener("click", async event => {
+    const toggle = event.target.closest("[data-provider-api-key-toggle]");
+    if (toggle) {
+      if (keyTogglePending || providerSavePending) return;
+      const id = form.elements.id.value;
+      const result = toggle.closest(".compatible-key-row").querySelector("[data-provider-api-key-result]");
+      keyTogglePending = true;
+      toggle.disabled = true;
+      try {
+        const response = await api(`/provider-configs/${encodeURIComponent(id)}`, {method: "PATCH", body: JSON.stringify({api_key_action: toggle.dataset.enabled === "true" ? "disable" : "enable", api_key_index: Number(toggle.dataset.providerApiKeyToggle)})});
+        const index = items.findIndex(item => item.id === id);
+        if (index >= 0) items[index] = response.item;
+        updateCompatibleProviderCard(section.querySelector(`[data-custom-provider="${CSS.escape(id)}"]`), response.item);
+        if (form.elements.id.value === id) renderKeyList(response.item);
+      } catch (error) {
+        if (error.message === "invalid_key") return logout();
+        result.textContent = t("providers.apiKeyToggleFailed");
+        result.className = "form-message failed";
+      } finally { keyTogglePending = false; toggle.disabled = false; }
+      return;
+    }
     const testButton = event.target.closest("[data-provider-api-key-test]");
     if (testButton) {
       testAPIKey(testButton, {id: form.elements.id.value, base_url: form.elements.base_url.value.trim(), api_key_index: Number(testButton.dataset.providerApiKeyTest)}, testButton.closest(".compatible-key-row").querySelector("[data-provider-api-key-result]"));
@@ -703,6 +824,7 @@ function bindCompatibleProviderControls(container, items, reload) {
   }));
   form.addEventListener("submit", async event => {
     event.preventDefault();
+    if (keyTogglePending) return;
     const lines = form.elements.models.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
     const models = lines.map(line => { const [name, alias] = line.split("|").map(value => value.trim()); return {name, alias: alias || name}; });
     const id = form.elements.id.value;
@@ -731,6 +853,7 @@ function bindCompatibleProviderControls(container, items, reload) {
     }
     if (!id || form.elements.base_url.value.trim() !== form.dataset.initialBaseUrl) body.base_url = form.elements.base_url.value.trim();
     if (!providerChanges.begin()) return;
+    providerSavePending = true;
     message.textContent = t("providers.savingCompatible");
     try {
       const response = await api(id ? `/provider-configs/${encodeURIComponent(id)}` : "/provider-configs", {method: id ? "PATCH" : "POST", body: JSON.stringify(body)});
@@ -793,7 +916,7 @@ function bindCompatibleProviderControls(container, items, reload) {
       if (error.message === "invalid_key") return logout();
       message.textContent = t(error.code === "provider_exists" ? "providers.compatibleExists" : "providers.compatibleSaveFailed");
       message.className = "form-message failed";
-    } finally { providerChanges.finish(); }
+    } finally { providerSavePending = false; providerChanges.finish(); }
   });
   section.querySelectorAll("[data-custom-enabled]").forEach(button => button.addEventListener("click", async () => {
     const enabled = button.dataset.enabled !== "true";

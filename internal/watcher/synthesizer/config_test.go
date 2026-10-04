@@ -17,6 +17,37 @@ func TestNewConfigSynthesizer(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatKeyDisablePreservesIdentityAndSiblings(t *testing.T) {
+	cfg := &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{
+		Name: "test", BaseURL: "https://example.test/v1",
+		APIKeyEntries: []config.OpenAICompatibilityAPIKey{{APIKey: "first"}, {APIKey: "second"}},
+	}}}
+	synthesize := func() []*coreauth.Auth {
+		t.Helper()
+		auths, err := NewConfigSynthesizer().Synthesize(&SynthesisContext{Config: cfg, Now: time.Now(), IDGenerator: NewStableIDGenerator()})
+		if err != nil || len(auths) != 2 {
+			t.Fatalf("auths = %d, error = %v", len(auths), err)
+		}
+		return auths
+	}
+	original := synthesize()
+	cfg.OpenAICompatibility[0].APIKeyEntries[0].Disabled = true
+	auths := synthesize()
+	if auths[0].ID != original[0].ID || !auths[0].Disabled || auths[0].Status != coreauth.StatusDisabled || auths[1].Disabled {
+		t.Fatal("disable did not preserve identity or affected sibling")
+	}
+	cfg.OpenAICompatibility[0].APIKeyEntries[1].Disabled = true
+	auths = synthesize()
+	if !auths[0].Disabled || !auths[1].Disabled {
+		t.Fatal("all disabled keys created an active anonymous fallback")
+	}
+	cfg.OpenAICompatibility[0].APIKeyEntries[0].Disabled = false
+	auths = synthesize()
+	if auths[0].Disabled || auths[0].Status != coreauth.StatusActive || auths[0].ID != original[0].ID {
+		t.Fatal("reenabling did not restore the original credential")
+	}
+}
+
 func TestConfigSynthesizer_Synthesize_NilContext(t *testing.T) {
 	synth := NewConfigSynthesizer()
 	auths, err := synth.Synthesize(nil)

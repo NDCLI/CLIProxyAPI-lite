@@ -351,6 +351,10 @@ func (s *ConfigSynthesizer) synthesizeOpenAICompat(ctx *SynthesisContext) []*cor
 			if len(a.Metadata) == 0 {
 				a.Metadata = nil
 			}
+			if entry.Disabled {
+				a.Disabled = true
+				a.Status = coreauth.StatusDisabled
+			}
 			out = append(out, a)
 			createdEntries++
 		}

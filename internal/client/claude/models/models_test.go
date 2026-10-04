@@ -95,6 +95,42 @@ func TestBuildResponseWithProvidersLabelsDuplicateNames(t *testing.T) {
 	}
 }
 
+func TestBuildResponseWithProvidersLabelsUniqueNamesBeforeCloaking(t *testing.T) {
+	availableModels := []map[string]any{
+		{"id": "claude-opus-5-5-high", "display_name": "Claude Opus 5.5 (High)"},
+		{"id": "gpt-6-astra", "display_name": "GPT 6.0 Astra"},
+		{"id": "custom-model", "display_name": "Custom Model"},
+	}
+	providers := func(id string) []string {
+		switch id {
+		case "claude-opus-5-5-high":
+			return []string{"antigravity"}
+		case "gpt-6-astra":
+			return []string{"codex", "custom-gateway"}
+		default:
+			return nil
+		}
+	}
+	wantNames := map[string]string{
+		"claude-opus-5-5-high": "Claude Opus 5.5 (High) (antigravity)",
+		"gpt-6-astra":          "GPT 6.0 Astra (codex, custom-gateway)",
+		"custom-model":         "Custom Model",
+	}
+	for _, disableCloaking := range []bool{false, true} {
+		response := BuildResponseWithProviders(availableModels, providers, disableCloaking)
+		for _, model := range response["data"].([]map[string]any) {
+			id := model["id"].(string)
+			originalID := ResolveClaudeModelIDPrefix(id)
+			if model["display_name"] != wantNames[originalID] {
+				t.Fatalf("display name for %q = %v, want %q", id, model["display_name"], wantNames[originalID])
+			}
+		}
+	}
+	if availableModels[0]["display_name"] != "Claude Opus 5.5 (High)" {
+		t.Fatal("provider labeling changed the source catalog")
+	}
+}
+
 func TestBuildResponseEmpty(t *testing.T) {
 	response := BuildResponse(nil, false)
 	models, ok := response["data"].([]map[string]any)

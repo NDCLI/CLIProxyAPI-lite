@@ -1,6 +1,7 @@
 package management
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -146,4 +147,32 @@ func containsStr(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func TestIsLocalOrOwnEndpointStrictLoopbackPort(t *testing.T) {
+	h := NewHandlerWithoutConfigFilePath(&config.Config{Port: 8317}, nil)
+	for _, tc := range []struct {
+		urlStr string
+		want   bool
+	}{
+		{"http://127.0.0.1:8317", true},
+		{"http://localhost:8317/v1", true},
+		{"http://127.0.0.1:80", false},
+		{"https://127.0.0.1:443", false},
+		{"http://127.0.0.1", false},
+		{"https://127.0.0.1", false},
+		{"http://localhost:9999", false},
+		{"http://127.0.0.1:9999", false},
+		{"http://attacker.com:8317", false},
+	} {
+		t.Run(tc.urlStr, func(t *testing.T) {
+			parsed, err := url.Parse(tc.urlStr)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := h.isLocalOrOwnEndpoint(parsed); got != tc.want {
+				t.Fatalf("isLocalOrOwnEndpoint(%q) = %v; want %v", tc.urlStr, got, tc.want)
+			}
+		})
+	}
 }

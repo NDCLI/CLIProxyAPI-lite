@@ -38,8 +38,8 @@ func TestClaudeModelsResponseUsesConfiguredDisplayName(t *testing.T) {
 	}
 	for _, model := range response.Data {
 		if model.ID == modelID {
-			if model.DisplayName != "Configured Claude Name" {
-				t.Fatalf("display_name = %q, want Configured Claude Name", model.DisplayName)
+			if model.DisplayName != "Configured Claude Name (claude)" {
+				t.Fatalf("display_name = %q, want Configured Claude Name (claude)", model.DisplayName)
 			}
 			return
 		}

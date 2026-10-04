@@ -16,6 +16,9 @@ type Config struct {
 	// TLS config controls HTTPS server settings.
 	TLS TLSConfig `yaml:"tls" json:"tls"`
 
+	// Tailscale exposes the proxy on a tailnet through an embedded Tailscale node.
+	Tailscale TailscaleConfig `yaml:"tailscale,omitempty" json:"tailscale,omitempty"`
+
 	// Home config is runtime-only and is populated from -home-jwt.
 	Home HomeConfig `yaml:"-" json:"-"`
 

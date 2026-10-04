@@ -24,12 +24,14 @@ type dashboardModel struct {
 	lastConfig    map[string]any
 	lastAuthFiles []map[string]any
 	lastAPIKeys   []string
+	lastTailscale map[string]any
 }
 
 type dashboardDataMsg struct {
 	config    map[string]any
 	authFiles []map[string]any
 	apiKeys   []string
+	tailscale map[string]any
 	err       error
 }
 
@@ -47,6 +49,8 @@ func (m dashboardModel) fetchData() tea.Msg {
 	cfg, cfgErr := m.client.GetConfig()
 	authFiles, authErr := m.client.GetAuthFiles()
 	apiKeys, keysErr := m.client.GetAPIKeys()
+	// Tailscale status is optional; ignore errors from older servers.
+	tailscale, _ := m.client.GetTailscale()
 
 	var err error
 	for _, e := range []error{cfgErr, authErr, keysErr} {
@@ -55,7 +59,19 @@ func (m dashboardModel) fetchData() tea.Msg {
 			break
 		}
 	}
-	return dashboardDataMsg{config: cfg, authFiles: authFiles, apiKeys: apiKeys, err: err}
+	return dashboardDataMsg{config: cfg, authFiles: authFiles, apiKeys: apiKeys, tailscale: tailscale, err: err}
+}
+
+// toggleTailscale starts or stops the Tailscale node based on its current state.
+func (m dashboardModel) toggleTailscale() tea.Msg {
+	running := false
+	if status, ok := m.lastTailscale["status"].(map[string]any); ok {
+		running = getBool(status, "running")
+	}
+	if errToggle := m.client.SetTailscaleRunning(!running); errToggle != nil {
+		return dashboardDataMsg{err: errToggle}
+	}
+	return m.fetchData()
 }
 
 func (m dashboardModel) Update(msg tea.Msg) (dashboardModel, tea.Cmd) {
@@ -77,6 +93,7 @@ func (m dashboardModel) Update(msg tea.Msg) (dashboardModel, tea.Cmd) {
 			m.lastConfig = msg.config
 			m.lastAuthFiles = msg.authFiles
 			m.lastAPIKeys = msg.apiKeys
+			m.lastTailscale = msg.tailscale
 
 			m.content = m.renderDashboard(msg.config, msg.authFiles, msg.apiKeys)
 		}
@@ -86,6 +103,9 @@ func (m dashboardModel) Update(msg tea.Msg) (dashboardModel, tea.Cmd) {
 	case tea.KeyMsg:
 		if msg.String() == "r" {
 			return m, m.fetchData
+		}
+		if msg.String() == "t" {
+			return m, m.toggleTailscale
 		}
 		var cmd tea.Cmd
 		m.viewport, cmd = m.viewport.Update(msg)
@@ -226,8 +246,43 @@ func (m dashboardModel) renderDashboard(cfg map[string]any, authFiles []map[stri
 	}
 
 	sb.WriteString("\n")
+	m.renderTailscale(&sb)
 
 	return sb.String()
+}
+
+// renderTailscale writes the Tailscale status section when available.
+func (m dashboardModel) renderTailscale(sb *strings.Builder) {
+	status, ok := m.lastTailscale["status"].(map[string]any)
+	if !ok {
+		return
+	}
+	sb.WriteString(lipgloss.NewStyle().Bold(true).Foreground(colorHighlight).Render(T("tailscale_title")))
+	sb.WriteString("\n")
+	sb.WriteString(strings.Repeat("─", minInt(m.width, 60)))
+	sb.WriteString("\n")
+	sb.WriteString(formatKV(T("ts_state"), fmt.Sprintf("%s %s", boolEmoji(getBool(status, "running")), getString(status, "state"))))
+	if authURL := getString(status, "auth_url"); authURL != "" {
+		sb.WriteString(formatKV(T("ts_login_url"), authURL))
+	}
+	joinList := func(key string) string {
+		items, _ := status[key].([]any)
+		parts := make([]string, 0, len(items))
+		for _, item := range items {
+			parts = append(parts, fmt.Sprint(item))
+		}
+		return strings.Join(parts, ", ")
+	}
+	if ips := joinList("ips"); ips != "" {
+		sb.WriteString(formatKV(T("ts_ips"), ips))
+	}
+	if urls := joinList("urls"); urls != "" {
+		sb.WriteString(formatKV(T("ts_urls"), urls))
+	}
+	if errMsg := getString(status, "error"); errMsg != "" {
+		sb.WriteString(formatKV(T("ts_error"), errMsg))
+	}
+	sb.WriteString("\n")
 }
 
 func formatKV(key, value string) string {

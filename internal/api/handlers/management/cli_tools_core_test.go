@@ -124,8 +124,10 @@ func TestCLIEndpointKeyCannotBeUsedForExternalEndpoint(t *testing.T) {
 	if errResolve != nil || resolved != key {
 		t.Fatalf("local endpoint key = %q, %v", resolved, errResolve)
 	}
-	if _, errResolve = handler.resolveCLIEndpointKey("https://api.example.com/v1", endpointKeyID(key), ""); errResolve == nil {
-		t.Fatal("saved local key was accepted for an external endpoint")
+	for _, endpoint := range []string{"https://api.example.com/v1", "http://127.0.0.1:80/v1", "https://localhost:443/v1", "http://127.0.0.1:8318/v1", "http://127.0.0.1:8317/other/v1"} {
+		if _, errResolve = handler.resolveCLIEndpointKey(endpoint, endpointKeyID(key), ""); errResolve == nil {
+			t.Fatalf("saved local key was accepted for endpoint %q", endpoint)
+		}
 	}
 }
 

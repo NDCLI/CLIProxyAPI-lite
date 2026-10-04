@@ -102,27 +102,57 @@
     return `<label>${t("tools.apiKey")}<select class="text-input" name="api_key_id"><option value="">${t("tools.customKey")}</option>${keys.map(item => `<option value="${escapeHTML(item.id)}" ${selected === item.id ? "selected" : ""}>${escapeHTML(item.label)} · ${escapeHTML(item.mask)}</option>`).join("")}</select><input class="text-input" name="api_key" type="password" autocomplete="new-password" placeholder="${t("tools.customKeyPlaceholder")}" ${selected ? "disabled" : ""}><small class="hint">${t("tools.apiKeyHint")}</small></label>`;
   }
 
-  function endpointField(value, id = "tool-endpoint", inputName = "base_url", local = `${location.origin}/v1`, hintKey = "tools.endpointHint") {
-    const isLocal = !value || value.replace(/\/+$/, "") === local.replace(/\/+$/, "");
-    return `<label>${t("tools.endpoint")}<select class="text-input" id="${id}-preset"><option value="local" ${isLocal ? "selected" : ""}>${t("tools.localEndpoint")} · ${escapeHTML(local)}</option>${!isLocal ? `<option value="saved" selected>${t("tools.currentEndpoint")} · ${escapeHTML(value)}</option>` : ""}<option value="custom">${t("tools.customEndpoint")}</option></select><input class="text-input" name="${inputName}" type="url" required value="${escapeHTML(value || local)}" ${isLocal ? "readonly" : ""}><small class="hint">${t(hintKey)}</small></label>`;
+  async function getTailscaleURLs() {
+    try {
+      const {status = {}} = await api("/tailscale");
+      if (!status.running || status.state !== "Running") return [];
+      return [...new Set((status.urls || []).flatMap(value => {
+        try {
+          const url = new URL(value);
+          return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && !url.search && !url.hash && url.pathname === "/" ? [url.origin] : [];
+        } catch (_) { return []; }
+      }))];
+    } catch (error) { if (error.message === "invalid_key") throw error; return []; }
   }
 
-  function bindEndpointField(container, id = "tool-endpoint", inputName = "base_url", local = `${location.origin}/v1`) {
+  function endpointURL(value) {
+    try { return new URL(value).href.replace(/\/+$/, ""); }
+    catch (_) { return ""; }
+  }
+
+  function endpointField(value, id = "tool-endpoint", inputName = "base_url", local = `${location.origin}/v1`, hintKey = "tools.endpointHint", tailscaleURLs = []) {
+    const urls = tailscaleURLs.map(url => `${url}${local.endsWith("/v1") ? "/v1" : ""}`);
+    const presets = [{id: "local", url: local, label: t(urls.includes(local) ? "endpoint.tailscaleEndpoint" : "tools.localEndpoint")}, ...urls.filter(url => url !== local).map((url, index) => ({id: `tailscale-${index}`, url, label: t("endpoint.tailscaleEndpoint")}))];
+    const selected = presets.find(item => endpointURL(item.url) === endpointURL(value || local));
+    return `<label>${t("tools.endpoint")}<select class="text-input" id="${id}-preset">${presets.map(item => `<option value="${item.id}" data-endpoint="${escapeHTML(item.url)}" ${selected?.id === item.id ? "selected" : ""}>${escapeHTML(item.label)} · ${escapeHTML(item.url)}</option>`).join("")}${!urls.length ? `<option disabled>${t("endpoint.tailscaleNotConfigured")}</option>` : ""}${!selected ? `<option value="saved" data-saved-endpoint="${escapeHTML(value)}" selected>${t("tools.currentEndpoint")} · ${escapeHTML(value)}</option>` : ""}<option value="custom">${t("tools.customEndpoint")}</option></select><input class="text-input" name="${inputName}" type="url" required value="${escapeHTML(value || local)}" ${selected ? "readonly" : ""}><small class="hint">${t(hintKey)}</small></label>`;
+  }
+
+  function bindEndpointField(container, id = "tool-endpoint", inputName = "base_url") {
     const preset = container.querySelector(`#${id}-preset`);
     const input = container.querySelector(`[name="${inputName}"]`);
     if (!preset || !input) return;
+    const keySelect = container.querySelector('[name="api_key_id"]');
+    const secret = container.querySelector('[name="api_key"]');
+    let gatewayKey = keySelect?.value || "";
+    let wasGateway = false;
     const selectKey = () => {
-      const keySelect = container.querySelector('[name="api_key_id"]');
-      const secret = container.querySelector('[name="api_key"]');
       if (!keySelect || !secret) return;
-      if (preset.value !== "local") keySelect.value = "";
+      const isGateway = [...preset.options].some(option => option.dataset.endpoint && endpointURL(option.dataset.endpoint) === endpointURL(input.value.trim()));
+      if (!isGateway && keySelect.value) { gatewayKey = keySelect.value; keySelect.value = ""; }
+      if (isGateway && !wasGateway) keySelect.value = gatewayKey;
+      for (const option of keySelect.options) if (option.value) option.disabled = !isGateway;
       secret.disabled = Boolean(keySelect.value);
+      if (secret.disabled) secret.value = "";
+      wasGateway = isGateway;
     };
     selectKey();
+    input.addEventListener("input", selectKey);
+    keySelect?.addEventListener("change", () => { if (wasGateway) gatewayKey = keySelect.value; });
     preset.addEventListener("change", () => {
-      if (preset.value === "local") { input.value = local; input.readOnly = true; }
-      else if (preset.value === "saved") input.readOnly = false;
-      else { input.readOnly = false; input.focus(); }
+      const option = preset.selectedOptions[0];
+      input.readOnly = Boolean(option.dataset.endpoint);
+      if (option.dataset.endpoint || option.dataset.savedEndpoint) input.value = option.dataset.endpoint || option.dataset.savedEndpoint;
+      if (!input.readOnly) input.focus();
       selectKey();
       input.dispatchEvent(new Event("input", {bubbles: true}));
     });
@@ -143,7 +173,7 @@
     page.innerHTML = header() + `<div class="loading">${t("common.loading")}</div>`;
     page.querySelector("#refresh").addEventListener("click", () => renderToolDetail(page, id, true));
     try {
-      const [toolResponse, references] = await Promise.all([api(`/cli-tools/${encodeURIComponent(id)}`), getReferenceData(forceReferences)]);
+      const [toolResponse, references, tailscaleURLs] = await Promise.all([api(`/cli-tools/${encodeURIComponent(id)}`), getReferenceData(forceReferences), getTailscaleURLs()]);
       if (!checkPage(page, run)) return;
       const item = toolResponse.item;
       const name = toolTitle[id] || item.label;
@@ -152,7 +182,7 @@
       const localEndpoint = isCowork ? location.origin : `${location.origin}/v1`;
       const url = current.base_url || localEndpoint;
       const selectedKey = references.keys[0]?.id || "";
-      const fields = `<div class="tool-form-grid">${endpointField(url, "tool-endpoint", "base_url", localEndpoint, isCowork ? "tools.coworkEndpointHint" : "tools.endpointHint")}${apiKeyField(references.keys, selectedKey)}${isCowork ? `<p class="hint">${t("tools.coworkModelHint")}</p>` : `<label>${t("tools.model")}<input class="text-input" name="model" list="cli-models" required value="${escapeHTML(current.model || "")}" placeholder="provider/model-id">${modelListMarkup("cli-models", references.models, current.model || "")}<small class="hint">${t("tools.modelHint")}</small></label>`}${item.capabilities?.includes("subagent") ? `<label>${t("tools.subagentModel")}<input class="text-input" name="subagent_model" list="cli-models" value="${escapeHTML(current.subagent_model || "")}" placeholder="${t("tools.sameAsMainModel")}"></label>` : ""}${item.capabilities?.includes("models") ? `<div class="tool-slot-grid">${["fable", "opus", "sonnet", "haiku"].map(slot => `<label>${t(`tools.slot.${slot}`)}<input class="text-input" name="model_${slot}" list="cli-models" value="${escapeHTML(current.models?.[slot] || "")}" placeholder="provider/model-id"></label>`).join("")}</div>` : ""}${item.capabilities?.includes("auto_compact") ? `<label>${t("tools.autoCompact")}<select class="text-input" name="auto_compact_window"><option value="0" ${!current.auto_compact_window ? "selected" : ""}>${t("tools.default")}</option><option value="200000" ${current.auto_compact_window === 200000 ? "selected" : ""}>200,000</option><option value="1000000" ${current.auto_compact_window === 1000000 ? "selected" : ""}>1,000,000</option></select></label>` : ""}</div>`;
+      const fields = `<div class="tool-form-grid">${endpointField(url, "tool-endpoint", "base_url", localEndpoint, isCowork ? "tools.coworkEndpointHint" : "tools.endpointHint", tailscaleURLs)}${apiKeyField(references.keys, selectedKey)}${isCowork ? `<p class="hint">${t("tools.coworkModelHint")}</p>` : `<label>${t("tools.model")}<input class="text-input" name="model" list="cli-models" required value="${escapeHTML(current.model || "")}" placeholder="provider/model-id">${modelListMarkup("cli-models", references.models, current.model || "")}<small class="hint">${t("tools.modelHint")}</small></label>`}${item.capabilities?.includes("subagent") ? `<label>${t("tools.subagentModel")}<input class="text-input" name="subagent_model" list="cli-models" value="${escapeHTML(current.subagent_model || "")}" placeholder="${t("tools.sameAsMainModel")}"></label>` : ""}${item.capabilities?.includes("models") ? `<div class="tool-slot-grid">${["fable", "opus", "sonnet", "haiku"].map(slot => `<label>${t(`tools.slot.${slot}`)}<input class="text-input" name="model_${slot}" list="cli-models" value="${escapeHTML(current.models?.[slot] || "")}" placeholder="provider/model-id"></label>`).join("")}</div>` : ""}${item.capabilities?.includes("auto_compact") ? `<label>${t("tools.autoCompact")}<select class="text-input" name="auto_compact_window"><option value="0" ${!current.auto_compact_window ? "selected" : ""}>${t("tools.default")}</option><option value="200000" ${current.auto_compact_window === 200000 ? "selected" : ""}>200,000</option><option value="1000000" ${current.auto_compact_window === 1000000 ? "selected" : ""}>1,000,000</option></select></label>` : ""}</div>`;
       const common = `<a class="text-link" href="#/cli-tools">${icon("arrow")}${t("tools.back")}</a><header class="tool-detail-heading"><span class="tool-detail-logo">${iconImage(id)}</span><div><h1>${escapeHTML(name)}</h1><p>${escapeHTML(item.description || t("tools.detailDescription"))}</p></div><span class="badge ${item.configured ? "ready" : item.config_error ? "failed" : "partial"}">${t(item.config_error ? "tools.status.invalid" : item.configured ? "tools.status.connected" : "tools.status.notConfigured")}</span></header>`;
       if (item.category === "guide") {
         page.innerHTML = header() + `<section class="tool-detail">${common}<article class="card tool-config-card"><div class="section-head"><div><h2>${t("tools.guideTitle")}</h2><p class="hint">${t(`tools.guide.${id}`)}</p></div>${stateBadge(t("tools.status.guide"), "guide")}</div>${fields}<div class="actions"><button class="primary compact" type="button" id="copy-guide">${icon("copy")}${t("tools.copyGuide")}</button><span id="tool-message" class="form-message" role="status" aria-live="polite"></span></div><pre class="tool-preview" id="guide-preview"></pre><p class="hint">${t("tools.guideSecretHint")}</p></article></section>`;
@@ -174,7 +204,7 @@
       page.innerHTML = header() + `<section class="tool-detail">${common}<form id="tool-config" class="card tool-config-card"><div class="tool-config-meta"><span>${t("tools.installation")}: <strong>${t(item.installed ? "tools.installed" : "tools.notInstalled")}</strong></span><code>${escapeHTML(item.config_path || item.configPath || t("tools.localConfig"))}</code></div>${item.config_error ? `<div class="form-message failed">${t("tools.configInvalid")}</div>` : ""}${fields}<div class="actions"><button class="secondary" id="preview-tool" type="button">${icon("terminal")}${t("tools.preview")}</button><button class="primary compact" type="submit">${icon("save")}${t("tools.apply")}</button><button class="secondary" id="copy-preview" type="button" disabled>${icon("copy")}${t("tools.copyConfig")}</button><button class="danger-button" id="reset-tool" type="button" ${item.can_reset ? "" : "disabled"}>${icon("refresh")}${t("tools.reset")}</button><span id="tool-message" class="form-message" role="status" aria-live="polite"></span></div><pre class="tool-preview" id="tool-preview" hidden></pre></form></section>`;
       page.querySelector("#refresh").addEventListener("click", () => renderToolDetail(page, id, true));
       const form = page.querySelector("#tool-config");
-      bindEndpointField(form, "tool-endpoint", "base_url", localEndpoint);
+      bindEndpointField(form);
       const keySelect = form.elements.api_key_id;
       const keyInput = form.elements.api_key;
       keySelect.addEventListener("change", () => { keyInput.disabled = Boolean(keySelect.value); if (keySelect.value) keyInput.value = ""; });
@@ -200,7 +230,7 @@
           form.querySelector("#tool-preview").hidden = false;
           form.querySelector("#copy-preview").disabled = !result.preview;
           message.textContent = t("tools.previewReady"); message.className = "form-message ok";
-        } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t(error.code === "" ? "tools.previewFailed" : "tools.invalidSettings"); message.className = "form-message failed"; }
+        } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = (error.message && error.message !== "server_error") ? error.message : t(error.code === "" ? "tools.previewFailed" : "tools.invalidSettings"); message.className = "form-message failed"; }
         finally { button.disabled = false; }
       };
       form.querySelector("#preview-tool").addEventListener("click", preview);
@@ -224,7 +254,7 @@
           if (status) { status.className = "badge ready"; status.textContent = t("tools.status.connected"); }
           message.textContent = t(isCowork ? "tools.coworkAppliedRestart" : applyChanges.isDirty() ? "tools.appliedWithUnsavedChanges" : "tools.applied"); message.className = "form-message ok";
           form.querySelector("#tool-preview").hidden = true; form.querySelector("#copy-preview").disabled = true;
-        } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t(error.code === "" ? "tools.applyFailed" : "tools.invalidSettings"); message.className = "form-message failed"; }
+        } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = (error.message && error.message !== "server_error") ? error.message : t(error.code === "" ? "tools.applyFailed" : "tools.invalidSettings"); message.className = "form-message failed"; }
         finally { applyChanges.finish(); }
       });
       form.querySelector("#reset-tool").addEventListener("click", async event => {
@@ -236,7 +266,7 @@
           const refreshedMessage = page.querySelector("#tool-message");
           if (refreshedMessage) { refreshedMessage.textContent = t(isCowork ? "tools.coworkResetRestart" : "tools.resetDone"); refreshedMessage.className = "form-message ok"; }
         }
-        catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("tools.resetFailed"); message.className = "form-message failed"; button.disabled = false; }
+        catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = (error.message && error.message !== "server_error") ? error.message : t("tools.resetFailed"); message.className = "form-message failed"; button.disabled = false; }
       });
     } catch (error) {
       if (error.message === "invalid_key") return logout();
@@ -287,7 +317,7 @@
       if (refreshMessage) { refreshMessage.textContent = t("tools.refreshingMITM"); refreshMessage.className = "form-message"; }
     } else page.innerHTML = header() + `<div class="loading">${t("common.loading")}</div>`;
     try {
-      const [statusResponse, refs] = await Promise.all([api("/mitm/status"), getReferenceData(options.force === true)]);
+      const [statusResponse, refs, tailscaleURLs] = await Promise.all([api("/mitm/status"), getReferenceData(options.force === true), getTailscaleURLs()]);
       if (!checkPage(page, run)) return;
       const statusItem = statusResponse;
       const tools = statusItem.tools || [];
@@ -300,7 +330,7 @@
       const hasPendingDNS = Object.values(statusItem.dns_pending || {}).some(Boolean);
       const hasRedirectedDNS = Object.values(statusItem.dns || {}).some(Boolean);
       const canCleanDNS = hasPendingDNS || hasRedirectedDNS || Boolean(statusItem.dns_warning);
-      const serverCard = `<article class="card mitm-server-card"><div class="tool-config-meta"><div><h2>${t("tools.mitmServer")}</h2><p class="hint">${t("tools.mitmWarning")}</p></div><div>${stateBadge(t(statusItem.running ? "tools.running" : "tools.stopped"), statusItem.running ? "ready" : "muted")}${trustedBadge}</div></div>${statusItem.dns_warning ? `<div class="form-message failed mitm-dns-warning" role="alert">${icon("warning")}${t("tools.dnsCleanupFailed")} ${escapeHTML(statusItem.dns_warning)}</div>` : ""}<div class="tool-form-grid">${endpointField(statusItem.base_url ? `${statusItem.base_url}/v1` : `${location.origin}/v1`, "mitm-endpoint", "mitm_base_url")}${apiKeyField(refs.keys, statusItem.api_key_id || refs.keys[0]?.id || "")}</div><div class="actions"><button class="primary compact" id="mitm-start" ${statusItem.running ? "disabled" : ""}>${icon("check")}${t("tools.startMITM")}</button><button class="secondary" id="mitm-stop" ${statusItem.running || canCleanDNS ? "" : "disabled"}>${icon(statusItem.running ? "pause" : "refresh")}${t(statusItem.running ? "tools.stopMITM" : "tools.repairDNS")}</button><button class="secondary" id="mitm-ca-download">${icon("download")}${t("tools.downloadCA")}</button><button class="secondary" id="mitm-ca-install" ${statusItem.cert_trusted ? "disabled" : ""}>${icon("shield")}${t("tools.trustCA")}</button><button class="danger-button" id="mitm-ca-remove" ${statusItem.cert_trusted ? "" : "disabled"}>${icon("trash")}${t("tools.removeCA")}</button><span class="form-message" id="mitm-message" role="status" aria-live="polite"></span></div><p class="hint">${t("tools.mitmPrivilege")} · ${t("tools.mitmAddress")}: <code>${escapeHTML(statusItem.address || "127.0.0.1:443")}</code> · ${t(statusItem.is_admin ? "tools.admin" : "tools.notAdmin")}</p></article>`;
+      const serverCard = `<article class="card mitm-server-card"><div class="tool-config-meta"><div><h2>${t("tools.mitmServer")}</h2><p class="hint">${t("tools.mitmWarning")}</p></div><div>${stateBadge(t(statusItem.running ? "tools.running" : "tools.stopped"), statusItem.running ? "ready" : "muted")}${trustedBadge}</div></div>${statusItem.dns_warning ? `<div class="form-message failed mitm-dns-warning" role="alert">${icon("warning")}${t("tools.dnsCleanupFailed")} ${escapeHTML(statusItem.dns_warning)}</div>` : ""}<div class="tool-form-grid">${endpointField(statusItem.base_url ? `${statusItem.base_url}/v1` : `${location.origin}/v1`, "mitm-endpoint", "mitm_base_url", `${location.origin}/v1`, "tools.endpointHint", tailscaleURLs)}${apiKeyField(refs.keys, statusItem.api_key_id || refs.keys[0]?.id || "")}</div><div class="actions"><button class="primary compact" id="mitm-start" ${statusItem.running ? "disabled" : ""}>${icon("check")}${t("tools.startMITM")}</button><button class="secondary" id="mitm-stop" ${statusItem.running || canCleanDNS ? "" : "disabled"}>${icon(statusItem.running ? "pause" : "refresh")}${t(statusItem.running ? "tools.stopMITM" : "tools.repairDNS")}</button><button class="secondary" id="mitm-ca-download">${icon("download")}${t("tools.downloadCA")}</button><button class="secondary" id="mitm-ca-install" ${statusItem.cert_trusted ? "disabled" : ""}>${icon("shield")}${t("tools.trustCA")}</button><button class="danger-button" id="mitm-ca-remove" ${statusItem.cert_trusted ? "" : "disabled"}>${icon("trash")}${t("tools.removeCA")}</button><span class="form-message" id="mitm-message" role="status" aria-live="polite"></span></div><p class="hint">${t("tools.mitmPrivilege")} · ${t("tools.mitmAddress")}: <code>${escapeHTML(statusItem.address || "127.0.0.1:443")}</code> · ${t(statusItem.is_admin ? "tools.admin" : "tools.notAdmin")}</p></article>`;
       const sourceModels = selected.source_models || [];
       const mappingModels = [...new Map([...sourceModels.map(model => [model.id, {id: model.id, label: model.label}]), ...Object.keys(savedMappings).map(id => [id, {id, label: id}])]).values()];
       const baselineMappings = Object.fromEntries(mappingModels.map(model => [model.id, savedMappings[model.id] || ""]));

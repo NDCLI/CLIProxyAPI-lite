@@ -13,6 +13,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/runtime/executor"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/tailnet"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v7/sdk/auth"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
@@ -170,6 +171,14 @@ func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) b
 	s.cfg = cfg
 	if s.tokenSaver != nil {
 		s.tokenSaver.Configure(cfg.TokenSaver)
+	}
+	if cfg != nil {
+		tsCfg := cfg.Tailscale
+		go func() {
+			if errTS := tailnet.Default().ApplyConfig(context.Background(), tsCfg); errTS != nil {
+				log.WithError(errTS).Warn("failed to apply tailscale configuration")
+			}
+		}()
 	}
 	if s.codexLiveHandler != nil {
 		if errUpdate := s.codexLiveHandler.UpdateConfig(cfg); errUpdate != nil {

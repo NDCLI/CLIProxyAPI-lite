@@ -12,6 +12,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -27,6 +28,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/pluginhost"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/redisqueue"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/tailnet"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/tokensaver"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/usageview"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v7/sdk/access"
@@ -356,6 +358,13 @@ func (s *Server) Start() error {
 		acceptErrCh <- s.acceptMuxConnections(listener, httpListener)
 	}()
 
+	tailnet.Default().SetHandler(s.server.Handler, filepath.Dir(s.configFilePath))
+	if s.cfg != nil && s.cfg.Tailscale.Enable {
+		if errTS := tailnet.Default().Start(s.cfg.Tailscale); errTS != nil {
+			log.WithError(errTS).Warn("failed to start tailscale")
+		}
+	}
+
 	select {
 	case errServe := <-httpErrCh:
 		if s.muxBaseListener != nil {
@@ -411,6 +420,9 @@ func (s *Server) Stop(ctx context.Context) error {
 	var errMITM error
 	if s.mgmt != nil {
 		errMITM = s.mgmt.ShutdownMITM(ctx)
+	}
+	if errTS := tailnet.Default().Stop(ctx); errTS != nil {
+		log.WithError(errTS).Warn("failed to stop tailscale")
 	}
 
 	if s.keepAliveEnabled {

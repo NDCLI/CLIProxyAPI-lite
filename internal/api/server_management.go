@@ -252,6 +252,10 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.PATCH("/mitm/dns", s.mgmt.ToggleMITMDNS)
 		mgmt.GET("/mitm/mappings", s.mgmt.GetMITMMappings)
 		mgmt.PUT("/mitm/mappings", s.mgmt.PutMITMMappings)
+		mgmt.GET("/tailscale", s.mgmt.GetTailscale)
+		mgmt.PUT("/tailscale", s.mgmt.PutTailscale)
+		mgmt.POST("/tailscale/start", s.mgmt.StartTailscale)
+		mgmt.POST("/tailscale/stop", s.mgmt.StopTailscale)
 	}
 }
 

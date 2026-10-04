@@ -15,6 +15,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/router-for-me/CLIProxyAPI/v7/internal/tailnet"
 	"gopkg.in/yaml.v3"
 )
 
@@ -146,21 +147,8 @@ func (h *Handler) resolveCLIEndpointKey(baseURL, keyID, apiKey string) (string, 
 	if h.cfg == nil {
 		return "", fmt.Errorf("configuration unavailable")
 	}
-	host := parsed.Hostname()
-	loopback := host == "localhost"
-	if ip := net.ParseIP(host); ip != nil {
-		loopback = ip.IsLoopback()
-	}
-	port := parsed.Port()
-	if port == "" {
-		if parsed.Scheme == "https" {
-			port = "443"
-		} else if parsed.Scheme == "http" {
-			port = "80"
-		}
-	}
 	path := strings.TrimRight(parsed.Path, "/")
-	if !loopback || port != strconv.Itoa(h.cfg.Port) || (path != "" && path != "/v1") || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+	if (path != "" && path != "/v1") || (parsed.Scheme != "http" && parsed.Scheme != "https") || !h.isLocalOrOwnEndpoint(parsed) {
 		return "", fmt.Errorf("saved endpoint keys can only be used with this local server; enter a custom key for other endpoints")
 	}
 	for _, key := range h.cfg.APIKeys {
@@ -172,6 +160,36 @@ func (h *Handler) resolveCLIEndpointKey(baseURL, keyID, apiKey string) (string, 
 		}
 	}
 	return "", fmt.Errorf("endpoint API key no longer exists; refresh and select a key")
+}
+
+func (h *Handler) isLocalOrOwnEndpoint(parsed *url.URL) bool {
+	if parsed == nil {
+		return false
+	}
+	host := parsed.Hostname()
+	port := parsed.Port()
+	if port == "" {
+		if parsed.Scheme == "https" {
+			port = "443"
+		} else if parsed.Scheme == "http" {
+			port = "80"
+		}
+	}
+	loopback := host == "localhost"
+	if ip := net.ParseIP(host); ip != nil {
+		loopback = ip.IsLoopback()
+	}
+	cfgPortStr := strconv.Itoa(h.cfg.Port)
+	if loopback && port == cfgPortStr {
+		return true
+	}
+	if h.cfg.Host != "" && h.cfg.Host != "0.0.0.0" && strings.EqualFold(host, h.cfg.Host) && port == cfgPortStr {
+		return true
+	}
+	if tailnet.Default().IsOwnEndpoint(parsed) {
+		return true
+	}
+	return false
 }
 
 func validateCLIToolRequest(item cliToolItem, req configureToolRequest) error {

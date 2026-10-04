@@ -11,6 +11,17 @@ tls:
   cert: ""
   key: ""
 
+# Expose the proxy on your Tailscale network via an embedded node (no tailscale client required).
+# Without auth-key (or TS_AUTHKEY env), a login URL is printed in logs / Management API.
+# tailscale:
+#   enable: false
+#   hostname: "cliproxyapi"      # reachable as http://cliproxyapi (MagicDNS)
+#   auth-key: ""                 # tskey-auth-...
+#   state-dir: ""                # default: <config-dir>/tsnet-state
+#   ephemeral: false
+#   https: false                 # serve https://<hostname>.<tailnet>.ts.net inside the tailnet
+#   funnel: false                # publish https://<hostname>.<tailnet>.ts.net to the internet
+
 # Management API settings
 remote-management:
   # Whether to allow remote (non-localhost) management access.

@@ -33,6 +33,9 @@ auths/*
 # Local MITM certificate authority
 /certs
 
+# Local embedded Tailscale node state
+/tsnet-state/
+
 # Local 9router credential backups
 /9router-backup-*.json
 

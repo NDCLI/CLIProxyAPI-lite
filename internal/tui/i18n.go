@@ -96,7 +96,7 @@ var zhStrings = map[string]string{
 
 	// ── Dashboard ──
 	"dashboard_title":  "📊 仪表盘",
-	"dashboard_help":   " [r] 刷新 • [↑↓] 滚动",
+	"dashboard_help":   " [r] 刷新 • [t] Tailscale 开/关 • [↑↓] 滚动",
 	"connected":        "● 已连接",
 	"mgmt_keys":        "管理密钥",
 	"auth_files_label": "认证文件",
@@ -112,6 +112,12 @@ var zhStrings = map[string]string{
 	"retry_count":      "重试次数",
 	"proxy_url":        "代理 URL",
 	"routing_strategy": "路由策略",
+	"tailscale_title":  "Tailscale",
+	"ts_state":         "状态",
+	"ts_login_url":     "登录链接",
+	"ts_ips":           "IP",
+	"ts_urls":          "访问地址",
+	"ts_error":         "错误",
 	"model_stats":      "模型统计",
 	"model":            "模型",
 	"requests":         "请求数",
@@ -253,7 +259,7 @@ var enStrings = map[string]string{
 
 	// ── Dashboard ──
 	"dashboard_title":  "📊 Dashboard",
-	"dashboard_help":   " [r] Refresh • [↑↓] Scroll",
+	"dashboard_help":   " [r] Refresh • [t] Toggle Tailscale • [↑↓] Scroll",
 	"connected":        "● Connected",
 	"mgmt_keys":        "Mgmt Keys",
 	"auth_files_label": "Auth Files",
@@ -269,6 +275,12 @@ var enStrings = map[string]string{
 	"retry_count":      "Retry Count",
 	"proxy_url":        "Proxy URL",
 	"routing_strategy": "Routing Strategy",
+	"tailscale_title":  "Tailscale",
+	"ts_state":         "State",
+	"ts_login_url":     "Login URL",
+	"ts_ips":           "IPs",
+	"ts_urls":          "Endpoints",
+	"ts_error":         "Error",
 	"model_stats":      "Model Stats",
 	"model":            "Model",
 	"requests":         "Requests",

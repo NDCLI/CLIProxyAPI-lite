@@ -433,3 +433,17 @@ func (c *Client) DeleteField(path string) error {
 	_, _, err := c.doRequest("DELETE", "/v0/management/"+path, nil)
 	return err
 }
+
+// GetTailscale fetches the Tailscale configuration and live status.
+func (c *Client) GetTailscale() (map[string]any, error) {
+	return c.getJSON("/v0/management/tailscale")
+}
+
+// SetTailscaleRunning starts or stops the embedded Tailscale node.
+func (c *Client) SetTailscaleRunning(run bool) error {
+	path := "/v0/management/tailscale/stop"
+	if run {
+		path = "/v0/management/tailscale/start"
+	}
+	return c.postJSON(path, map[string]any{})
+}

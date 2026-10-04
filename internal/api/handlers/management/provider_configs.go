@@ -16,13 +16,14 @@ import (
 )
 
 type compatibleProviderItem struct {
-	ID         string                            `json:"id"`
-	Name       string                            `json:"name"`
-	BaseURL    string                            `json:"base_url"`
-	Prefix     string                            `json:"prefix,omitempty"`
-	Enabled    bool                              `json:"enabled"`
-	APIKeyMask []string                          `json:"api_key_masks"`
-	Models     []config.OpenAICompatibilityModel `json:"models"`
+	ID            string                            `json:"id"`
+	Name          string                            `json:"name"`
+	BaseURL       string                            `json:"base_url"`
+	Prefix        string                            `json:"prefix,omitempty"`
+	Enabled       bool                              `json:"enabled"`
+	APIKeyMask    []string                          `json:"api_key_masks"`
+	APIKeyEnabled []bool                            `json:"api_key_enabled"`
+	Models        []config.OpenAICompatibilityModel `json:"models"`
 }
 
 type compatibleProviderMutation struct {
@@ -63,6 +64,11 @@ func mutateCompatibleProviderAPIKey(entry *config.OpenAICompatibility, action st
 			return errors.New("invalid API key operation")
 		}
 		entry.APIKeyEntries = append(entry.APIKeyEntries[:*index], entry.APIKeyEntries[*index+1:]...)
+	case "enable", "disable":
+		if index == nil || *index < 0 || *index >= len(entry.APIKeyEntries) || key != "" {
+			return errors.New("invalid API key operation")
+		}
+		entry.APIKeyEntries[*index].Disabled = action == "disable"
 	default:
 		return errors.New("invalid API key operation")
 	}
@@ -86,13 +92,15 @@ func safeCompatibleProviderURL(value string) string {
 
 func compatibleProviderFromConfig(item config.OpenAICompatibility) compatibleProviderItem {
 	keys := make([]string, 0, len(item.APIKeyEntries))
+	enabled := make([]bool, 0, len(item.APIKeyEntries))
 	for _, entry := range item.APIKeyEntries {
 		keys = append(keys, maskEndpointKey(entry.APIKey))
+		enabled = append(enabled, !entry.Disabled)
 	}
 	models := append([]config.OpenAICompatibilityModel(nil), item.Models...)
 	return compatibleProviderItem{
 		ID: compatibleProviderID(item.Name), Name: item.Name, BaseURL: safeCompatibleProviderURL(item.BaseURL),
-		Prefix: item.Prefix, Enabled: !item.Disabled, APIKeyMask: keys, Models: models,
+		Prefix: item.Prefix, Enabled: !item.Disabled, APIKeyMask: keys, APIKeyEnabled: enabled, Models: models,
 	}
 }
 
@@ -360,7 +368,7 @@ func (h *Handler) PatchCompatibleProvider(c *gin.Context) {
 	}
 	if err := mutateCompatibleProviderAPIKey(&entry, body.APIKeyAction, body.APIKeyIndex, body.APIKey); err != nil {
 		h.mu.Unlock()
-		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_api_key_operation", "message": "Select a saved API key to replace or delete, or choose to add a new key"}})
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "invalid_api_key_operation", "message": "Select a saved API key to replace, delete, enable or disable, or choose to add a new key"}})
 		return
 	}
 	h.cfg.OpenAICompatibility[index] = entry

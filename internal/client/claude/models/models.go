@@ -13,13 +13,13 @@ func BuildResponse(availableModels []map[string]any, disableCloaking bool) map[s
 	return BuildResponseWithProviders(availableModels, nil, disableCloaking)
 }
 
-// BuildResponseWithProviders builds an Anthropic model response and labels duplicate display names with their providers.
+// BuildResponseWithProviders builds an Anthropic model response with provider labels on display names.
 func BuildResponseWithProviders(availableModels []map[string]any, providersForModel func(string) []string, disableCloaking bool) map[string]any {
 	models := make([]map[string]any, len(availableModels))
 	for i, model := range availableModels {
 		models[i] = cloneModel(model)
 	}
-	addProviderLabelsToDuplicateNames(models, providersForModel)
+	addProviderLabels(models, providersForModel)
 	if !disableCloaking {
 		for i := range models {
 			if id, ok := models[i]["id"].(string); ok {
@@ -54,7 +54,7 @@ func BuildResponseWithProviders(availableModels []map[string]any, providersForMo
 	}
 }
 
-func addProviderLabelsToDuplicateNames(models []map[string]any, providersForModel func(string) []string) {
+func addProviderLabels(models []map[string]any, providersForModel func(string) []string) {
 	if providersForModel == nil {
 		return
 	}
@@ -81,7 +81,7 @@ func addProviderLabelsToDuplicateNames(models []map[string]any, providersForMode
 		}
 	}
 	for i, label := range labels {
-		if label.id == "" || nameCounts[label.key] < 2 {
+		if label.id == "" || (label.provider == "" && nameCounts[label.key] < 2) {
 			continue
 		}
 		provider := label.provider
