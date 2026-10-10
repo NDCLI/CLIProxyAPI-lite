@@ -24,6 +24,9 @@
   --input-padding: 6px 10px;
 }
 * { box-sizing: border-box; }
+.update-notice { position: fixed; right: 18px; bottom: 18px; z-index: 30; width: min(360px, calc(100vw - 36px)); display: grid; gap: 10px; padding: 14px; border: 1px solid var(--accent); border-radius: 12px; background: var(--panel); box-shadow: 0 8px 28px #0006; }
+.update-notice label { display: grid; gap: 6px; }
+.update-notice textarea { width: 100%; font-family: Consolas, monospace; font-size: 12px; resize: vertical; }
 [hidden] { display: none !important; }
 body { margin: 0; min-width: 320px; min-height: 100vh; font-size: 13px; line-height: 1.5; background: radial-gradient(ellipse 75% 42% at 85% 0, #1b3d5e66, transparent 75%), var(--bg); }
 button, input, textarea, select { font: inherit; }

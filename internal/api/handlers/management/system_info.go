@@ -3,6 +3,7 @@ package management
 import (
 	"net/http"
 	"runtime"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/buildinfo"
@@ -15,6 +16,7 @@ type systemInfoItem struct {
 	GoVersion       string `json:"go_version"`
 	OperatingSystem string `json:"operating_system"`
 	Architecture    string `json:"architecture"`
+	UpdateCommand   string `json:"update_command"`
 }
 
 func (h *Handler) GetSystemInfo(c *gin.Context) {
@@ -27,6 +29,24 @@ func (h *Handler) GetSystemInfo(c *gin.Context) {
 			GoVersion:       runtime.Version(),
 			OperatingSystem: runtime.GOOS,
 			Architecture:    runtime.GOARCH,
+			UpdateCommand:   h.updateCommand(),
 		},
 	})
+}
+
+func (h *Handler) updateCommand() string {
+	command := "npm install -g @ndcli/lumina@latest --include=optional"
+	configPath := h.configFilePath
+	if runtime.GOOS == "windows" {
+		launch := "lumina --tray"
+		if configPath != "" {
+			launch += " --config '" + strings.ReplaceAll(configPath, "'", "''") + "'"
+		}
+		return command + "\nif ($LASTEXITCODE -eq 0) { " + launch + " }"
+	}
+	launch := "lumina"
+	if configPath != "" {
+		launch += " --config '" + strings.ReplaceAll(configPath, "'", "'\"'\"'") + "'"
+	}
+	return command + " && " + launch
 }

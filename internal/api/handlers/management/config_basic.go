@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
@@ -19,7 +18,7 @@ import (
 )
 
 const (
-	latestReleaseURL       = "https://api.github.com/repos/router-for-me/CLIProxyAPI/releases/latest"
+	latestReleaseURL       = "https://api.github.com/repos/NDCLI/CLIProxyAPI-lite/releases/latest"
 	latestReleaseUserAgent = "Lumina"
 )
 
@@ -46,7 +45,7 @@ func setLatestReleaseRequestHeaders(req *http.Request) {
 
 // GetLatestVersion returns the latest release version from GitHub without downloading assets.
 func (h *Handler) GetLatestVersion(c *gin.Context) {
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{}
 	proxyURL := ""
 	if h != nil && h.cfg != nil {
 		proxyURL = strings.TrimSpace(h.cfg.ProxyURL)

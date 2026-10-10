@@ -29,6 +29,11 @@ func (s *Server) registerManagementRoutes() {
 	{
 		mgmt.GET("/capabilities", s.mgmt.GetCapabilities)
 		mgmt.GET("/system-info", s.mgmt.GetSystemInfo)
+		mgmt.POST("/shutdown", func(c *gin.Context) {
+			c.JSON(http.StatusAccepted, gin.H{"status": "shutting_down"})
+			c.Writer.Flush()
+			s.shutdownOnce.Do(func() { close(s.shutdownRequested) })
+		})
 		mgmt.GET("/endpoint-keys", s.mgmt.GetEndpointKeys)
 		mgmt.GET("/endpoint-keys/:id/secret", s.mgmt.GetEndpointKeySecret)
 		mgmt.POST("/endpoint-keys", s.mgmt.PostEndpointKey)

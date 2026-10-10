@@ -1,9 +1,13 @@
 const state = {
   locale: localStorage.getItem("cliproxy-next-locale") === "en" ? "en" : "vi",
   messages: {},
-  key: sessionStorage.getItem("cliproxy-next-management-key") || "",
+  key: localStorage.getItem("cliproxy-next-management-key") || sessionStorage.getItem("cliproxy-next-management-key") || "",
   capabilities: new Map(),
-  collapsed: localStorage.getItem("cliproxy-next-sidebar") === "collapsed"
+  collapsed: localStorage.getItem("cliproxy-next-sidebar") === "collapsed",
+  update: null,
+  updateCheckedAt: 0,
+  updateChecking: false,
+  updateStopped: false
 };
 
 const routes = [
@@ -175,7 +179,7 @@ function renderLogin(error = "") {
     <div class="brand"><span class="brand-mark"><i></i><i></i><i></i></span><span class="brand-copy"><strong>${t("app.name")}</strong><small>${t("app.subtitle")}</small></span></div>
     <h1>${t("auth.title")}</h1><p>${t("auth.description")}</p>
     <form id="login-form"><div class="field"><label for="management-key">${t("auth.key")}</label><input id="management-key" type="password" autocomplete="current-password" placeholder="${t("auth.keyPlaceholder")}" value="${escapeHTML(state.key)}" required /></div>
-    <span class="login-default-password">${t("auth.defaultPassword")}</span><span class="hint">${t("auth.sessionOnly")}</span><button class="primary" type="submit">${icon("key")}${t("action.login")}</button><div class="form-error">${escapeHTML(error)}</div></form>
+    <span class="login-default-password">${t("auth.defaultPassword")}</span><span class="hint">${t("auth.remembered")}</span><button class="primary" type="submit">${icon("key")}${t("action.login")}</button><div class="form-error">${escapeHTML(error)}</div></form>
   </section></main>`;
   document.getElementById("login-form").addEventListener("submit", async event => {
     event.preventDefault();
@@ -184,7 +188,7 @@ function renderLogin(error = "") {
     state.key = document.getElementById("management-key").value.trim();
     try {
       await loadCapabilities();
-      sessionStorage.setItem("cliproxy-next-management-key", state.key);
+      rememberManagementKey();
       renderShell();
     } catch (error) {
       button.disabled = false;
@@ -223,6 +227,8 @@ function renderShell() {
   });
   if (matchMedia("(max-width: 680px)").matches) app.querySelector(".nav-link.active")?.scrollIntoView({block: "nearest", inline: "center", behavior: "auto"});
   renderPage(active);
+  renderUpdateNotice();
+  checkForUpdate();
   window.scrollTo(0, 0);
 }
 
@@ -234,10 +240,79 @@ async function changeLocale() {
 }
 
 function logout() {
+  localStorage.removeItem("cliproxy-next-management-key");
   sessionStorage.removeItem("cliproxy-next-management-key");
   state.key = "";
   state.capabilities.clear();
+  state.update = null;
+  state.updateStopped = false;
+  state.updateCheckedAt = 0;
   renderLogin();
+}
+
+function rememberManagementKey() {
+  localStorage.setItem("cliproxy-next-management-key", state.key);
+  sessionStorage.removeItem("cliproxy-next-management-key");
+}
+
+function isNewerVersion(latest, current) {
+  const parse = value => /^v?\d+\.\d+\.\d+$/.test(String(value)) ? String(value).replace(/^v/, "").split(".").map(Number) : null;
+  const next = parse(latest), installed = parse(current);
+  if (!next || !installed) return false;
+  for (let index = 0; index < next.length; index++) {
+    if (next[index] !== installed[index]) return next[index] > installed[index];
+  }
+  return false;
+}
+
+async function checkForUpdate() {
+  if (!state.key || state.updateStopped || state.updateChecking || Date.now() - state.updateCheckedAt < 15 * 60 * 1000) return;
+  state.updateChecking = true;
+  state.updateCheckedAt = Date.now();
+  try {
+    const [system, release] = await Promise.all([api("/system-info"), api("/latest-version")]);
+    const latest = release["latest-version"];
+    state.update = isNewerVersion(latest, system.item?.version) ? {version: latest, command: system.item.update_command.replace("@ndcli/lumina@latest", `@ndcli/lumina@${latest.replace(/^v/, "")}`)} : null;
+    renderUpdateNotice();
+  } catch (error) {
+    if (error.message === "invalid_key") logout();
+  } finally { state.updateChecking = false; }
+}
+
+function renderUpdateNotice() {
+  document.getElementById("update-notice")?.remove();
+  if (!state.update || !state.key || !app.querySelector(".workspace")) return;
+  app.querySelector(".workspace").insertAdjacentHTML("beforeend", `<section class="update-notice" id="update-notice" aria-label="${t("update.title")}"><strong>${t("update.available").replace("{version}", escapeHTML(state.update.version))}</strong><button class="secondary compact" id="update-prepare" type="button" ${state.updateStopped ? "hidden" : ""}>${icon("copy")}${t("update.copyStop")}</button><div id="update-details" ${state.updateStopped ? "" : "hidden"}><label>${t("update.command")}<textarea class="text-input" id="update-command" rows="3" readonly>${escapeHTML(state.update.command)}</textarea></label><p class="hint">${t("update.runCommand")}</p><button class="primary compact" id="update-reload" type="button">${icon("refresh")}${t("update.reload")}</button></div><span class="form-message" id="update-status" role="status" aria-live="polite">${state.updateStopped ? t("update.stopped") : ""}</span></section>`);
+  document.getElementById("update-prepare").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    const status = document.getElementById("update-status");
+    button.disabled = true;
+    document.getElementById("update-details").hidden = false;
+    try {
+      await copyText(state.update.command);
+      status.textContent = t("update.stopping");
+      await api("/shutdown", {method: "POST"});
+      state.updateStopped = true;
+      renderUpdateNotice();
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      status.textContent = t("update.prepareFailed");
+      button.disabled = false;
+    }
+  });
+  document.getElementById("update-reload").addEventListener("click", async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      const system = await api("/system-info");
+      if (isNewerVersion(state.update.version, system.item?.version)) {
+        document.getElementById("update-status").textContent = t("update.oldVersion");
+      } else location.reload();
+    } catch (error) {
+      if (error.message === "invalid_key") return logout();
+      document.getElementById("update-status").textContent = t("update.notRunning");
+    } finally { button.disabled = false; }
+  });
 }
 
 function pageHeader(kicker, title, description, refresh = false) {
@@ -2009,7 +2084,7 @@ async function renderSettings(page) {
       try {
         await api("/management-password", {method: "PATCH", body: JSON.stringify({current_password: current, new_password: next})});
         state.key = next;
-        sessionStorage.setItem("cliproxy-next-management-key", next);
+        rememberManagementKey();
         passwordForm.reset();
         passwordMessage.textContent = t("settings.passwordChanged");
         passwordMessage.className = "form-message ok";
@@ -2587,16 +2662,21 @@ async function renderBasicChat(page) {
 }
 
 window.addEventListener("hashchange", () => state.key && renderShell());
+setInterval(checkForUpdate, 15 * 60 * 1000);
 
 (async () => {
   try {
     await loadMessages();
     if (!state.key) return renderLogin();
     await loadCapabilities();
+    rememberManagementKey();
     renderShell();
   } catch (error) {
-    sessionStorage.removeItem("cliproxy-next-management-key");
-    state.key = "";
+    if (error.message === "invalid_key") {
+      localStorage.removeItem("cliproxy-next-management-key");
+      sessionStorage.removeItem("cliproxy-next-management-key");
+      state.key = "";
+    }
     renderLogin(error.message === "invalid_key" ? t("error.invalidKey") : t("error.server"));
   }
 })();

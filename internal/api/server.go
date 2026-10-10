@@ -106,6 +106,8 @@ type Server struct {
 	keepAliveOnTimeout func()
 	keepAliveHeartbeat chan struct{}
 	keepAliveStop      chan struct{}
+	shutdownRequested  chan struct{}
+	shutdownOnce       sync.Once
 
 	exampleAPIKeySafeModeEnabled bool
 	exampleAPIKeySafeModeActive  atomic.Bool
@@ -215,6 +217,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		wsRoutes:            make(map[string]struct{}),
 		pluginHost:          optionState.pluginHost,
 		tokenSaver:          tokensaver.NewService(cfg.TokenSaver),
+		shutdownRequested:   make(chan struct{}),
 
 		exampleAPIKeySafeModeEnabled: optionState.exampleAPIKeySafeMode,
 	}
@@ -470,3 +473,6 @@ func (s *Server) Stop(ctx context.Context) error {
 	log.Debug("API server stopped")
 	return nil
 }
+
+// ShutdownRequested signals an authenticated management request to stop the service.
+func (s *Server) ShutdownRequested() <-chan struct{} { return s.shutdownRequested }

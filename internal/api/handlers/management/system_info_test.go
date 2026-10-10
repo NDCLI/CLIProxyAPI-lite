@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http/httptest"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -31,5 +32,8 @@ func TestGetSystemInfoContract(t *testing.T) {
 	}
 	if response.Item.GoVersion != runtime.Version() || response.Item.OperatingSystem != runtime.GOOS || response.Item.Architecture != runtime.GOARCH {
 		t.Fatalf("runtime metadata = %#v, does not match runtime", response.Item)
+	}
+	if !strings.Contains(response.Item.UpdateCommand, "npm install -g @ndcli/lumina@latest --include=optional") {
+		t.Fatalf("update command = %q", response.Item.UpdateCommand)
 	}
 }
