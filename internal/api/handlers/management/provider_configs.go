@@ -1,6 +1,7 @@
 package management
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/config"
+	log "github.com/sirupsen/logrus"
+	"github.com/tidwall/gjson"
 )
 
 type compatibleProviderItem struct {
@@ -245,7 +248,11 @@ func fetchCompatibleProviderModels(ctx context.Context, baseURL, apiKey string) 
 	if errDo != nil {
 		return nil, errors.New("provider model request failed")
 	}
-	defer response.Body.Close()
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Errorf("failed to close test response body: %v", err)
+		}
+	}()
 	if response.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("provider returned HTTP %s", http.StatusText(response.StatusCode))
 	}
@@ -264,6 +271,152 @@ func fetchCompatibleProviderModels(ctx context.Context, baseURL, apiKey string) 
 		}
 	}
 	return models, nil
+}
+
+func (h *Handler) TestCompatibleProviderModel(c *gin.Context) {
+	id := strings.TrimSpace(c.Param("id"))
+	var body struct {
+		Model       string `json:"model"`
+		APIKeyIndex *int   `json:"api_key_index"`
+	}
+	if errBind := c.ShouldBindJSON(&body); errBind != nil || strings.TrimSpace(body.Model) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "model_required", "message": "A model is required"}})
+		return
+	}
+	model := strings.TrimSpace(body.Model)
+	h.mu.Lock()
+	if h.cfg == nil {
+		h.mu.Unlock()
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": gin.H{"code": "config_unavailable", "message": "Configuration unavailable"}})
+		return
+	}
+	var entry *config.OpenAICompatibility
+	for index := range h.cfg.OpenAICompatibility {
+		if compatibleProviderID(h.cfg.OpenAICompatibility[index].Name) == id {
+			candidate := h.cfg.OpenAICompatibility[index]
+			entry = &candidate
+			break
+		}
+	}
+	if entry == nil {
+		h.mu.Unlock()
+		c.JSON(http.StatusNotFound, gin.H{"error": gin.H{"code": "provider_not_found", "message": "Provider not found"}})
+		return
+	}
+	if entry.Disabled {
+		h.mu.Unlock()
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "provider_disabled", "message": "Enable this provider before testing a model"}})
+		return
+	}
+	registered := false
+	for _, configured := range entry.Models {
+		if strings.TrimSpace(configured.Name) == model || strings.TrimSpace(configured.Alias) == model {
+			registered = true
+			break
+		}
+	}
+	if !registered {
+		h.mu.Unlock()
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "model_not_registered", "message": "Choose a model listed for this provider"}})
+		return
+	}
+	if body.APIKeyIndex == nil || *body.APIKeyIndex < 0 || *body.APIKeyIndex >= len(entry.APIKeyEntries) {
+		h.mu.Unlock()
+		c.JSON(http.StatusBadRequest, gin.H{"error": gin.H{"code": "api_key_required", "message": "Choose a saved API key for this model test"}})
+		return
+	}
+	keyEntry := entry.APIKeyEntries[*body.APIKeyIndex]
+	baseURL := strings.TrimRight(strings.TrimSpace(entry.BaseURL), "/")
+	headers := make(map[string]string, len(entry.Headers))
+	for name, value := range entry.Headers {
+		headers[name] = value
+	}
+	apiKey := strings.TrimSpace(keyEntry.APIKey)
+	h.mu.Unlock()
+	if keyEntry.Disabled || apiKey == "" {
+		c.JSON(http.StatusConflict, gin.H{"error": gin.H{"code": "api_key_disabled", "message": "Enable the selected API key before testing a model"}})
+		return
+	}
+	payload, errMarshal := json.Marshal(map[string]any{
+		"model":      model,
+		"messages":   []map[string]string{{"role": "user", "content": "Reply with OK."}},
+		"max_tokens": 8,
+	})
+	if errMarshal != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": gin.H{"code": "model_test_failed", "message": "Could not prepare the test request"}})
+		return
+	}
+	start := time.Now()
+	response, errProbe := probeCompatibleChatCompletion(c.Request.Context(), baseURL, apiKey, headers, payload)
+	if errProbe != nil {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "model": model, "latency_ms": time.Since(start).Milliseconds(), "error": errProbe.Error()})
+		return
+	}
+	if !compatibleChatCompletionHasChoices(response) {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "model": model, "latency_ms": time.Since(start).Milliseconds(), "error": "Provider returned no model response"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true, "model": model, "latency_ms": time.Since(start).Milliseconds()})
+}
+
+func probeCompatibleChatCompletion(ctx context.Context, baseURL, apiKey string, headers map[string]string, payload []byte) ([]byte, error) {
+	probeCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	request, errRequest := http.NewRequestWithContext(probeCtx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(payload))
+	if errRequest != nil {
+		return nil, errors.New("invalid provider URL")
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Authorization", "Bearer "+apiKey)
+	for name, value := range headers {
+		if strings.EqualFold(name, "authorization") || strings.EqualFold(name, "cookie") {
+			continue
+		}
+		request.Header.Set(name, value)
+	}
+	client := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	response, errDo := client.Do(request)
+	if errDo != nil {
+		return nil, errors.New("provider model request failed")
+	}
+	defer func() {
+		if err := response.Body.Close(); err != nil {
+			log.Errorf("failed to close test response body: %v", err)
+		}
+	}()
+	result, errRead := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		if errRead == nil && json.Valid(result) {
+			msg := strings.TrimSpace(gjson.GetBytes(result, "error.message").String())
+			if msg == "" {
+				msg = strings.TrimSpace(gjson.GetBytes(result, "error").String())
+			}
+			if msg != "" {
+				if len(msg) > 200 {
+					msg = msg[:197] + "..."
+				}
+				return nil, fmt.Errorf("HTTP %d: %s", response.StatusCode, msg)
+			}
+		}
+		return nil, fmt.Errorf("provider returned HTTP %d", response.StatusCode)
+	}
+	if errRead != nil || !json.Valid(result) {
+		return nil, errors.New("provider returned an invalid model response")
+	}
+	return result, nil
+}
+
+func compatibleChatCompletionHasChoices(body []byte) bool {
+	choices := gjson.GetBytes(body, "choices")
+	if !choices.IsArray() || len(choices.Array()) == 0 {
+		return false
+	}
+	for _, choice := range choices.Array() {
+		if strings.TrimSpace(choice.Get("message.content").String()) != "" || strings.TrimSpace(choice.Get("text").String()) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) PostCompatibleProvider(c *gin.Context) {

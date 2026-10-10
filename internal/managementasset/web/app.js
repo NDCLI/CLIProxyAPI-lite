@@ -439,34 +439,11 @@ async function renderTokenSaver(page) {
     const item = response.item || {};
     const stats = item.statistics || {};
     const count = value => Number(value || 0).toLocaleString(state.locale);
-    const statusLabel = status => status === "ready" ? t("tokenSaver.connected") : status === "unknown" ? t("tokenSaver.notChecked") : status === "timeout" ? t("tokenSaver.timeout") : /^http_\d+$/.test(status || "") ? `HTTP ${status.slice(5)}` : t("tokenSaver.unreachable");
-    const statusClass = status => status === "ready" ? "ready" : status === "unknown" ? "muted" : "failed";
-    page.innerHTML = pageHeader("kicker.management", "page.tokenSaver", "tokenSaver.description", true) + `<div class="settings-layout token-saver-layout"><form id="token-saver-form" class="settings-layout"><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("zap")}</span><div><h2>RTK</h2><p>${t("tokenSaver.rtkDescription")}</p></div></div><label class="settings-toggle"><input type="checkbox" name="rtk_enabled" ${item.rtk_enabled ? "checked" : ""}><span><strong>${t("tokenSaver.rtkToggle")}</strong><small>${t("tokenSaver.rtkHint")}</small></span></label></section><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("route")}</span><div><h2>Headroom</h2><p>${t("tokenSaver.headroomDescription")}</p></div><span class="badge ${statusClass(item.headroom_status)}" id="headroom-status">${statusLabel(item.headroom_status)}</span></div><label class="settings-toggle"><input type="checkbox" name="headroom_enabled" ${item.headroom_enabled ? "checked" : ""}><span><strong>${t("tokenSaver.headroomToggle")}</strong><small>${t("tokenSaver.headroomHint")}</small></span></label><div class="settings-grid"><label>${t("tokenSaver.headroomURL")}<input class="text-input" type="url" name="headroom_url" required value="${escapeHTML(item.headroom_url || "http://127.0.0.1:8787")}" placeholder="http://127.0.0.1:8787"></label><label>${t("tokenSaver.headroomTimeout")}<input class="text-input" type="number" name="headroom_timeout_ms" min="500" max="15000" required value="${Number(item.headroom_timeout_ms || 3000)}"></label></div><div class="actions"><button class="secondary" type="button" id="test-headroom">${icon("check")}${t("tokenSaver.testConnection")}</button><span class="form-message" id="headroom-message" role="status" aria-live="polite"></span></div><p class="hint">${t("tokenSaver.headroomSetup")} <code>pip install "headroom-ai[proxy]"</code> · <code>headroom proxy --port 8787</code></p><p class="hint">${t("tokenSaver.headroomPrivacy")}</p></section><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="token-saver-message" role="status" aria-live="polite"></span></div></form><section class="card settings-section"><div class="section-head"><div><h2>${t("tokenSaver.sessionStats")}</h2><p class="hint">${t("tokenSaver.statsHint")}</p></div></div><div class="token-saver-stats"><div><strong>${count(stats.rtk_requests)}</strong><span>${t("tokenSaver.rtkRequests")}</span></div><div><strong>${count(stats.rtk_hits)}</strong><span>${t("tokenSaver.rtkHits")}</span></div><div><strong>${count(stats.rtk_bytes_saved)} B</strong><span>${t("tokenSaver.rtkBytesSaved")}</span></div><div><strong>${count(stats.headroom_bytes_saved)} B</strong><span>${t("tokenSaver.headroomBytesSaved")}</span></div><div><strong>${count(stats.headroom_applied)}</strong><span>${t("tokenSaver.headroomApplied")}</span></div><div><strong>${count(stats.headroom_failures)}</strong><span>${t("tokenSaver.headroomFailures")}</span></div></div><p class="hint">${t("tokenSaver.bypassHint")} <code>X-CLIProxy-Token-Saver: off</code></p></section></div>`;
+    page.innerHTML = pageHeader("kicker.management", "page.tokenSaver", "tokenSaver.description", true) + `<div class="settings-layout token-saver-layout"><form id="token-saver-form" class="settings-layout"><section class="card settings-section"><div class="tool-title"><span class="feature-icon">${icon("zap")}</span><div><h2>RTK</h2><p>${t("tokenSaver.rtkDescription")}</p></div></div><label class="settings-toggle"><input type="checkbox" name="rtk_enabled" ${item.rtk_enabled ? "checked" : ""}><span><strong>${t("tokenSaver.rtkToggle")}</strong><small>${t("tokenSaver.rtkHint")}</small></span></label></section><div class="actions"><button class="primary compact" type="submit">${icon("save")}${t("settings.save")}</button><span class="form-message" id="token-saver-message" role="status" aria-live="polite"></span></div></form><section class="card settings-section"><div class="section-head"><div><h2>${t("tokenSaver.sessionStats")}</h2><p class="hint">${t("tokenSaver.statsHint")}</p></div></div><div class="token-saver-stats"><div><strong>${count(stats.rtk_requests)}</strong><span>${t("tokenSaver.rtkRequests")}</span></div><div><strong>${count(stats.rtk_hits)}</strong><span>${t("tokenSaver.rtkHits")}</span></div><div><strong>${count(stats.rtk_bytes_saved)} B</strong><span>${t("tokenSaver.rtkBytesSaved")}</span></div></div><p class="hint">${t("tokenSaver.bypassHint")} <code>X-CLIProxy-Token-Saver: off</code></p></section></div>`;
     const form = page.querySelector("#token-saver-form");
     const message = page.querySelector("#token-saver-message");
-    const status = page.querySelector("#headroom-status");
-    const headroomMessage = page.querySelector("#headroom-message");
-    const payload = () => ({rtk_enabled: form.elements.rtk_enabled.checked, headroom_enabled: form.elements.headroom_enabled.checked, headroom_url: form.elements.headroom_url.value.trim(), headroom_timeout_ms: Number(form.elements.headroom_timeout_ms.value)});
+    const payload = () => ({rtk_enabled: form.elements.rtk_enabled.checked});
     const changes = bindDirtyAction(form, form.querySelector('[type="submit"]'), payload, () => form.checkValidity());
-    let savedHeadroomURL = item.headroom_url;
-    let savedHeadroomTimeout = Number(item.headroom_timeout_ms);
-    const checkHeadroom = async () => {
-      if (form.elements.headroom_url.value.trim() !== savedHeadroomURL || Number(form.elements.headroom_timeout_ms.value) !== savedHeadroomTimeout) {
-        headroomMessage.textContent = t("tokenSaver.saveBeforeTest"); headroomMessage.className = "form-message failed"; return;
-      }
-      const button = page.querySelector("#test-headroom");
-      button.disabled = true; headroomMessage.textContent = t("tokenSaver.testing"); headroomMessage.className = "form-message";
-      try {
-        const result = (await api("/token-saver/headroom/test", {method: "POST", body: "{}"})).item || {};
-        if (!button.isConnected) return;
-        status.className = `badge ${statusClass(result.status)}`;
-        status.textContent = statusLabel(result.status);
-        headroomMessage.textContent = result.ok ? t("tokenSaver.testPassed").replace("{ms}", String(result.latency_ms || 0)) : t("tokenSaver.testFailed");
-        headroomMessage.className = `form-message ${result.ok ? "ok" : "failed"}`;
-      } catch (error) { if (error.message === "invalid_key") return logout(); headroomMessage.textContent = t("tokenSaver.testFailed"); headroomMessage.className = "form-message failed"; }
-      finally { button.disabled = false; }
-    };
-    page.querySelector("#test-headroom").addEventListener("click", checkHeadroom);
     form.addEventListener("submit", async event => {
       event.preventDefault();
       if (!changes.begin()) return;
@@ -474,25 +451,19 @@ async function renderTokenSaver(page) {
       message.textContent = t("settings.saving"); message.className = "form-message";
       try {
         const saved = (await api("/token-saver", {method: "PATCH", body: JSON.stringify(sent)})).item || {};
-        savedHeadroomURL = saved.headroom_url || sent.headroom_url;
-        savedHeadroomTimeout = Number(saved.headroom_timeout_ms || sent.headroom_timeout_ms);
         changes.accept(sent);
-        status.className = `badge ${statusClass(saved.headroom_status)}`;
-        status.textContent = statusLabel(saved.headroom_status);
         message.textContent = t(changes.isDirty() ? "tokenSaver.savedEditsPending" : "tokenSaver.saved"); message.className = "form-message ok";
-        if (saved.headroom_enabled && !changes.isDirty()) void checkHeadroom();
+        if (saved.rtk_enabled !== sent.rtk_enabled) form.elements.rtk_enabled.checked = Boolean(saved.rtk_enabled);
       } catch (error) { if (error.message === "invalid_key") return logout(); message.textContent = t("tokenSaver.saveFailed"); message.className = "form-message failed"; }
       finally { changes.finish(); }
     });
     page.querySelector("#refresh").addEventListener("click", () => { if (!changes.isDirty() || confirm(t("tokenSaver.confirmDiscard"))) renderTokenSaver(page); });
-    if (item.headroom_enabled) void checkHeadroom();
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     page.innerHTML = pageHeader("kicker.management", "page.tokenSaver", "tokenSaver.description", true) + `<div class="error">${t("tokenSaver.loadFailed")}</div>`;
     page.querySelector("#refresh").addEventListener("click", () => renderTokenSaver(page));
   }
 }
-
 async function copyText(value) {
   const input = document.createElement("textarea");
   input.value = value;
@@ -1178,24 +1149,503 @@ function bindProviderImport(container, reload) {
   });
 }
 
-async function renderProviderDetail(page, providerID, accounts, authFiles, reload) {
+async function renderProviderDetail(page, providerID, accounts, authFiles, reload, customProviders = []) {
+  if (!customProviders.length) {
+    try {
+      const customResponse = await api("/provider-configs");
+      customProviders = customResponse.items || [];
+    } catch (_) {}
+  }
+  const customEntry = (customProviders || []).find(item => item.id === providerID || compatibleProviderKey(item.name) === providerID || String(item.name || "").toLowerCase() === providerID);
+
+  if (customEntry) {
+    const keyCount = (customEntry.api_key_masks || []).length;
+    const modelCount = (customEntry.models || []).length;
+    const isEnabled = Boolean(customEntry.enabled);
+
+    page.innerHTML = `
+      <div class="page-head provider-detail-head">
+        <div class="provider-detail-title">
+          <a class="provider-back" href="#/providers">${icon("arrow")}${t("providers.back")}</a>
+          <div class="provider-detail-brand">
+            <span class="provider-identity">
+              <span class="provider-logo">${icon("route")}</span>
+              <div>
+                <h1>${escapeHTML(customEntry.name)}</h1>
+                <p><span class="badge protocol-badge">${t("providers.protocolOpenAI")}</span> · ${keyCount} ${t("providers.apiKeys")} · ${modelCount} ${t("providers.models")}</p>
+              </div>
+            </span>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="secondary" type="button" id="toggle-custom-provider-btn" data-enabled="${isEnabled}">
+            ${icon(isEnabled ? "pause" : "check")}${t(isEnabled ? "providers.disable" : "providers.enable")}
+          </button>
+          <button class="danger-button" type="button" id="delete-custom-provider-btn">
+            ${icon("trash")}${t("endpoint.delete")}
+          </button>
+          <button class="refresh" id="refresh">${icon("refresh")}${t("action.refresh")}</button>
+        </div>
+      </div>
+      <div class="form-message" id="provider-detail-status" role="status" aria-live="polite"></div>
+
+      <div class="provider-detail-layout">
+        <section class="status-panel provider-info-panel">
+          <div class="section-head">
+            <h2>${t("providers.providerInfo")}</h2>
+            <span class="badge ${isEnabled ? "ready" : "partial"}">${t(isEnabled ? "providers.status.active" : "providers.status.disabled")}</span>
+          </div>
+          <div class="provider-info-grid">
+            <div class="provider-info-item">
+              <small>${t("providers.protocol")}</small>
+              <strong>${t("providers.protocolOpenAI")}</strong>
+              <small class="hint">${t("providers.chatCompletions")}: <code>/chat/completions</code></small>
+            </div>
+            <div class="provider-info-item">
+              <small>${t("providers.endpoint")}</small>
+              <code class="compatible-base-url">${escapeHTML(customEntry.base_url)}</code>
+            </div>
+            <div class="provider-info-item">
+              <small>${t("providers.prefix")}</small>
+              <code>${escapeHTML(customEntry.prefix || "-")}</code>
+            </div>
+          </div>
+        </section>
+
+        <section class="status-panel provider-connections">
+          <div class="section-head">
+            <h2>${t("providers.connectionTitle")}</h2>
+            <span class="badge">${keyCount}</span>
+            <div class="actions">
+              <button class="primary compact" type="button" id="add-custom-key-btn">${icon("plus")}${t("providers.addApiKey")}</button>
+            </div>
+          </div>
+          <div class="compatible-key-list" id="custom-key-list">
+            ${(customEntry.api_key_masks || []).map((mask, index) => {
+              const keyEnabled = customEntry.api_key_enabled?.[index] !== false;
+              return `
+                <div class="compatible-key-row">
+                  <div class="compatible-key-details">
+                    <code>${escapeHTML(mask)}</code>
+                    <span class="badge ${keyEnabled ? "ready" : "partial"}">${t(keyEnabled ? "providers.status.active" : "providers.status.disabled")}</span>
+                    <span class="form-message" data-key-test-result role="status" aria-live="polite"></span>
+                  </div>
+                  <div class="actions">
+                    <button class="secondary" type="button" data-key-toggle="${index}" data-enabled="${keyEnabled}">
+                      ${icon(keyEnabled ? "pause" : "check")}${t(keyEnabled ? "providers.disable" : "providers.enable")}
+                    </button>
+                    <button class="secondary" type="button" data-key-test="${index}">
+                      ${icon("check")}${t("providers.testApiKey")}
+                    </button>
+                    <button class="danger-button" type="button" data-key-delete="${index}" title="${t("endpoint.delete")}">
+                      ${icon("trash")}
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join("") || `<p class="hint">${t("providers.noSavedApiKeys")}</p>`}
+          </div>
+        </section>
+
+        <section class="status-panel provider-models-section">
+          <div class="section-head">
+            <h2>${t("providers.availableModels")}</h2>
+            <span class="badge">${modelCount}</span>
+            <div class="actions">
+              <button class="primary compact" type="button" id="add-model-btn">${icon("plus")}${t("providers.addModel")}</button>
+              <button class="secondary" type="button" id="discover-models-btn">${icon("refresh")}${t("providers.discoverModels")}</button>
+            </div>
+          </div>
+          <div class="model-test-list" id="custom-models-list">
+            ${(customEntry.models || []).map(model => {
+              const hasVision = Boolean(model.image || (model.input_modalities && model.input_modalities.includes("image")));
+              const hasReasoning = Boolean(model.thinking);
+              const caps = (hasVision ? `<span class="model-cap-badge">${icon("eye")}${t("providers.tagVision")}</span>` : "") +
+                           (hasReasoning ? `<span class="model-cap-badge">${icon("zap")}${t("providers.tagReasoning")}</span>` : "");
+              return `
+                <div class="model-test-card" data-model-name="${escapeHTML(model.name)}">
+                  <div class="model-test-identity">
+                    <strong>${escapeHTML(model.alias || model.name)}</strong>
+                    <small><code>${escapeHTML(model.name)}</code></small>
+                    ${caps ? `<div class="model-caps">${caps}</div>` : ""}
+                  </div>
+                  <div class="model-test-actions">
+                    <span class="form-message model-test-result" role="status" aria-live="polite"></span>
+                    <button class="secondary model-test-btn" type="button" data-test-custom-model="${escapeHTML(customEntry.id)}" data-model-id="${escapeHTML(model.name || model.alias)}">
+                      ${icon("zap")}${t("providers.testModel")}
+                    </button>
+                    <button class="secondary" type="button" data-copy-model="${escapeHTML(model.alias || model.name)}" title="${t("providers.copyModel")}">
+                      ${icon("copy")}
+                    </button>
+                    <button class="danger-button" type="button" data-delete-model="${escapeHTML(model.name)}" title="${t("providers.deleteModel")}">
+                      ${icon("trash")}
+                    </button>
+                  </div>
+                </div>
+              `;
+            }).join("") || `<div class="empty">${t("providers.noModels")}</div>`}
+          </div>
+        </section>
+      </div>
+
+      <dialog class="custom-model-dialog" id="custom-model-dialog">
+        <form id="custom-model-form">
+          <div class="card-title">
+            <h2>${t("providers.addModel")}</h2>
+            <button type="button" class="secondary" id="close-model-dialog">${icon("close")}</button>
+          </div>
+          <label>
+            ${t("providers.modelName")}
+            <input class="text-input" name="model_name" required placeholder="e.g. llama-3.3-70b-versatile">
+          </label>
+          <label>
+            ${t("providers.modelAlias")}
+            <input class="text-input" name="model_alias" placeholder="e.g. llama-3.3-70b">
+          </label>
+          <div class="actions">
+            <button class="secondary" type="button" id="test-model-before-save-btn">
+              ${icon("zap")}${t("providers.testBeforeSave")}
+            </button>
+            <span class="form-message" id="test-model-before-save-result" role="status" aria-live="polite"></span>
+          </div>
+          <div class="actions">
+            <button class="primary compact" type="submit">${icon("save")}${t("providers.saveModel")}</button>
+          </div>
+        </form>
+      </dialog>
+    `;
+
+    page.querySelector("#refresh").addEventListener("click", reload);
+
+    page.querySelectorAll("[data-test-custom-model]").forEach(button => button.addEventListener("click", async () => {
+      const card = button.closest(".model-test-card");
+      const result = card?.querySelector(".model-test-result");
+      const original = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = icon("refresh") + t("providers.testingModel");
+      if (result) { result.textContent = ""; result.className = "form-message model-test-result"; }
+      try {
+        const firstActive = customEntry.api_key_enabled ? customEntry.api_key_enabled.findIndex(Boolean) : 0;
+        const keyIdx = firstActive >= 0 ? firstActive : 0;
+        const response = await api(`/provider-configs/${encodeURIComponent(button.dataset.testCustomModel)}/test-model`, {
+          method: "POST",
+          body: JSON.stringify({ model: button.dataset.modelId, api_key_index: keyIdx })
+        });
+        if (result) {
+          if (response.ok) {
+            result.textContent = t("providers.modelTestPassed").replace("{latency}", Number(response.latency_ms || 0).toLocaleString(state.locale));
+            result.className = "form-message model-test-result is-success";
+          } else {
+            result.textContent = response.error || t("providers.modelTestFailed");
+            result.className = "form-message model-test-result is-error";
+          }
+        }
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        if (result) { result.textContent = err.message || t("providers.modelTestFailed"); result.className = "form-message model-test-result is-error"; }
+      } finally {
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    }));
+
+    page.querySelectorAll("[data-copy-model]").forEach(button => button.addEventListener("click", async () => {
+      try {
+        await copyText(button.dataset.copyModel);
+        flashAction(button, t("providers.copied"));
+      } catch (_) {}
+    }));
+
+    page.querySelectorAll("[data-delete-model]").forEach(button => button.addEventListener("click", async () => {
+      const modelName = button.dataset.deleteModel;
+      if (!confirm(t("providers.confirmDeleteModel").replace("{model}", modelName))) return;
+      button.disabled = true;
+      const updatedModels = (customEntry.models || []).filter(m => m.name !== modelName);
+      try {
+        await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ models: updatedModels })
+        });
+        await reload();
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        button.disabled = false;
+      }
+    }));
+
+    const modelDialog = page.querySelector("#custom-model-dialog");
+    const modelForm = page.querySelector("#custom-model-form");
+    page.querySelector("#add-model-btn")?.addEventListener("click", () => {
+      modelForm.reset();
+      const testRes = page.querySelector("#test-model-before-save-result");
+      if (testRes) testRes.textContent = "";
+      modelDialog.showModal();
+    });
+    page.querySelector("#close-model-dialog")?.addEventListener("click", () => modelDialog.close());
+
+    page.querySelector("#test-model-before-save-btn")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      const modelName = modelForm.elements.model_name.value.trim();
+      const result = page.querySelector("#test-model-before-save-result");
+      if (!modelName) {
+        if (result) { result.textContent = t("providers.modelName"); result.className = "form-message is-error"; }
+        return;
+      }
+      const original = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = icon("refresh") + t("providers.testingModel");
+      if (result) result.textContent = "";
+      try {
+        const firstActive = customEntry.api_key_enabled ? customEntry.api_key_enabled.findIndex(Boolean) : 0;
+        const keyIdx = firstActive >= 0 ? firstActive : 0;
+        const response = await api(`/provider-configs/${encodeURIComponent(customEntry.id)}/test-model`, {
+          method: "POST",
+          body: JSON.stringify({ model: modelName, api_key_index: keyIdx })
+        });
+        if (result) {
+          if (response.ok) {
+            result.textContent = t("providers.modelTestPassed").replace("{latency}", Number(response.latency_ms || 0).toLocaleString(state.locale));
+            result.className = "form-message model-test-result is-success";
+          } else {
+            result.textContent = response.error || t("providers.modelTestFailed");
+            result.className = "form-message model-test-result is-error";
+          }
+        }
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        if (result) { result.textContent = err.message || t("providers.modelTestFailed"); result.className = "form-message model-test-result is-error"; }
+      } finally {
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    });
+
+    modelForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const modelName = modelForm.elements.model_name.value.trim();
+      const modelAlias = modelForm.elements.model_alias.value.trim() || modelName;
+      if (!modelName) return;
+      const updatedModels = [...(customEntry.models || []), { name: modelName, alias: modelAlias }];
+      try {
+        await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ models: updatedModels })
+        });
+        modelDialog.close();
+        await reload();
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        const result = page.querySelector("#test-model-before-save-result");
+        if (result) { result.textContent = err.message || t("common.error"); result.className = "form-message is-error"; }
+      }
+    });
+
+    page.querySelector("#discover-models-btn")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      button.disabled = true;
+      try {
+        const discovered = await api("/provider-configs/discover-models", {
+          method: "POST",
+          body: JSON.stringify({ id: customEntry.id, base_url: customEntry.base_url })
+        });
+        const existingNames = new Set((customEntry.models || []).map(m => m.name));
+        const newModels = (discovered.items || []).filter(name => !existingNames.has(name)).map(name => ({ name, alias: name }));
+        if (newModels.length) {
+          const merged = [...(customEntry.models || []), ...newModels];
+          await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ models: merged })
+          });
+          await reload();
+        }
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    page.querySelector("#toggle-custom-provider-btn")?.addEventListener("click", async (event) => {
+      const button = event.currentTarget;
+      const willEnable = button.dataset.enabled !== "true";
+      button.disabled = true;
+      try {
+        await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ disabled: !willEnable })
+        });
+        await reload();
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        button.disabled = false;
+      }
+    });
+
+    page.querySelector("#delete-custom-provider-btn")?.addEventListener("click", async () => {
+      if (!confirm(t("providers.confirmDeleteCompatible"))) return;
+      try {
+        await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, { method: "DELETE" });
+        location.hash = "#/providers";
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+      }
+    });
+
+    page.querySelectorAll("[data-key-toggle]").forEach(button => button.addEventListener("click", async () => {
+      const idx = Number(button.dataset.keyToggle);
+      const isKeyEnabled = button.dataset.enabled === "true";
+      button.disabled = true;
+      try {
+        await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ api_key_action: isKeyEnabled ? "disable" : "enable", api_key_index: idx })
+        });
+        await reload();
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        button.disabled = false;
+      }
+    }));
+
+    page.querySelectorAll("[data-key-test]").forEach(button => button.addEventListener("click", async () => {
+      const idx = Number(button.dataset.keyTest);
+      const row = button.closest(".compatible-key-row");
+      const result = row?.querySelector("[data-key-test-result]");
+      const original = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = icon("refresh") + t("providers.testingApiKey");
+      if (result) { result.textContent = ""; result.className = "form-message"; }
+      try {
+        const resp = await api("/provider-configs/test-api-key", {
+          method: "POST",
+          body: JSON.stringify({ id: customEntry.id, base_url: customEntry.base_url, api_key_index: idx })
+        });
+        if (result) {
+          result.textContent = resp.ok
+            ? t("providers.apiKeyTestPassed").replace("{models}", Number(resp.model_count || 0).toLocaleString(state.locale)).replace("{latency}", Number(resp.latency_ms || 0).toLocaleString(state.locale))
+            : t("providers.apiKeyTestFailed");
+          result.className = "form-message " + (resp.ok ? "ok" : "failed");
+        }
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        if (result) { result.textContent = t("providers.apiKeyTestFailed"); result.className = "form-message failed"; }
+      } finally {
+        button.disabled = false;
+        button.innerHTML = original;
+      }
+    }));
+
+    page.querySelectorAll("[data-key-delete]").forEach(button => button.addEventListener("click", async () => {
+      const idx = Number(button.dataset.keyDelete);
+      const mask = customEntry.api_key_masks?.[idx] || "";
+      if (!confirm(t("providers.confirmDeleteApiKey").replace("{key}", mask))) return;
+      button.disabled = true;
+      try {
+        await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ api_key_action: "delete", api_key_index: idx })
+        });
+        await reload();
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        button.disabled = false;
+      }
+    }));
+
+    page.querySelector("#add-custom-key-btn")?.addEventListener("click", async () => {
+      const key = prompt(t("providers.apiKey"));
+      if (!key || !key.trim()) return;
+      try {
+        await api(`/provider-configs/${encodeURIComponent(customEntry.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ api_key_action: "append", api_key: key.trim() })
+        });
+        await reload();
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        alert(err.message || t("common.error"));
+      }
+    });
+
+    return;
+  }
+
+  // Official / OAuth / Free tier / API Key provider detail
   const catalog = buildProviderCatalog(accounts);
   const entry = catalog.find(item => item.id === providerID);
   if (!entry) {
-    page.innerHTML = pageHeader("kicker.management", "page.providers", "providers.description", true) + '<div class="empty">' + t("providers.noMatches") + '</div><a class="text-link" href="#/providers">' + icon("arrow") + t("providers.back") + '</a>';
-    document.getElementById("refresh").onclick = reload;
+    page.innerHTML = pageHeader("kicker.management", "page.providers", "providers.description", true) +
+      '<div class="empty">' + t("providers.noMatches") + '</div><a class="text-link" href="#/providers">' + icon("arrow") + t("providers.back") + '</a>';
+    page.querySelector("#refresh").addEventListener("click", reload);
     return;
   }
+
   const providerAccounts = accounts.filter(account => providerKey(account.provider) === providerID);
   const connected = providerAccounts.length;
+  const activeCount = providerAccounts.filter(a => a.enabled && a.status === "active").length;
   const loginButtons = entry.oauthMethods.map(method => '<button class="secondary" type="button" data-provider-oauth="' + escapeHTML(method) + '">' + icon("user") + t("providers.connectAccount") + '</button>').join("");
   const rows = providerAccounts.map(account => providerAccountRow(account, authFiles)).join("");
-  page.innerHTML = '<div class="page-head"><div class="provider-detail-title"><a class="provider-back" href="#/providers">' + icon("arrow") + t("providers.back") + '</a><div class="provider-detail-brand">' + providerIdentity(providerID) + '<div><h1>' + escapeHTML(providerBrands[providerID]?.[0] || providerID) + '</h1><p>' + connected + ' ' + t("providers.connections") + '</p></div></div></div>' +
-    '<button class="refresh" id="refresh">' + icon("refresh") + t("action.refresh") + '</button></div>' +
-    '<div class="provider-detail-actions">' + loginButtons + '<input id="provider-upload-input" type="file" accept=".json,application/json" multiple hidden><button class="primary compact" type="button" id="provider-import">' + icon("plus") + t("authFiles.upload") + '</button><span class="form-message" id="provider-action-status" role="status" aria-live="polite"></span></div>' +
-    '<section class="status-panel provider-connections"><div class="section-head"><h2>' + t("providers.connectionTitle") + '</h2><span class="badge">' + connected + '</span></div>' +
-    (rows ? '<div class="account-list">' + rows + '</div>' : '<div class="empty">' + t("providers.noAccounts") + '</div>') + '</section><div id="provider-models" class="provider-models" aria-live="polite"></div>';
-  document.getElementById("refresh").onclick = reload;
+
+  page.innerHTML = `
+    <div class="page-head provider-detail-head">
+      <div class="provider-detail-title">
+        <a class="provider-back" href="#/providers">${icon("arrow")}${t("providers.back")}</a>
+        <div class="provider-detail-brand">
+          ${providerIdentity(providerID)}
+          <div>
+            <h1>${escapeHTML(providerBrands[providerID]?.[0] || providerID)}</h1>
+            <p><span class="badge">${t("providers.category." + entry.category)}</span> · ${connected} ${t("providers.connections")}</p>
+          </div>
+        </div>
+      </div>
+      <div class="actions">
+        ${loginButtons}
+        <input id="provider-upload-input" type="file" accept=".json,application/json" multiple hidden>
+        <button class="primary compact" type="button" id="provider-import">${icon("plus")}${t("authFiles.upload")}</button>
+        <button class="refresh" id="refresh">${icon("refresh")}${t("action.refresh")}</button>
+      </div>
+    </div>
+    <div class="form-message" id="provider-action-status" role="status" aria-live="polite"></div>
+
+    <div class="provider-detail-layout">
+      <section class="status-panel provider-info-panel">
+        <div class="section-head">
+          <h2>${t("providers.providerInfo")}</h2>
+          <span class="badge ${activeCount ? "ready" : "partial"}">${activeCount ? activeCount + " " + t("providers.status.active") : t("providers.notConnected")}</span>
+        </div>
+        <div class="provider-info-grid">
+          <div class="provider-info-item">
+            <small>${t("providers.type")}</small>
+            <strong>${t("providers.category." + entry.category)}</strong>
+          </div>
+          <div class="provider-info-item">
+            <small>${t("providers.connections")}</small>
+            <strong>${connected} (${activeCount} ${t("providers.status.active")})</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="status-panel provider-connections">
+        <div class="section-head">
+          <h2>${t("providers.connectionTitle")}</h2>
+          <span class="badge">${connected}</span>
+        </div>
+        ${rows ? `<div class="account-list">${rows}</div>` : `<div class="empty">${t("providers.noAccounts")}</div>`}
+      </section>
+
+      <section class="status-panel provider-models-section" id="provider-models-panel">
+        <div class="section-head">
+          <h2>${t("providers.availableModels")}</h2>
+          <span class="badge" id="models-count-badge">...</span>
+        </div>
+        <div class="model-test-list" id="provider-models">
+          <div class="loading">${t("common.loading")}</div>
+        </div>
+      </section>
+    </div>
+  `;
+
+  page.querySelector("#refresh").addEventListener("click", reload);
   page.querySelectorAll("[data-provider-oauth]").forEach(button => button.addEventListener("click", async () => {
     button.disabled = true;
     const message = page.querySelector("#provider-action-status");
@@ -1205,35 +1655,256 @@ async function renderProviderDetail(page, providerID, accounts, authFiles, reloa
   }));
   bindProviderImport(page, reload);
   bindProviderAccountControls(page, reload);
+
+  const modelsContainer = page.querySelector("#provider-models");
+  const countBadge = page.querySelector("#models-count-badge");
+  const activeAccount = providerAccounts.find(a => a.enabled && a.status === "active") || providerAccounts[0];
+
+  if (activeAccount) {
+    try {
+      const modelsResp = await api("/providers/" + encodeURIComponent(activeAccount.id) + "/models");
+      const models = modelsResp.items || [];
+      if (countBadge) countBadge.textContent = String(models.length);
+      modelsContainer.innerHTML = models.length ? models.map(model => {
+        const isVision = (model.id || "").includes("vision") || (model.id || "").includes("image");
+        const isReasoning = (model.id || "").includes("thinking") || (model.id || "").includes("r1") || (model.id || "").includes("o1") || (model.id || "").includes("o3");
+        const caps = (isVision ? `<span class="model-cap-badge">${icon("eye")}${t("providers.tagVision")}</span>` : "") +
+                     (isReasoning ? `<span class="model-cap-badge">${icon("zap")}${t("providers.tagReasoning")}</span>` : "");
+        return `
+          <div class="model-test-card" data-model-id="${escapeHTML(model.id)}">
+            <div class="model-test-identity">
+              <strong>${escapeHTML(model.display_name || model.id)}</strong>
+              <small><code>${escapeHTML(model.id)}</code></small>
+              ${caps ? `<div class="model-caps">${caps}</div>` : ""}
+            </div>
+            <div class="model-test-actions">
+              <span class="form-message model-test-result" role="status" aria-live="polite"></span>
+              <button class="secondary model-test-btn" type="button" data-test-provider-model="${escapeHTML(activeAccount.id)}" data-model-id="${escapeHTML(model.id)}">
+                ${icon("zap")}${t("providers.testModel")}
+              </button>
+              <button class="secondary" type="button" data-copy-model="${escapeHTML(model.id)}" title="${t("providers.copyModel")}">
+                ${icon("copy")}
+              </button>
+            </div>
+          </div>
+        `;
+      }).join("") : `<div class="empty">${t("providers.modelsEmpty")}</div>`;
+
+      modelsContainer.querySelectorAll("[data-test-provider-model]").forEach(testButton => testButton.addEventListener("click", async () => {
+        const card = testButton.closest(".model-test-card");
+        const result = card?.querySelector(".model-test-result");
+        const original = testButton.innerHTML;
+        testButton.disabled = true;
+        testButton.innerHTML = icon("refresh") + t("providers.testingModel");
+        if (result) { result.textContent = ""; result.className = "form-message model-test-result"; }
+        try {
+          const response = await api(`/providers/${encodeURIComponent(testButton.dataset.testProviderModel)}/test-model`, {
+            method: "POST",
+            body: JSON.stringify({ model: testButton.dataset.modelId })
+          });
+          if (result) {
+            if (response.ok) {
+              result.textContent = t("providers.modelTestPassed").replace("{latency}", Number(response.latency_ms || 0).toLocaleString(state.locale));
+              result.className = "form-message model-test-result is-success";
+            } else {
+              result.textContent = response.error || t("providers.modelTestFailed");
+              result.className = "form-message model-test-result is-error";
+            }
+          }
+        } catch (err) {
+          if (err.message === "invalid_key") return logout();
+          if (result) { result.textContent = err.message || t("providers.modelTestFailed"); result.className = "form-message model-test-result is-error"; }
+        } finally {
+          testButton.disabled = false;
+          testButton.innerHTML = original;
+        }
+      }));
+
+      modelsContainer.querySelectorAll("[data-copy-model]").forEach(button => button.addEventListener("click", async () => {
+        try {
+          await copyText(button.dataset.copyModel);
+          flashAction(button, t("providers.copied"));
+        } catch (_) {}
+      }));
+    } catch (_) {
+      if (countBadge) countBadge.textContent = "0";
+      modelsContainer.innerHTML = `<div class="empty">${t("providers.modelsEmpty")}</div>`;
+    }
+  } else {
+    if (countBadge) countBadge.textContent = "0";
+    modelsContainer.innerHTML = `<div class="empty">${t("providers.modelsEmpty")}</div>`;
+  }
 }
 
 async function renderProviders(page) {
   page.innerHTML = pageHeader("kicker.liveData", "page.providers", "providers.description", true) + '<div id="providers"><div class="loading">' + t("common.loading") + '</div></div>';
   const reload = () => renderProviders(page);
-  document.getElementById("refresh").onclick = reload;
+  page.querySelector("#refresh").addEventListener("click", reload);
   try {
-    const [providerResponse, authResponse, customResponse] = await Promise.all([api("/providers"), api("/auth-files"), api("/provider-configs")]);
+    const [providerResponse, authResponse, customResponse] = await Promise.all([
+      api("/providers"),
+      api("/auth-files"),
+      api("/provider-configs")
+    ]);
     if (!page.isConnected || page.dataset.page !== "providers") return;
+
     const accounts = providerResponse.items || [];
     const authFiles = authResponse.files || [];
     const customProviders = customResponse.items || [];
     const detailID = providerRouteID();
+
     if (detailID) {
-      await renderProviderDetail(page, detailID, accounts, authFiles, reload);
+      await renderProviderDetail(page, detailID, accounts, authFiles, reload, customProviders);
       return;
     }
+
     const customProviderKeys = new Set(customProviders.map(item => compatibleProviderKey(item.name)));
     const officialAccounts = accounts.filter(account => !customProviderKeys.has(providerKey(account.provider)));
     const catalog = buildProviderCatalog(officialAccounts);
     const active = officialAccounts.filter(account => account.enabled && account.status === "active").length;
-    const groups = ["oauth", "free", "apikey"].map(category => providerCategorySection(category, catalog.filter(item => item.category === category))).join("");
+
+    const customCards = customProviders.map(compatibleProviderCard).join("");
+    const oauthCards = catalog.filter(item => item.category === "oauth").map(providerCatalogCard).join("");
+    const freeCards = catalog.filter(item => item.category === "free").map(providerCatalogCard).join("");
+    const apiKeyCards = catalog.filter(item => item.category === "apikey").map(providerCatalogCard).join("");
+
     const container = page.querySelector("#providers");
-    container.innerHTML = '<div class="provider-catalog-toolbar"><div class="provider-summary"><span><strong>' + (catalog.length + customProviders.length) + '</strong> ' + t("providers.type") + '</span><span><strong>' + officialAccounts.length + '</strong> ' + t("providers.accounts") + '</span><span class="ok"><strong>' + active + '</strong> ' + t("providers.active") + '</span></div>' +
-      '<div class="provider-import"><input id="provider-upload-input" type="file" accept=".json,application/json" multiple hidden><button class="primary compact" type="button" id="provider-import">' + icon("plus") + t("authFiles.upload") + '</button></div></div>' +
-      '<div class="form-message" id="provider-action-status" role="status" aria-live="polite"></div><div id="provider-custom"></div><div class="provider-categories">' + groups + '</div>';
-    container.querySelector("#provider-custom").innerHTML = compatibleProviderSection(customProviders);
-    bindCompatibleProviderControls(container, customProviders, reload);
+    container.innerHTML = `
+      <div class="provider-catalog-toolbar">
+        <div class="provider-search-filters">
+          <label class="search-field">
+            ${icon("search")}
+            <input id="provider-search-input" type="search" placeholder="${escapeHTML(t("providers.search"))}" aria-label="${escapeHTML(t("providers.search"))}">
+          </label>
+          <select id="provider-conn-filter" aria-label="${escapeHTML(t("providers.filterConnections"))}">
+            <option value="all">${t("providers.allConnections")}</option>
+            <option value="connected">${t("providers.connectedOnly")}</option>
+            <option value="not_connected">${t("providers.notConnectedOnly")}</option>
+          </select>
+        </div>
+        <div class="provider-summary">
+          <span><strong>${catalog.length + customProviders.length}</strong> ${t("providers.type")}</span>
+          <span><strong>${officialAccounts.length}</strong> ${t("providers.accounts")}</span>
+          <span class="ok"><strong>${active}</strong> ${t("providers.active")}</span>
+        </div>
+        <div class="actions">
+          <button class="primary compact" type="button" id="show-custom-provider-btn">${icon("plus")}${t("providers.addCompatible")}</button>
+          <input id="provider-upload-input" type="file" accept=".json,application/json" multiple hidden>
+          <button class="secondary compact" type="button" id="provider-import">${icon("plus")}${t("authFiles.upload")}</button>
+        </div>
+      </div>
+      <div class="form-message" id="provider-action-status" role="status" aria-live="polite"></div>
+
+      <div class="provider-categories">
+        <section class="provider-category" data-category="custom">
+          <div class="section-head">
+            <div>
+              <h2>${t("providers.category.custom")}</h2>
+              <p class="hint">${t("providers.compatibleDescription")}</p>
+            </div>
+            <span class="badge">${customProviders.length}</span>
+          </div>
+          ${customCards ? `<div class="grid provider-catalog-grid">${customCards}</div>` : `<div class="empty provider-category-empty">${t("providers.compatibleEmpty")}</div>`}
+        </section>
+
+        <section class="provider-category" data-category="oauth">
+          <div class="section-head">
+            <div><h2>${t("providers.category.oauth")}</h2></div>
+            <span class="badge">${catalog.filter(item => item.category === "oauth").length}</span>
+          </div>
+          ${oauthCards ? `<div class="grid provider-catalog-grid">${oauthCards}</div>` : `<div class="empty provider-category-empty">${t("providers.categoryEmpty")}</div>`}
+        </section>
+
+        <section class="provider-category" data-category="free">
+          <div class="section-head">
+            <div><h2>${t("providers.category.free")}</h2></div>
+            <span class="badge">${catalog.filter(item => item.category === "free").length}</span>
+          </div>
+          ${freeCards ? `<div class="grid provider-catalog-grid">${freeCards}</div>` : `<div class="empty provider-category-empty">${t("providers.categoryEmpty")}</div>`}
+        </section>
+
+        <section class="provider-category" data-category="apikey">
+          <div class="section-head">
+            <div>
+              <h2>${t("providers.category.apikey")}</h2>
+              <p class="hint">${t("providers.officialApiKeyDescription")}</p>
+            </div>
+            <span class="badge">${catalog.filter(item => item.category === "apikey").length}</span>
+          </div>
+          ${apiKeyCards ? `<div class="grid provider-catalog-grid">${apiKeyCards}</div>` : `<div class="empty provider-category-empty">${t("providers.categoryEmpty")}</div>`}
+        </section>
+      </div>
+
+      <dialog class="custom-model-dialog" id="create-provider-dialog">
+        <form id="create-provider-form">
+          <div class="card-title">
+            <h2>${t("providers.addCompatible")}</h2>
+            <button type="button" class="secondary" id="close-create-dialog">${icon("close")}</button>
+          </div>
+          <div class="settings-grid">
+            <label>${t("providers.compatibleName")}<input class="text-input" name="name" required placeholder="e.g. Groq"></label>
+            <label>${t("providers.baseUrl")}<input class="text-input" name="base_url" type="url" placeholder="https://api.groq.com/openai/v1" required></label>
+          </div>
+          <div class="settings-grid">
+            <label>${t("providers.apiKey")}<input class="text-input" name="api_key" type="password" placeholder="${t("providers.apiKeyOptional")}"></label>
+            <label>${t("providers.prefix")}<input class="text-input" name="prefix" placeholder="e.g. groq"></label>
+          </div>
+          <label>${t("providers.modelList")}<textarea class="text-input" name="models" rows="3" placeholder="model-name | model-alias"></textarea><small class="hint">${t("providers.modelListHint")}</small></label>
+          <div class="actions">
+            <button class="primary compact" type="submit">${icon("save")}${t("providers.saveCompatible")}</button>
+          </div>
+        </form>
+      </dialog>
+    `;
+
     bindProviderImport(container, reload);
+
+    const createDialog = page.querySelector("#create-provider-dialog");
+    const createForm = page.querySelector("#create-provider-form");
+    page.querySelector("#show-custom-provider-btn")?.addEventListener("click", () => {
+      createForm.reset();
+      createDialog.showModal();
+    });
+    page.querySelector("#close-create-dialog")?.addEventListener("click", () => createDialog.close());
+
+    createForm?.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const lines = createForm.elements.models.value.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const models = lines.map(line => { const [name, alias] = line.split("|").map(v => v.trim()); return { name, alias: alias || name }; });
+      const body = {
+        name: createForm.elements.name.value.trim(),
+        base_url: createForm.elements.base_url.value.trim(),
+        prefix: createForm.elements.prefix.value.trim(),
+        api_key: createForm.elements.api_key.value.trim(),
+        models
+      };
+      try {
+        await api("/provider-configs", { method: "POST", body: JSON.stringify(body) });
+        createDialog.close();
+        await reload();
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        alert(err.message || t("common.error"));
+      }
+    });
+
+    // Search and filter logic
+    const searchInput = page.querySelector("#provider-search-input");
+    const connFilter = page.querySelector("#provider-conn-filter");
+    const applyFilter = () => {
+      const q = (searchInput?.value || "").trim().toLowerCase();
+      const connMode = connFilter?.value || "all";
+      page.querySelectorAll(".provider-catalog-card").forEach(card => {
+        const cardText = card.textContent.toLowerCase();
+        const matchesQuery = !q || cardText.includes(q);
+        const isConnected = !cardText.includes(t("providers.notConnected").toLowerCase());
+        const matchesConn = connMode === "all" || (connMode === "connected" && isConnected) || (connMode === "not_connected" && !isConnected);
+        card.style.display = matchesQuery && matchesConn ? "" : "none";
+      });
+    };
+    searchInput?.addEventListener("input", applyFilter);
+    connFilter?.addEventListener("change", applyFilter);
+
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     const container = page.querySelector("#providers");
@@ -1866,75 +2537,380 @@ function usageTable(records) {
 async function renderQuota(page) {
   page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="loading">${t("common.loading")}</div>`;
   try {
-    const [authResponse, providerResponse] = await Promise.all([api("/auth-files"), api("/quota/providers").catch(error => { if (error.message === "invalid_key") throw error; return {providers: []}; })]);
+    const [authResponse, providerResponse] = await Promise.all([
+      api("/auth-files"),
+      api("/quota/providers").catch(error => { if (error.message === "invalid_key") throw error; return { providers: [] }; })
+    ]);
     if (!page.isConnected || page.dataset.page !== "quota") return;
+
     const credentials = (authResponse.files || []).filter(file => file.supports_quota);
     const quotaProviders = providerResponse.providers || [];
     const canReset = credential => quotaProviders.some(provider => provider.supports_reset && (provider.supported_providers || []).some(name => String(name).toLowerCase() === String(credential.provider).toLowerCase()));
-    const cards = credentials.map(credential => `<article class="card quota-card" data-quota-card data-quota-provider="${escapeHTML(credential.provider || "")}"><div class="card-title"><h2 title="${escapeHTML(credential.label || credential.email || credential.name || credential.id)}">${escapeHTML(credential.label || credential.email || credential.name || credential.id)}</h2><span class="badge ${credential.unavailable || credential.status !== "active" ? "partial" : "ready"}">${escapeHTML(credential.unavailable ? t("providers.unavailable") : providerStatusLabel(credential.status))}</span></div><div class="quota-brand">${providerIdentity(credential.provider, true)}</div><p class="quota-observed" data-quota-checked>${t("quota.checking")}</p><div class="quota-card-result" data-quota-result="${escapeHTML(credential.auth_index)}"><div class="loading">${t("common.loading")}</div></div><div class="actions"><button class="secondary" data-quota-fetch="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.refresh")}</button>${canReset(credential) ? `<button class="secondary" data-quota-reset="${escapeHTML(credential.auth_index)}" data-provider="${escapeHTML(credential.provider || "")}">${icon("refresh")}${t("quota.reset")}</button>` : ""}</div></article>`).join("");
-    page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + (cards ? `${providerFilterChips(credentials.map(credential => credential.provider))}<section class="grid quota-grid">${cards}</section><div id="quota-filter-empty" class="empty" hidden>${t("quota.noMatches")}</div>` : `<div class="empty">${t("quota.empty")}</div>`);
-    document.getElementById("refresh").addEventListener("click", () => renderQuota(page));
-    if (cards) {
-      const applyFilter = provider => {
-        let visible = 0;
-        page.querySelectorAll("[data-quota-card]").forEach(card => {
-          card.hidden = Boolean(provider && card.dataset.quotaProvider.toLowerCase() !== provider);
-          if (!card.hidden) visible++;
-        });
-        page.querySelector("#quota-filter-empty").hidden = visible > 0;
-      };
-      bindProviderFilterChips(page.querySelector(".provider-chips"), applyFilter);
+
+    if (!credentials.length) {
+      page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="empty">${t("quota.empty")}</div>`;
+      page.querySelector("#refresh")?.addEventListener("click", () => renderQuota(page));
+      return;
     }
-    const renderResult = (target, value) => {
-      const summary = (value.summary || []).map(metric => { const labels = {credit_amount: "quota.creditAmount", minimum_credit_amount: "quota.minimumCredit", observed_signals: "quota.observedSignals"}; return `<li><strong>${escapeHTML(t(labels[metric.key] || metric.label || metric.key))}</strong><span>${escapeHTML(`${metric.value}${metric.unit ? ` ${metric.unit}` : ""}`)}</span></li>`; });
-      const signalRows = Object.entries(value.signals || {}).map(([key, signal]) => `<li><strong>${escapeHTML(key)}</strong><code>${escapeHTML(signal)}</code></li>`).join("");
-      const cockpit = renderQuotaCockpit(value, target.closest(".quota-card")?.querySelector("[data-quota-fetch]")?.dataset.provider);
-      const observed = value.observed_at ? `<p class="quota-observed">${t("quota.lastObserved")}: ${escapeHTML(new Date(value.observed_at).toLocaleString(state.locale))}</p>` : "";
-      const availability = typeof value.credits_available === "boolean" ? `<span class="badge ${value.credits_available ? "ready" : "partial"}">${t(value.credits_available ? "quota.creditsAvailable" : "quota.creditsUnavailable")}</span>` : "";
-      const empty = summary.length || cockpit || signalRows ? "" : `<div class="empty quota-empty-note">${t("quota.noObservation")}</div>`;
-      target.innerHTML = `${observed}${value.subscription?.plan ? `<p>${escapeHTML(value.subscription.plan)}</p>` : ""}<div class="quota-result-heading"><strong>${t("quota.result")}</strong>${availability}</div>${summary.length ? `<ul class="quota-list">${summary.join("")}</ul>` : ""}${cockpit}${signalRows ? `<details class="quota-signals"><summary>${t("quota.signals")}</summary><ul class="quota-list">${signalRows}</ul></details>` : ""}${empty}`;
+
+    const quotaCache = new Map();
+    let selectedProvider = "all";
+    let selectedStatus = "all";
+    let sortByReset = false;
+    let autoRefresh = true;
+    let countdown = 60;
+    let currentPage = 1;
+    const pageSize = 8;
+
+    const uniqueProviders = [...new Set(credentials.map(c => c.provider).filter(Boolean))].sort();
+
+    const renderShell = () => {
+      const providerOptions = `<option value="all">${t("quota.allProviders")}</option>` + uniqueProviders.map(p => `<option value="${escapeHTML(p.toLowerCase())}" ${selectedProvider === p.toLowerCase() ? "selected" : ""}>${escapeHTML(p)}</option>`).join("");
+      const statusOptions = `
+        <option value="all" ${selectedStatus === "all" ? "selected" : ""}>${t("quota.allStatuses")}</option>
+        <option value="active" ${selectedStatus === "active" ? "selected" : ""}>${t("quota.activeOnly")}</option>
+        <option value="attention" ${selectedStatus === "attention" ? "selected" : ""}>${t("quota.attentionOnly")}</option>
+      `;
+
+      page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) +
+        `<div class="quota-toolbar">` +
+        `<div class="quota-toolbar-filters">` +
+        `<select id="quota-provider-filter" aria-label="${escapeHTML(t("quota.filterProvider"))}">${providerOptions}</select>` +
+        `<select id="quota-status-filter" aria-label="${escapeHTML(t("quota.filterStatus"))}">${statusOptions}</select>` +
+        `<label class="quota-toolbar-toggle"><input type="checkbox" id="quota-sort-reset" ${sortByReset ? "checked" : ""}> ${t("quota.sortReset")}</label>` +
+        `</div>` +
+        `<div class="quota-toolbar-actions">` +
+        `<label class="quota-toolbar-toggle"><input type="checkbox" id="quota-auto-refresh" ${autoRefresh ? "checked" : ""}> ${t("quota.autoRefresh")} (<span id="quota-countdown">${countdown}s</span>)</label>` +
+        `<button class="secondary" id="quota-refresh-all">${icon("refresh")}${t("quota.refreshAll")}</button>` +
+        `<button class="secondary" id="quota-bulk-enable" title="${t("quota.confirmBulkEnable")}">${icon("check")}${t("quota.bulkEnable")}</button>` +
+        `<button class="secondary" id="quota-bulk-disable" title="${t("quota.confirmBulkDisable")}">${icon("pause")}${t("quota.bulkDisable")}</button>` +
+        `</div>` +
+        `</div>` +
+        `<div id="quota-cards-container"><div class="grid quota-grid" id="quota-grid"></div><div id="quota-pagination-bar" class="quota-pagination"></div></div>` +
+        `<div id="quota-filter-empty" class="empty" hidden>${t("quota.noMatches")}</div>`;
+
+      page.querySelector("#refresh")?.addEventListener("click", () => renderQuota(page));
     };
-    const fetchQuota = async button => {
-      const target = page.querySelector(`[data-quota-result="${CSS.escape(button.dataset.quotaFetch)}"]`);
-      if (!target) return;
-      const card = button.closest(".quota-card");
-      const checked = card?.querySelector("[data-quota-checked]");
-      const badge = card?.querySelector(".card-title .badge");
-      if (badge && !badge.dataset.originalStatus) {
-        badge.dataset.originalStatus = badge.textContent;
-        badge.dataset.originalClass = badge.className;
+
+    renderShell();
+
+    const getEarliestReset = (authIndex) => {
+      const data = quotaCache.get(authIndex);
+      if (!data || !data.groups) return Infinity;
+      let earliest = Infinity;
+      for (const group of data.groups) {
+        for (const bucket of group.buckets || []) {
+          if (bucket.resetTime) {
+            const time = new Date(bucket.resetTime).getTime();
+            if (Number.isFinite(time) && time > Date.now() && time < earliest) earliest = time;
+          }
+        }
       }
-      button.disabled = true;
-      target.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
-      if (checked) checked.textContent = t("quota.checking");
-      try {
-        renderResult(target, await api("/quota/fetch", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaFetch, provider: button.dataset.provider})}));
-        if (checked) checked.textContent = `${t("quota.lastChecked")}: ${new Date().toLocaleString(state.locale)}`;
-        if (badge) { badge.className = badge.dataset.originalClass; badge.textContent = badge.dataset.originalStatus; }
-      } catch (error) {
-        if (error.message === "invalid_key") return logout();
-        const needsCodexLogin = button.dataset.provider === "codex" && (error.code === "reauth_required" || /status 401|token_revoked/i.test(error.message));
-        const message = needsCodexLogin ? t("quota.authRequired") : error.message === "server_error" ? t("quota.unavailable") : error.message;
-        if (needsCodexLogin && badge) { badge.className = "badge partial"; badge.textContent = t("quota.authRequiredShort"); }
-        target.innerHTML = `<div class="error">${escapeHTML(message)}</div>${needsCodexLogin ? `<button class="secondary quota-login" type="button">${icon("key")}${t("quota.reconnectCodex")}</button>` : ""}`;
-        if (checked) checked.textContent = t("quota.checkFailed");
-        target.querySelector(".quota-login")?.addEventListener("click", async event => {
-          event.currentTarget.disabled = true;
-          try { await startOAuthLogin("codex", target.querySelector(".error"), () => renderQuota(page)); }
-          catch (loginError) { if (loginError.message === "invalid_key") return logout(); target.querySelector(".error").textContent = t("authFiles.loginFailed"); event.currentTarget.disabled = false; }
-        });
-      } finally { button.disabled = false; }
+      return earliest;
     };
-    page.querySelectorAll("[data-quota-fetch]").forEach(button => button.addEventListener("click", () => fetchQuota(button)));
-    page.querySelectorAll("[data-quota-reset]").forEach(button => button.addEventListener("click", async () => { if (!confirm(t("quota.confirmReset"))) return; button.disabled = true; try { await api("/quota/reset", {method: "POST", body: JSON.stringify({auth_index: button.dataset.quotaReset, provider: button.dataset.provider})}); await renderQuota(page); } catch (error) { if (error.message === "invalid_key") return logout(); const target = page.querySelector(`[data-quota-result="${CSS.escape(button.dataset.quotaReset)}"]`); if (target) target.innerHTML = `<div class="error">${escapeHTML(error.message)}</div>`; button.disabled = false; } }));
-    page.querySelectorAll("[data-quota-fetch]").forEach(fetchQuota);
+
+    const getVisibleCredentials = () => {
+      let filtered = credentials.filter(c => {
+        if (selectedProvider !== "all" && String(c.provider || "").toLowerCase() !== selectedProvider) return false;
+        if (selectedStatus === "active" && (c.disabled || c.status !== "active")) return false;
+        if (selectedStatus === "attention" && !c.disabled && c.status === "active") return false;
+        return true;
+      });
+
+      if (sortByReset) {
+        filtered.sort((a, b) => getEarliestReset(a.auth_index) - getEarliestReset(b.auth_index));
+      }
+      return filtered;
+    };
+
+    const renderQuotaRows = (value, provider) => {
+      const rows = [];
+      for (const group of value.groups || []) {
+        for (const bucket of group.buckets || []) {
+          const remainingFraction = Math.max(0, Math.min(1, Number(bucket.remainingFraction) || 0));
+          const pct = Math.round(remainingFraction * 100);
+          const colorClass = pct > 70 ? "progress-high" : pct >= 30 ? "progress-medium" : "progress-low";
+          const statusClass = pct > 70 ? "status-high" : pct >= 30 ? "status-medium" : "status-low";
+          const dot = pct > 70 ? "🟢" : pct >= 30 ? "🟡" : "🔴";
+          const label = group.displayName || bucket.window || provider;
+          const resetLabel = bucket.resetTime ? quotaResetLabel(bucket.resetTime) : "";
+          rows.push(`
+            <div class="quota-row">
+              <div class="quota-row-meta">
+                <strong title="${escapeHTML(label)}">${escapeHTML(label)}</strong>
+                <span class="${statusClass}">${dot} ${pct}% ${t("quota.remaining")}</span>
+              </div>
+              <progress max="1" value="${remainingFraction}" class="${colorClass}" aria-label="${escapeHTML(label)}"></progress>
+              ${resetLabel ? `<div class="quota-row-reset"><span title="${escapeHTML(new Date(bucket.resetTime).toLocaleString(state.locale))}">${escapeHTML(resetLabel)}</span></div>` : ""}
+            </div>
+          `);
+        }
+      }
+      return rows.join("");
+    };
+
+    const renderCardData = (target, value, credential) => {
+      const rowsHtml = renderQuotaRows(value, credential.provider);
+      const observed = value.observed_at ? `<p class="quota-observed">${t("quota.lastObserved")}: ${escapeHTML(new Date(value.observed_at).toLocaleString(state.locale))}</p>` : "";
+      const planTag = value.subscription?.plan ? `<span class="badge protocol-badge">${escapeHTML(value.subscription.plan)}</span>` : "";
+      const emptyNote = !rowsHtml ? `<div class="empty quota-empty-note">${t("quota.noObservation")}</div>` : "";
+      target.innerHTML = `
+        ${observed}
+        ${planTag ? `<div style="margin-bottom:8px;">${planTag}</div>` : ""}
+        <div class="quota-card-rows">${rowsHtml}</div>
+        ${emptyNote}
+      `;
+    };
+
+    const fetchSingleQuota = async (authIndex, provider, target, credential, btn = null) => {
+      if (!target) return;
+      if (btn) btn.disabled = true;
+      target.innerHTML = `<div class="loading">${t("common.loading")}</div>`;
+      try {
+        const result = await api("/quota/fetch", {
+          method: "POST",
+          body: JSON.stringify({ auth_index: authIndex, provider: provider })
+        });
+        quotaCache.set(authIndex, result);
+        renderCardData(target, result, credential);
+      } catch (err) {
+        if (err.message === "invalid_key") return logout();
+        const needsCodexLogin = provider === "codex" && (err.code === "reauth_required" || /status 401|token_revoked/i.test(err.message));
+        const msg = needsCodexLogin ? t("quota.authRequired") : err.message;
+        target.innerHTML = `
+          <div class="error">${escapeHTML(msg)}</div>
+          ${needsCodexLogin ? `<button class="secondary quota-login" type="button">${icon("key")}${t("quota.reconnectCodex")}</button>` : ""}
+        `;
+        target.querySelector(".quota-login")?.addEventListener("click", async (e) => {
+          e.currentTarget.disabled = true;
+          try {
+            await startOAuthLogin("codex", target.querySelector(".error"), () => renderQuota(page));
+          } catch (loginErr) {
+            if (loginErr.message === "invalid_key") return logout();
+            target.querySelector(".error").textContent = t("authFiles.loginFailed");
+            e.currentTarget.disabled = false;
+          }
+        });
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    };
+
+    const bindCardActions = () => {
+      page.querySelectorAll("[data-quota-fetch]").forEach(btn => btn.addEventListener("click", () => {
+        const authIdx = btn.dataset.quotaFetch;
+        const provider = btn.dataset.provider;
+        const target = page.querySelector(`[data-quota-body="${CSS.escape(authIdx)}"]`);
+        const cred = credentials.find(c => c.auth_index === authIdx);
+        if (target && cred) fetchSingleQuota(authIdx, provider, target, cred, btn);
+      }));
+
+      page.querySelectorAll("[data-quota-reset]").forEach(btn => btn.addEventListener("click", async () => {
+        if (!confirm(t("quota.confirmReset"))) return;
+        btn.disabled = true;
+        try {
+          await api("/quota/reset", {
+            method: "POST",
+            body: JSON.stringify({ auth_index: btn.dataset.quotaReset, provider: btn.dataset.provider })
+          });
+          const target = page.querySelector(`[data-quota-body="${CSS.escape(btn.dataset.quotaReset)}"]`);
+          const cred = credentials.find(c => c.auth_index === btn.dataset.quotaReset);
+          if (target && cred) fetchSingleQuota(btn.dataset.quotaReset, btn.dataset.provider, target, cred, btn);
+        } catch (err) {
+          if (err.message === "invalid_key") return logout();
+          alert(err.message || t("common.error"));
+        } finally {
+          btn.disabled = false;
+        }
+      }));
+
+      page.querySelectorAll("[data-quota-toggle]").forEach(btn => btn.addEventListener("click", async () => {
+        const enabled = btn.dataset.enabled !== "true";
+        btn.disabled = true;
+        try {
+          await api(`/providers/${encodeURIComponent(btn.dataset.quotaToggle)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ enabled })
+          });
+          await renderQuota(page);
+        } catch (err) {
+          if (err.message === "invalid_key") return logout();
+          btn.disabled = false;
+        }
+      }));
+    };
+
+    const updateCards = () => {
+      const visible = getVisibleCredentials();
+      const emptyNotice = page.querySelector("#quota-filter-empty");
+      const grid = page.querySelector("#quota-grid");
+      const paginationBar = page.querySelector("#quota-pagination-bar");
+
+      if (!visible.length) {
+        if (grid) grid.innerHTML = "";
+        if (paginationBar) paginationBar.innerHTML = "";
+        if (emptyNotice) emptyNotice.hidden = false;
+        return;
+      }
+      if (emptyNotice) emptyNotice.hidden = true;
+
+      const totalPages = Math.ceil(visible.length / pageSize) || 1;
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      const paged = visible.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+      grid.innerHTML = paged.map(c => {
+        const name = c.label || c.email || c.name || c.id;
+        const isDisabled = Boolean(c.disabled);
+        const stateClass = isDisabled ? "partial" : c.status === "active" ? "ready" : "partial";
+        const statusText = isDisabled ? t("providers.status.disabled") : c.unavailable ? t("providers.unavailable") : providerStatusLabel(c.status);
+
+        return `
+          <article class="card quota-card" data-quota-card data-auth-index="${escapeHTML(c.auth_index)}" data-provider="${escapeHTML(c.provider || "")}">
+            <div class="quota-card-header">
+              <div class="quota-card-header-main">
+                <div class="quota-brand">${providerIdentity(c.provider, true)}</div>
+                <div class="quota-card-identity">
+                  <strong title="${escapeHTML(name)}">${escapeHTML(name)}</strong>
+                  <small>${escapeHTML(c.provider || "")}</small>
+                </div>
+              </div>
+              <div class="quota-card-header-actions">
+                <span class="badge ${stateClass}">${escapeHTML(statusText)}</span>
+                <button class="secondary compact" type="button" data-quota-fetch="${escapeHTML(c.auth_index)}" data-provider="${escapeHTML(c.provider || "")}" title="${t("quota.refresh")}">
+                  ${icon("refresh")}
+                </button>
+                ${canReset(c) ? `<button class="secondary compact" type="button" data-quota-reset="${escapeHTML(c.auth_index)}" data-provider="${escapeHTML(c.provider || "")}" title="${t("quota.reset")}">${icon("refresh")}</button>` : ""}
+                <button class="secondary compact" type="button" data-quota-toggle="${escapeHTML(c.id)}" data-enabled="${!isDisabled}" title="${t(isDisabled ? "providers.enable" : "providers.disable")}">
+                  ${icon(isDisabled ? "check" : "pause")}
+                </button>
+              </div>
+            </div>
+            <div class="quota-card-body" data-quota-body="${escapeHTML(c.auth_index)}">
+              <div class="loading">${t("common.loading")}</div>
+            </div>
+          </article>
+        `;
+      }).join("");
+
+      if (totalPages > 1) {
+        paginationBar.innerHTML = `
+          <button class="secondary" id="quota-prev-btn" ${currentPage <= 1 ? "disabled" : ""}>${icon("arrow")}${t("quota.previous")}</button>
+          <span>${t("quota.page")} ${currentPage} / ${totalPages} (${visible.length} ${t("providers.name")})</span>
+          <button class="secondary" id="quota-next-btn" ${currentPage >= totalPages ? "disabled" : ""}>${t("quota.next")}${icon("arrow")}</button>
+        `;
+        paginationBar.querySelector("#quota-prev-btn")?.addEventListener("click", () => { currentPage--; updateCards(); });
+        paginationBar.querySelector("#quota-next-btn")?.addEventListener("click", () => { currentPage++; updateCards(); });
+      } else {
+        paginationBar.innerHTML = "";
+      }
+
+      paged.forEach(c => {
+        const target = grid.querySelector(`[data-quota-body="${CSS.escape(c.auth_index)}"]`);
+        if (!target) return;
+        if (quotaCache.has(c.auth_index)) {
+          renderCardData(target, quotaCache.get(c.auth_index), c);
+        } else {
+          fetchSingleQuota(c.auth_index, c.provider, target, c);
+        }
+      });
+
+      bindCardActions();
+    };
+
+    page.querySelector("#quota-provider-filter")?.addEventListener("change", (e) => {
+      selectedProvider = e.target.value;
+      currentPage = 1;
+      updateCards();
+    });
+
+    page.querySelector("#quota-status-filter")?.addEventListener("change", (e) => {
+      selectedStatus = e.target.value;
+      currentPage = 1;
+      updateCards();
+    });
+
+    page.querySelector("#quota-sort-reset")?.addEventListener("change", (e) => {
+      sortByReset = e.target.checked;
+      updateCards();
+    });
+
+    page.querySelector("#quota-auto-refresh")?.addEventListener("change", (e) => {
+      autoRefresh = e.target.checked;
+      countdown = 60;
+      const cdEl = page.querySelector("#quota-countdown");
+      if (cdEl) cdEl.textContent = `${countdown}s`;
+    });
+
+    page.querySelector("#quota-refresh-all")?.addEventListener("click", async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const visible = getVisibleCredentials();
+      await Promise.all(visible.map(c => {
+        const target = page.querySelector(`[data-quota-body="${CSS.escape(c.auth_index)}"]`);
+        return target ? fetchSingleQuota(c.auth_index, c.provider, target, c, btn) : Promise.resolve();
+      }));
+      btn.disabled = false;
+    });
+
+    page.querySelector("#quota-bulk-enable")?.addEventListener("click", async () => {
+      const visible = getVisibleCredentials();
+      const candidates = visible.filter(c => {
+        if (!c.disabled) return false;
+        const data = quotaCache.get(c.auth_index);
+        return data && data.groups && data.groups.some(g => (g.buckets || []).some(b => Number(b.remainingFraction) > 0));
+      });
+      if (!candidates.length) return;
+      if (!confirm(t("quota.confirmBulkEnable"))) return;
+      await Promise.all(candidates.map(c => api(`/providers/${encodeURIComponent(c.id)}`, { method: "PATCH", body: JSON.stringify({ enabled: true }) }).catch(() => {})));
+      await renderQuota(page);
+    });
+
+    page.querySelector("#quota-bulk-disable")?.addEventListener("click", async () => {
+      const visible = getVisibleCredentials();
+      const candidates = visible.filter(c => !c.disabled);
+      if (!candidates.length) return;
+      if (!confirm(t("quota.confirmBulkDisable"))) return;
+      const toDisable = candidates.filter(c => {
+        const data = quotaCache.get(c.auth_index);
+        if (!data || !data.groups) return false;
+        return data.groups.some(g => (g.buckets || []).some(b => Number(b.remainingFraction) <= 0.05));
+      });
+      if (toDisable.length) {
+        await Promise.all(toDisable.map(c => api(`/providers/${encodeURIComponent(c.id)}`, { method: "PATCH", body: JSON.stringify({ enabled: false }) }).catch(() => {})));
+        await renderQuota(page);
+      }
+    });
+
+    updateCards();
+
+    if (page._quotaTimer) clearInterval(page._quotaTimer);
+    page._quotaTimer = setInterval(() => {
+      if (!page.isConnected || page.dataset.page !== "quota") {
+        clearInterval(page._quotaTimer);
+        return;
+      }
+      if (!autoRefresh) return;
+      countdown--;
+      const cdEl = page.querySelector("#quota-countdown");
+      if (cdEl) cdEl.textContent = `${countdown}s`;
+      if (countdown <= 0) {
+        countdown = 60;
+        const visible = getVisibleCredentials();
+        visible.forEach(c => {
+          const target = page.querySelector(`[data-quota-body="${CSS.escape(c.auth_index)}"]`);
+          if (target) fetchSingleQuota(c.auth_index, c.provider, target, c);
+        });
+      }
+    }, 1000);
+
   } catch (error) {
     if (error.message === "invalid_key") return logout();
     page.innerHTML = pageHeader("kicker.quotaProviders", "quota.title", "quota.description", true) + `<div class="error">${t("common.error")}</div>`;
-    document.getElementById("refresh").addEventListener("click", () => renderQuota(page));
+    page.querySelector("#refresh")?.addEventListener("click", () => renderQuota(page));
   }
 }
-
 async function renderLogs(page, query = "") {
   const run = page._logsRun = (page._logsRun || 0) + 1;
   let tab = "server";

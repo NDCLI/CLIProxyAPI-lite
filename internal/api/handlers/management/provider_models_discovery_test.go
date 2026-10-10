@@ -61,6 +61,48 @@ func TestTestCompatibleProviderAPIKeyUsesSelectedSavedKey(t *testing.T) {
 	}
 }
 
+func TestTestCompatibleProviderModelUsesSavedKeyAndValidatesResponse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer model-secret" {
+			t.Errorf("unexpected model request: path=%q authorization=%q", r.URL.Path, r.Header.Get("Authorization"))
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"OK"}}]}`))
+	}))
+	defer upstream.Close()
+	gin.SetMode(gin.TestMode)
+	body := `{"model":"model-a","api_key_index":1}`
+	request := httptest.NewRequest(http.MethodPost, "/provider-configs/"+compatibleProviderID("model-provider")+"/test-model", strings.NewReader(body))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(response)
+	ctx.Request = request
+	ctx.Params = gin.Params{{Key: "id", Value: compatibleProviderID("model-provider")}}
+	h := &Handler{cfg: &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{Name: "model-provider", BaseURL: upstream.URL + "/v1", Models: []config.OpenAICompatibilityModel{{Name: "model-a", Alias: "public-model"}}, APIKeyEntries: []config.OpenAICompatibilityAPIKey{{APIKey: "first-secret"}, {APIKey: "model-secret"}}}}}}
+	h.TestCompatibleProviderModel(ctx)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"ok":true`) || strings.Contains(response.Body.String(), "model-secret") {
+		t.Fatalf("unexpected model test response: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestTestCompatibleProviderModelRejectsEmptyChoices(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`{"choices":[]}`))
+	}))
+	defer upstream.Close()
+	gin.SetMode(gin.TestMode)
+	request := httptest.NewRequest(http.MethodPost, "/provider-configs/"+compatibleProviderID("empty-provider")+"/test-model", strings.NewReader(`{"model":"model-a","api_key_index":0}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(response)
+	ctx.Request = request
+	ctx.Params = gin.Params{{Key: "id", Value: compatibleProviderID("empty-provider")}}
+	h := &Handler{cfg: &config.Config{OpenAICompatibility: []config.OpenAICompatibility{{Name: "empty-provider", BaseURL: upstream.URL, Models: []config.OpenAICompatibilityModel{{Name: "model-a", Alias: "model-a"}}, APIKeyEntries: []config.OpenAICompatibilityAPIKey{{APIKey: "secret"}}}}}}
+	h.TestCompatibleProviderModel(ctx)
+	if response.Code != http.StatusOK || strings.Contains(response.Body.String(), `"ok":true`) {
+		t.Fatalf("empty choices accepted: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestTestCompatibleProviderAPIKeyDoesNotExposeInvalidKey(t *testing.T) {
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusUnauthorized)
