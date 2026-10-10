@@ -1,6 +1,7 @@
 package management
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -59,17 +60,23 @@ func (h *Handler) TestProviderModel(c *gin.Context) {
 		return
 	}
 	start := time.Now()
-	_, errExecute := manager.Execute(c.Request.Context(), []string{auth.Provider}, coreexecutor.Request{
+	probeCtx, cancel := context.WithTimeout(c.Request.Context(), 15*time.Second)
+	defer cancel()
+	response, errExecute := manager.Execute(probeCtx, []string{auth.Provider}, coreexecutor.Request{
 		Model:   model,
 		Payload: payload,
 		Format:  sdktranslator.FormatOpenAI,
-	}, coreexecutor.Options{Metadata: map[string]any{
+	}, coreexecutor.Options{SourceFormat: sdktranslator.FormatOpenAI, OriginalRequest: payload, Metadata: map[string]any{
 		coreexecutor.PinnedAuthMetadataKey:     auth.ID,
 		coreexecutor.RequestedModelMetadataKey: model,
 		coreexecutor.GenerateMetadataKey:       false,
 	}})
 	if errExecute != nil {
 		c.JSON(http.StatusOK, gin.H{"ok": false, "model": model, "latency_ms": time.Since(start).Milliseconds(), "error": "The provider could not complete this model test"})
+		return
+	}
+	if !compatibleChatCompletionHasChoices(response.Payload) {
+		c.JSON(http.StatusOK, gin.H{"ok": false, "model": model, "latency_ms": time.Since(start).Milliseconds(), "error": "Provider returned no model response"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true, "model": model, "latency_ms": time.Since(start).Milliseconds()})

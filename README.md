@@ -10,7 +10,7 @@ This app is based on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI)
 - Add official API-key providers separately from third-party custom endpoints.
 - Route model aliases through combos, with usage, quota, and request-log views.
 - Configure model mappings and optional MITM DNS redirection for supported CLI tools.
-- Reduce prompt size with RTK or a configured Headroom service.
+- Reduce prompt size with built-in RTK filters.
 - Back up application settings and provider accounts to JSON.
 
 ## Install with npm
@@ -139,7 +139,7 @@ Keep the MITM server running while DNS is redirected. Turn off DNS redirection i
 
 ## Token Saver
 
-**Token Saver** supports RTK and Headroom request compression. RTK runs locally. Headroom requires its service to be running at the configured URL. Both are off by default and can be enabled in the management page.
+**Token Saver** supports built-in RTK request compression. It is off by default and can be enabled in the management page.
 
 ## Settings and backups
 

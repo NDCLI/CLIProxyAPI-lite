@@ -1,19 +1,31 @@
 {
   "name": "@ndcli/lumina",
-  "version": "0.1.0",
+  "version": "0.2.9",
   "description": "Lumina local AI gateway and management app",
   "license": "MIT",
-  "bin": { "lumina": "cli.cjs" },
-  "files": ["cli.cjs", "runtime.cjs", "LICENSE"],
-  "engines": { "node": ">=20" },
-  "scripts": { "test": "node --test *.test.cjs" },
-  "publishConfig": { "access": "public" },
+  "bin": {
+    "lumina": "cli.cjs"
+  },
+  "files": [
+    "cli.cjs",
+    "runtime.cjs",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test *.test.cjs"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "optionalDependencies": {
-    "@ndcli/lumina-win32-x64": "0.1.0",
-    "@ndcli/lumina-win32-arm64": "0.1.0",
-    "@ndcli/lumina-darwin-x64": "0.1.0",
-    "@ndcli/lumina-darwin-arm64": "0.1.0",
-    "@ndcli/lumina-linux-x64": "0.1.0",
-    "@ndcli/lumina-linux-arm64": "0.1.0"
+    "@ndcli/lumina-win32-x64": "0.2.9",
+    "@ndcli/lumina-win32-arm64": "0.2.9",
+    "@ndcli/lumina-darwin-x64": "0.2.9",
+    "@ndcli/lumina-darwin-arm64": "0.2.9",
+    "@ndcli/lumina-linux-x64": "0.2.9",
+    "@ndcli/lumina-linux-arm64": "0.2.9"
   }
 }
