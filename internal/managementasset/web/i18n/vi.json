@@ -514,6 +514,7 @@
   "usage.period.all": "Tất cả",
   "usage.routing": "Yêu cầu theo nhà cung cấp",
   "usage.connectedProviders": "nhà cung cấp đã kết nối",
+  "usage.credential": "Tài khoản / API key",
   "usage.filterByProvider": "Chọn provider để lọc yêu cầu.",
   "usage.latestRoute": "Tuyến gần nhất",
   "usage.gateway": "Cổng API",

@@ -1547,7 +1547,7 @@ function usageRecentPanel(records) {
   const preview = records.map(row => {
     const time = new Date(row.timestamp);
     const timeLabel = Number.isNaN(time.getTime()) ? "-" : time.toLocaleTimeString(state.locale, {hour: "2-digit", minute: "2-digit"});
-    return `<div class="usage-recent-preview-row"><span class="usage-status-dot ${row.failed ? "is-failed" : "is-ok"}" aria-label="${t(row.failed ? "usage.failed" : "usage.ok")}"></span><span class="usage-recent-preview-model"><strong title="${escapeHTML(row.model || "-")}">${escapeHTML(row.model || "-")}</strong><small>${escapeHTML(row.provider_label || row.provider || "-")} · ${escapeHTML(timeLabel)}</small></span><span class="usage-recent-preview-tokens">${Number(row.input_tokens || 0).toLocaleString(state.locale)} ↑<br>${Number(row.output_tokens || 0).toLocaleString(state.locale)} ↓</span></div>`;
+    return `<div class="usage-recent-preview-row"><span class="usage-status-dot ${row.failed ? "is-failed" : "is-ok"}" aria-label="${t(row.failed ? "usage.failed" : "usage.ok")}"></span><span class="usage-recent-preview-model"><strong title="${escapeHTML(row.model || "-")}">${escapeHTML(row.model || "-")}</strong><small>${escapeHTML(row.provider_label || row.provider || "-")} · ${escapeHTML(row.credential_label || "-")} · ${escapeHTML(timeLabel)}</small></span><span class="usage-recent-preview-tokens">${Number(row.input_tokens || 0).toLocaleString(state.locale)} ↑<br>${Number(row.output_tokens || 0).toLocaleString(state.locale)} ↓</span></div>`;
   }).join("");
   return `<section class="card usage-recent-launcher"><div class="usage-recent-heading"><div><h2>${t("usage.recent")}</h2><span class="hint">${t("usage.recentScrollHint")}</span></div><span class="usage-recent-count">${records.length.toLocaleString(state.locale)}</span></div>${preview ? `<div class="usage-recent-preview" role="region" aria-label="${t("usage.recent")}" tabindex="0">${preview}</div>` : `<div class="empty">${t("usage.noRecent")}</div>`}</section>`;
 }
@@ -1676,13 +1676,18 @@ async function renderUsage(page, filter = {}) {
   if (filter.status) query.set("status", filter.status);
   try {
     const fallbackProviders = error => { if (error.message === "invalid_key") throw error; return {items: []}; };
-    const [recordsResponse, summaryResponse, providersResponse, customResponse] = await Promise.all([api(`/usage/records?${query}`), api(`/usage/summary?${query}`), api("/providers").catch(fallbackProviders), api("/provider-configs").catch(fallbackProviders)]);
+    const [recordsResponse, summaryResponse, providersResponse, customResponse, authResponse] = await Promise.all([api(`/usage/records?${query}`), api(`/usage/summary?${query}`), api("/providers").catch(fallbackProviders), api("/provider-configs").catch(fallbackProviders), api("/auth-files").catch(fallbackProviders)]);
     const customNames = new Map((customResponse.items || []).map(item => [compatibleProviderKey(item.name), String(item.name || "").trim()]));
+    const authLabels = new Map((authResponse.files || []).map(item => [String(item.auth_index || ""), String(item.label || item.email || item.name || item.id || "").trim()]));
     const displayProvider = value => {
       const key = String(value || "").trim().toLowerCase();
       return customNames.get(key) || providerBrands[key]?.[0] || String(value || "-");
     };
-    const records = (recordsResponse.items || []).map(row => ({...row, provider_label: displayProvider(row.provider)}));
+    const records = (recordsResponse.items || []).map(row => {
+      const authIndex = String(row.auth_index || "");
+      const authLabel = authLabels.get(authIndex);
+      return {...row, provider_label: displayProvider(row.provider), credential_label: authIndex ? `${authLabel || t("usage.credential")} · ${authIndex.slice(0, 8)}` : "-"};
+    });
     const providers = (providersResponse.items || []).map(item => ({...item, provider_label: displayProvider(item.provider)}));
     const summary = summaryResponse.item || {};
     if (!page.isConnected || page.dataset.page !== "usage" || page._usageRun !== run) return;
@@ -1764,8 +1769,8 @@ function renderQuotaCockpit(value, provider) {
 
 function usageTable(records) {
   if (!records.length) return `<div class="empty">${t("common.empty")}</div>`;
-  const rows = records.slice(0, 100).map(row => `<tr><td>${escapeHTML(new Date(row.timestamp).toLocaleString(state.locale))}</td><td>${escapeHTML(row.alias || "-")}</td><td>${escapeHTML(row.provider_label || row.provider || "-")}</td><td>${escapeHTML(row.model || "-")}</td><td>${Number(row.input_tokens || 0).toLocaleString()}</td><td>${Number(row.output_tokens || 0).toLocaleString()}</td><td>${Number(row.latency_ms || 0).toLocaleString()} ms</td><td class="${row.failed ? "failed" : "ok"}">${t(row.failed ? "usage.failed" : "usage.ok")}</td></tr>`).join("");
-  return `<div class="table-wrap"><table><thead><tr><th>${t("usage.time")}</th><th>${t("usage.requestedModel")}</th><th>${t("usage.provider")}</th><th>${t("usage.upstreamModel")}</th><th>${t("usage.input")}</th><th>${t("usage.output")}</th><th>${t("usage.latency")}</th><th>${t("usage.status")}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  const rows = records.slice(0, 100).map(row => `<tr><td>${escapeHTML(new Date(row.timestamp).toLocaleString(state.locale))}</td><td>${escapeHTML(row.alias || "-")}</td><td>${escapeHTML(row.provider_label || row.provider || "-")}</td><td>${escapeHTML(row.credential_label || "-")}</td><td>${escapeHTML(row.model || "-")}</td><td>${Number(row.input_tokens || 0).toLocaleString()}</td><td>${Number(row.output_tokens || 0).toLocaleString()}</td><td>${Number(row.latency_ms || 0).toLocaleString()} ms</td><td class="${row.failed ? "failed" : "ok"}">${t(row.failed ? "usage.failed" : "usage.ok")}</td></tr>`).join("");
+  return `<div class="table-wrap"><table><thead><tr><th>${t("usage.time")}</th><th>${t("usage.requestedModel")}</th><th>${t("usage.provider")}</th><th>${t("usage.credential")}</th><th>${t("usage.upstreamModel")}</th><th>${t("usage.input")}</th><th>${t("usage.output")}</th><th>${t("usage.latency")}</th><th>${t("usage.status")}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 async function renderQuota(page) {

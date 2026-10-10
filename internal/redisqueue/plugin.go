@@ -33,6 +33,7 @@ func (p *usageQueuePlugin) HandleUsage(ctx context.Context, record coreusage.Rec
 		usageview.Add(usageview.Record{
 			Timestamp:           record.RequestedAt,
 			Provider:            record.Provider,
+			AuthIndex:           record.AuthIndex,
 			Model:               record.Model,
 			Alias:               record.Alias,
 			Endpoint:            resolveEndpoint(ctx),

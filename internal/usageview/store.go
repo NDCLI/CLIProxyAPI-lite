@@ -15,6 +15,7 @@ const maxRecords = 1000
 type Record struct {
 	Timestamp           time.Time `json:"timestamp"`
 	Provider            string    `json:"provider"`
+	AuthIndex           string    `json:"auth_index,omitempty"`
 	Model               string    `json:"model"`
 	Alias               string    `json:"alias,omitempty"`
 	Endpoint            string    `json:"endpoint,omitempty"`
@@ -99,6 +100,7 @@ func Add(record Record) {
 		record.Timestamp = time.Now()
 	}
 	record.Provider = strings.TrimSpace(record.Provider)
+	record.AuthIndex = strings.TrimSpace(record.AuthIndex)
 	record.Model = strings.TrimSpace(record.Model)
 	record.Alias = strings.TrimSpace(record.Alias)
 	record.Endpoint = strings.TrimSpace(record.Endpoint)

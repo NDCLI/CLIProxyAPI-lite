@@ -514,6 +514,7 @@
   "usage.period.all": "All",
   "usage.routing": "Requests by provider",
   "usage.connectedProviders": "connected providers",
+  "usage.credential": "Account / API key",
   "usage.filterByProvider": "Select a provider to filter requests.",
   "usage.latestRoute": "Latest route",
   "usage.gateway": "API gateway",
