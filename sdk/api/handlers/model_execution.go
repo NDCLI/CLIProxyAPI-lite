@@ -22,6 +22,7 @@ type modelExecutionOptions struct {
 	SkipRouterPluginID      string
 	ForcedProvider          string
 	AuthSelectionModel      string
+	ComboModel              string
 }
 
 // ProtocolExecutionRequest describes a route-level model execution request with explicit protocols.

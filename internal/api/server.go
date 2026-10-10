@@ -125,6 +125,20 @@ func (r comboResolver) ResolveCombo(model string) ([]handlers.ComboTarget, bool)
 	return out, true
 }
 
+func (r comboResolver) ListComboModels() []handlers.ComboModel {
+	if r.store == nil {
+		return nil
+	}
+	items := r.store.List()
+	models := make([]handlers.ComboModel, 0, len(items))
+	for _, item := range items {
+		if item.Enabled {
+			models = append(models, handlers.ComboModel{ID: item.Model, Name: item.Name})
+		}
+	}
+	return models
+}
+
 // NewServer creates and initializes a new API server instance.
 // It sets up the Gin engine, middleware, routes, and handlers.
 //

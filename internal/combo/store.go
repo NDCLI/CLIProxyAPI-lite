@@ -72,8 +72,9 @@ func (s *Store) List() []Definition {
 	if s == nil {
 		return []Definition{}
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.loadLocked()
 	return append([]Definition(nil), s.items...)
 }
 

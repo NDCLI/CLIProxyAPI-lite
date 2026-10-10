@@ -223,6 +223,9 @@ tbody tr:hover { background: #79b2ff0a; }
 .combo-target-heading strong { font-size: 13px; }
 .combo-target-heading .hint { font-size: 11px; }
 .combo-target-list { display: grid; gap: 8px; }
+.combo-target-entry { display: grid; gap: 5px; }
+.combo-target-role { display: flex; align-items: center; justify-content: space-between; min-height: 26px; color: var(--muted); font-size: 11px; }
+.combo-target-role strong { color: var(--text-primary); font-weight: 600; }
 .combo-target-row { display: grid; grid-template-columns: minmax(110px, .8fr) 18px minmax(140px, 1.2fr) 36px; align-items: center; gap: 8px; }
 .combo-target-row .text-input { width: 100%; min-width: 0; }
 .combo-target-arrow { display: grid; place-items: center; color: var(--muted); }

@@ -376,6 +376,84 @@ type ComboResolver interface {
 	ResolveCombo(string) ([]ComboTarget, bool)
 }
 
+type ComboModel struct {
+	ID   string
+	Name string
+}
+
+type comboModelLister interface {
+	ListComboModels() []ComboModel
+}
+
+func (h *BaseAPIHandler) AppendComboModels(models []map[string]any, format string) []map[string]any {
+	if h == nil || h.ComboResolver == nil {
+		return models
+	}
+	lister, ok := h.ComboResolver.(comboModelLister)
+	if !ok {
+		return models
+	}
+	seen := make(map[string]struct{}, len(models))
+	for _, model := range models {
+		id, okID := model["id"].(string)
+		if !okID {
+			id, okID = model["name"].(string)
+		}
+		if okID {
+			seen[id] = struct{}{}
+		}
+	}
+	for _, combo := range lister.ListComboModels() {
+		if combo.ID == "" {
+			continue
+		}
+		if _, exists := seen[combo.ID]; exists {
+			continue
+		}
+		model := make(map[string]any, 6)
+		switch format {
+		case "gemini":
+			model["name"] = combo.ID
+			model["displayName"] = combo.Name
+			model["description"] = "Combo model with ordered fallbacks"
+		case "claude":
+			model["id"] = combo.ID
+			model["object"] = "model"
+			model["owned_by"] = "cli-proxy-api"
+			model["type"] = "model"
+			model["display_name"] = combo.Name
+			model["max_input_tokens"] = 200000
+			model["max_tokens"] = 64000
+		default:
+			model["id"] = combo.ID
+			model["object"] = "model"
+			model["owned_by"] = "cli-proxy-api"
+			model["display_name"] = combo.Name
+		}
+		models = append(models, model)
+		seen[combo.ID] = struct{}{}
+	}
+	return models
+}
+
+func (h *BaseAPIHandler) comboTargetsForExecution(model string, options modelExecutionOptions, decision modelRouteDecision) []ComboTarget {
+	if h == nil || h.ComboResolver == nil || options.ComboModel != "" || options.ForcedProvider != "" || decision.Provider != "" {
+		return nil
+	}
+	targets, ok := h.ComboResolver.ResolveCombo(model)
+	if !ok {
+		return nil
+	}
+	return targets
+}
+
+func comboTargetOptions(options modelExecutionOptions, comboModel string, target ComboTarget) modelExecutionOptions {
+	options.ComboModel = comboModel
+	options.ForcedProvider = target.Provider
+	options.AuthSelectionModel = target.Model
+	return options
+}
+
 // NewBaseAPIHandlers creates a new API handlers instance.
 // It takes a slice of clients and configuration as input.
 //

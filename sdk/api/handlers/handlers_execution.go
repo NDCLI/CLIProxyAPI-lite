@@ -44,6 +44,9 @@ func (h *BaseAPIHandler) executeWithAuthManager(ctx context.Context, handlerType
 
 func (h *BaseAPIHandler) executeWithAuthManagerFormats(ctx context.Context, entryProtocol, exitProtocol, modelName string, rawJSON []byte, alt string, allowImageModel bool, execOptions modelExecutionOptions) ([]byte, http.Header, *interfaces.ErrorMessage) {
 	originalRequestedModel := modelName
+	if execOptions.ComboModel != "" {
+		originalRequestedModel = execOptions.ComboModel
+	}
 	routeDecision := h.applyModelRouter(ctx, entryProtocol, modelName, rawJSON, false, execOptions)
 	responseProtocol := modelExecutionResponseProtocol(entryProtocol, exitProtocol)
 	if errMsg := validateNativeInteractionsExecution(entryProtocol, execOptions, routeDecision); errMsg != nil {
@@ -51,6 +54,20 @@ func (h *BaseAPIHandler) executeWithAuthManagerFormats(ctx context.Context, entr
 	}
 	if routeDecision.ExecutorPluginID != "" {
 		return h.executeWithPluginExecutor(ctx, entryProtocol, responseProtocol, modelName, originalRequestedModel, rawJSON, alt, routeDecision.ExecutorPluginID, execOptions)
+	}
+	if targets := h.comboTargetsForExecution(modelName, execOptions, routeDecision); len(targets) > 0 {
+		var lastErr *interfaces.ErrorMessage
+		for _, target := range targets {
+			body, headers, errMsg := h.executeWithAuthManagerFormats(ctx, entryProtocol, exitProtocol, target.Model, rawJSON, alt, allowImageModel, comboTargetOptions(execOptions, modelName, target))
+			if errMsg == nil {
+				return body, headers, nil
+			}
+			lastErr = errMsg
+			if ctx != nil && ctx.Err() != nil {
+				return nil, nil, errMsg
+			}
+		}
+		return nil, nil, lastErr
 	}
 	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, allowImageModel, routeDecision, execOptions)
 	if errMsg != nil {
@@ -86,7 +103,9 @@ func (h *BaseAPIHandler) executeWithAuthManagerFormats(ctx context.Context, entr
 		WebSocketResponseObserver:   h.webSocketResponseObserver(lifecycle.requestID(), execOptions.SkipInterceptorPluginID),
 	}
 	opts.Metadata = reqMeta
-	h.installComboInterceptor(&opts, originalRequestedModel)
+	if execOptions.ComboModel == "" {
+		h.installComboInterceptor(&opts, originalRequestedModel)
+	}
 	ctx = enrichContextWithSessionHierarchy(ctx, opts.Headers, req.Payload, opts.Metadata)
 	var interceptErr *interfaces.ErrorMessage
 	req, opts, interceptErr = h.applyRequestInterceptorsBeforeAuth(ctx, entryProtocol, originalRequestedModel, lifecycle.requestID(), req, opts, execOptions.SkipInterceptorPluginID)
@@ -119,9 +138,26 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 
 func (h *BaseAPIHandler) executeCountWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string, execOptions modelExecutionOptions) ([]byte, http.Header, *interfaces.ErrorMessage) {
 	originalRequestedModel := modelName
+	if execOptions.ComboModel != "" {
+		originalRequestedModel = execOptions.ComboModel
+	}
 	routeDecision := h.applyModelRouter(ctx, handlerType, modelName, rawJSON, false, execOptions)
 	if routeDecision.ExecutorPluginID != "" {
 		return h.countWithPluginExecutor(ctx, handlerType, modelName, originalRequestedModel, rawJSON, alt, routeDecision.ExecutorPluginID, execOptions)
+	}
+	if targets := h.comboTargetsForExecution(modelName, execOptions, routeDecision); len(targets) > 0 {
+		var lastErr *interfaces.ErrorMessage
+		for _, target := range targets {
+			body, headers, errMsg := h.executeCountWithAuthManager(ctx, handlerType, target.Model, rawJSON, alt, comboTargetOptions(execOptions, modelName, target))
+			if errMsg == nil {
+				return body, headers, nil
+			}
+			lastErr = errMsg
+			if ctx != nil && ctx.Err() != nil {
+				return nil, nil, errMsg
+			}
+		}
+		return nil, nil, lastErr
 	}
 	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, false, routeDecision, execOptions)
 	if errMsg != nil {
@@ -155,7 +191,9 @@ func (h *BaseAPIHandler) executeCountWithAuthManager(ctx context.Context, handle
 		WebSocketResponseObserver:   h.webSocketResponseObserver(lifecycle.requestID(), execOptions.SkipInterceptorPluginID),
 	}
 	opts.Metadata = reqMeta
-	h.installComboInterceptor(&opts, originalRequestedModel)
+	if execOptions.ComboModel == "" {
+		h.installComboInterceptor(&opts, originalRequestedModel)
+	}
 	ctx = enrichContextWithSessionHierarchy(ctx, opts.Headers, req.Payload, opts.Metadata)
 	var interceptErr *interfaces.ErrorMessage
 	req, opts, interceptErr = h.applyRequestInterceptorsBeforeAuth(ctx, handlerType, originalRequestedModel, lifecycle.requestID(), req, opts, execOptions.SkipInterceptorPluginID)

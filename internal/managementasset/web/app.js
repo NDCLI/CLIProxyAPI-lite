@@ -1274,10 +1274,10 @@ async function renderCombos(page, feedback = "") {
     options.unshift(`<option value="" ${selected ? "" : "selected"}>${t("combo.selectProvider")}</option>`);
     return options.join("");
   };
-  const targetRowHTML = target => {
+  const targetRowHTML = (target, index) => {
     const provider = String(target?.provider || "").trim().toLowerCase();
     const model = String(target?.model || "").trim();
-    return `<div class="combo-target-row"><select class="text-input" data-target-provider aria-label="${t("combo.selectProvider")}" required>${providerOptions(provider)}</select><span class="combo-target-arrow">${icon("arrow")}</span><select class="text-input" data-target-model aria-label="${t("combo.selectModel")}" required>${modelOptions(provider, model)}</select><button class="secondary combo-remove-target" type="button" data-remove-target aria-label="${t("combo.removeTarget")}" title="${t("combo.removeTarget")}">${icon("close")}</button></div>`;
+    return `<div class="combo-target-entry"><div class="combo-target-role"><strong data-target-role>${index === 0 ? t("combo.primary") : t("combo.fallback")}</strong><button class="secondary compact" type="button" data-move-target-up aria-label="${t("combo.moveUp")}" title="${t("combo.moveUp")}" ${index === 0 ? "disabled" : ""}>↑</button></div><div class="combo-target-row"><select class="text-input" data-target-provider aria-label="${t("combo.selectProvider")}" required>${providerOptions(provider)}</select><span class="combo-target-arrow">${icon("arrow")}</span><select class="text-input" data-target-model aria-label="${t("combo.selectModel")}" required>${modelOptions(provider, model)}</select><button class="secondary combo-remove-target" type="button" data-remove-target aria-label="${t("combo.removeTarget")}" title="${t("combo.removeTarget")}">${icon("close")}</button></div></div>`;
   };
   const values = (form, message) => {
     const name = form.elements.name.value.trim();
@@ -1321,12 +1321,16 @@ async function renderCombos(page, feedback = "") {
     const form = page.querySelector("#combo-form");
     const message = page.querySelector("#combo-message");
     const targetList = page.querySelector("#combo-target-list");
-    targetList.innerHTML = (item?.targets?.length ? item.targets : [{}]).map(targetRowHTML).join("");
+    targetList.innerHTML = (item?.targets?.length ? item.targets : [{}]).map((target, index) => targetRowHTML(target, index)).join("");
     const submit = form.querySelector('[type="submit"]');
     const comboSnapshot = () => ({name: form.elements.name.value.trim(), model: form.elements.model.value.trim() || comboModelID(form.elements.name.value), enabled: form.elements.enabled.checked, vision: form.elements.vision.checked, targets: [...form.querySelectorAll(".combo-target-row")].map(row => [row.querySelector("[data-target-provider]").value, row.querySelector("[data-target-model]").value])});
     const comboChanges = bindDirtyAction(form, submit, comboSnapshot, () => form.checkValidity() && form.querySelectorAll(".combo-target-row").length > 0);
     form.dataset.dirty = "false";
     const syncDirty = () => { form.dataset.dirty = String(comboChanges.isDirty()); };
+    const refreshTargetRoles = () => [...targetList.querySelectorAll(".combo-target-entry")].forEach((entry, index) => {
+      entry.querySelector("[data-target-role]").textContent = index === 0 ? t("combo.primary") : t("combo.fallback");
+      entry.querySelector("[data-move-target-up]").disabled = index === 0;
+    });
     if (catalogError) message.textContent = catalogError;
     targetList.addEventListener("change", event => {
       if (!event.target.matches("[data-target-provider]")) return;
@@ -1338,14 +1342,25 @@ async function renderCombos(page, feedback = "") {
       message.textContent = "";
     });
     targetList.addEventListener("click", event => {
+      const moveUp = event.target.closest("[data-move-target-up]");
+      if (moveUp) {
+        const entry = moveUp.closest(".combo-target-entry");
+        const previous = entry?.previousElementSibling;
+        if (entry && previous) targetList.insertBefore(entry, previous);
+        refreshTargetRoles();
+        syncDirty();
+        message.textContent = "";
+        return;
+      }
       const remove = event.target.closest("[data-remove-target]");
       if (!remove) return;
-      remove.closest(".combo-target-row").remove();
+      remove.closest(".combo-target-entry").remove();
+      refreshTargetRoles();
       syncDirty();
       message.textContent = "";
     });
     form.querySelector("#add-combo-target").addEventListener("click", () => {
-      targetList.insertAdjacentHTML("beforeend", targetRowHTML({}));
+      targetList.insertAdjacentHTML("beforeend", targetRowHTML({}, targetList.querySelectorAll(".combo-target-entry").length));
       const rows = targetList.querySelectorAll(".combo-target-row");
       rows[rows.length - 1].querySelector("[data-target-provider]").focus();
       syncDirty();
@@ -1425,7 +1440,7 @@ async function renderCombos(page, feedback = "") {
       const response = await api("/combos");
       items = response.items || [];
       document.getElementById("combos-list").className = "";
-      document.getElementById("combos-list").innerHTML = items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ${item.enabled ? "ready" : "partial"}">${item.enabled ? t("capability.ready") : t("providers.disabled")}</span></div><p class="combo-model">${icon("route")}${escapeHTML(item.model)}</p><ol class="target-chain">${(item.targets || []).map(target => `<li>${providerIdentity(target.provider, true)}<code>${escapeHTML(target.model)}</code></li>`).join("")}</ol><div class="actions"><button class="secondary" data-edit-combo="${escapeHTML(item.id)}">${icon("edit")}${t("combo.edit")}</button><button class="secondary" data-duplicate-combo="${escapeHTML(item.id)}">${icon("copy")}${t("combo.duplicate")}</button><button class="secondary" data-toggle-combo="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${item.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${icon("trash")}${t("combo.delete")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`;
+      document.getElementById("combos-list").innerHTML = items.length ? `<section class="grid">${items.map(item => `<article class="card"><div class="card-title"><h2>${escapeHTML(item.name)}</h2><span class="badge ${item.enabled ? "ready" : "partial"}">${item.enabled ? t("capability.ready") : t("providers.disabled")}</span></div><p class="combo-model">${icon("route")}${escapeHTML(item.model)}</p><ol class="target-chain">${(item.targets || []).map((target, index) => `<li><span>${t(index === 0 ? "combo.primary" : "combo.fallback")}</span>${providerIdentity(target.provider, true)}<code>${escapeHTML(target.model)}</code></li>`).join("")}</ol><div class="actions"><button class="secondary" data-edit-combo="${escapeHTML(item.id)}">${icon("edit")}${t("combo.edit")}</button><button class="secondary" data-duplicate-combo="${escapeHTML(item.id)}">${icon("copy")}${t("combo.duplicate")}</button><button class="secondary" data-toggle-combo="${escapeHTML(item.id)}" data-enabled="${Boolean(item.enabled)}">${icon(item.enabled ? "pause" : "check")}${item.enabled ? t("providers.disable") : t("providers.enable")}</button><button class="danger-button" data-delete-combo="${escapeHTML(item.id)}">${icon("trash")}${t("combo.delete")}</button></div></article>`).join("")}</section>` : `<div class="empty">${t("combo.empty")}</div>`;
       page.querySelectorAll("[data-edit-combo]").forEach(button => button.addEventListener("click", () => { const item = items.find(entry => entry.id === button.dataset.editCombo); if (item) openForm(item); }));
       page.querySelectorAll("[data-duplicate-combo]").forEach(button => button.addEventListener("click", () => {
         const item = items.find(entry => entry.id === button.dataset.duplicateCombo);

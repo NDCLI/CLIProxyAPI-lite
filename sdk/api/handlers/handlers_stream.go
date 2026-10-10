@@ -296,6 +296,9 @@ func (h *BaseAPIHandler) executeStreamWithAuthManager(ctx context.Context, handl
 
 func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context, entryProtocol, exitProtocol, modelName string, rawJSON []byte, alt string, allowImageModel bool, execOptions modelExecutionOptions) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
 	originalRequestedModel := modelName
+	if execOptions.ComboModel != "" {
+		originalRequestedModel = execOptions.ComboModel
+	}
 	routeDecision, preparedRoute := preparedModelRouteFromContext(ctx, execOptions.SkipRouterPluginID)
 	if !preparedRoute {
 		routeDecision = h.applyModelRouter(ctx, entryProtocol, modelName, rawJSON, true, execOptions)
@@ -309,6 +312,24 @@ func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context
 	}
 	if routeDecision.ExecutorPluginID != "" {
 		return h.streamWithPluginExecutor(ctx, entryProtocol, responseProtocol, modelName, originalRequestedModel, rawJSON, alt, routeDecision.ExecutorPluginID, execOptions)
+	}
+	if targets := h.comboTargetsForExecution(modelName, execOptions, routeDecision); len(targets) > 0 {
+		var lastErr *interfaces.ErrorMessage
+		for _, target := range targets {
+			data, headers, errors := h.executeStreamWithAuthManagerFormats(ctx, entryProtocol, exitProtocol, target.Model, rawJSON, alt, allowImageModel, comboTargetOptions(execOptions, modelName, target))
+			data, errMsg, hasError := awaitComboStreamStart(ctx, data, errors)
+			if !hasError {
+				return data, headers, errors
+			}
+			lastErr = errMsg
+			if ctx != nil && ctx.Err() != nil {
+				break
+			}
+		}
+		if lastErr == nil {
+			lastErr = executionErrorMessage(fmt.Errorf("combo has no available fallback target"))
+		}
+		return nil, nil, comboStreamErrorChannel(lastErr)
 	}
 	providers, normalizedModel, errMsg := h.providersForExecution(modelName, originalRequestedModel, allowImageModel, routeDecision, execOptions)
 	if errMsg != nil {
@@ -347,7 +368,9 @@ func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context
 		WebSocketResponseObserver:   h.webSocketResponseObserver(lifecycle.requestID(), execOptions.SkipInterceptorPluginID),
 	}
 	opts.Metadata = reqMeta
-	h.installComboInterceptor(&opts, originalRequestedModel)
+	if execOptions.ComboModel == "" {
+		h.installComboInterceptor(&opts, originalRequestedModel)
+	}
 	ctx = enrichContextWithSessionHierarchy(ctx, opts.Headers, req.Payload, opts.Metadata)
 	var interceptErr *interfaces.ErrorMessage
 	req, opts, interceptErr = h.applyRequestInterceptorsBeforeAuth(ctx, entryProtocol, originalRequestedModel, lifecycle.requestID(), req, opts, execOptions.SkipInterceptorPluginID)
@@ -741,6 +764,84 @@ func (h *BaseAPIHandler) executeStreamWithAuthManagerFormats(ctx context.Context
 		}
 	}()
 	return dataChan, upstreamHeaders, errChan
+}
+
+func awaitComboStreamStart(ctx context.Context, data <-chan []byte, errors <-chan *interfaces.ErrorMessage) (<-chan []byte, *interfaces.ErrorMessage, bool) {
+	if data == nil {
+		select {
+		case errMsg, ok := <-errors:
+			if ok && errMsg != nil {
+				return nil, errMsg, true
+			}
+		default:
+		}
+		return nil, executionErrorMessage(fmt.Errorf("combo target returned no stream")), true
+	}
+	select {
+	case first, ok := <-data:
+		if ok {
+			return prependComboStreamChunk(ctx, first, data), nil, false
+		}
+		if errors == nil {
+			return data, nil, false
+		}
+		select {
+		case errMsg, open := <-errors:
+			if open && errMsg != nil {
+				return nil, errMsg, true
+			}
+			return data, nil, false
+		case <-ctxDone(ctx):
+			if ctx != nil && ctx.Err() != nil {
+				return nil, executionErrorMessage(ctx.Err()), true
+			}
+			return data, nil, false
+		}
+	case errMsg, ok := <-errors:
+		if ok && errMsg != nil {
+			return nil, errMsg, true
+		}
+		return data, nil, false
+	case <-ctxDone(ctx):
+		if ctx != nil && ctx.Err() != nil {
+			return nil, executionErrorMessage(ctx.Err()), true
+		}
+		return data, nil, false
+	}
+}
+
+func prependComboStreamChunk(ctx context.Context, first []byte, rest <-chan []byte) <-chan []byte {
+	data := make(chan []byte)
+	go func() {
+		defer close(data)
+		select {
+		case <-ctxDone(ctx):
+			return
+		case data <- first:
+		}
+		for chunk := range rest {
+			select {
+			case <-ctxDone(ctx):
+				return
+			case data <- chunk:
+			}
+		}
+	}()
+	return data
+}
+
+func comboStreamErrorChannel(errMsg *interfaces.ErrorMessage) <-chan *interfaces.ErrorMessage {
+	channel := make(chan *interfaces.ErrorMessage, 1)
+	channel <- errMsg
+	close(channel)
+	return channel
+}
+
+func ctxDone(ctx context.Context) <-chan struct{} {
+	if ctx == nil {
+		return nil
+	}
+	return ctx.Done()
 }
 
 type sseJSONValidationState struct {
